@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "../../lib/supabase/server";
+import { notifyWelcomeTeam } from "../../lib/email/welcome";
 
 export type NewHereSubmission = {
   name: string;
@@ -20,10 +21,14 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
     return { ok: false, error: "Email or phone helps us follow up." };
   }
 
+  const name = input.name.trim();
+  const email = input.email?.trim() || null;
+  const phone = input.phone?.trim() || null;
+
   const { error } = await supabaseAdmin().from("visitors").insert({
-    name: input.name.trim(),
-    email: input.email?.trim() || null,
-    phone: input.phone?.trim() || null,
+    name,
+    email,
+    phone,
     first_time: input.firstTime,
     interests: input.interests,
     source: "tap-hub",
@@ -33,6 +38,14 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  const firstName = (input.name.trim().split(/\s+/)[0] ?? "friend").slice(0, 40);
+  await notifyWelcomeTeam({
+    name,
+    email,
+    phone,
+    firstTime: input.firstTime,
+    interests: input.interests,
+  });
+
+  const firstName = (name.split(/\s+/)[0] ?? "friend").slice(0, 40);
   return { ok: true, firstName };
 }
