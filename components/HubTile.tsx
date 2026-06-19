@@ -6,28 +6,29 @@ export function HubTile({
   icon,
   title,
   sub,
+  external,
 }: {
   href: string;
   icon: ReactNode;
   title: string;
   sub: string;
+  external?: boolean;
 }) {
-  return (
-    <Link
-      href={href}
-      style={{
-        background: "#121a2e",
-        border: "1px solid rgba(244,241,234,.08)",
-        borderRadius: "16px",
-        padding: "18px",
-        minHeight: "138px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        textDecoration: "none",
-        color: "inherit",
-      }}
-    >
+  const style: React.CSSProperties = {
+    background: "#121a2e",
+    border: "1px solid rgba(244,241,234,.08)",
+    borderRadius: "16px",
+    padding: "18px",
+    minHeight: "138px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    textDecoration: "none",
+    color: "inherit",
+  };
+
+  const inner = (
+    <>
       <span
         style={{
           width: "46px",
@@ -65,6 +66,19 @@ export function HubTile({
           {sub}
         </div>
       </div>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={style}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} style={style}>
+      {inner}
     </Link>
   );
 }

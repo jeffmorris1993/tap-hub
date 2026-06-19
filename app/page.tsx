@@ -5,9 +5,9 @@ import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
 
 const CHURCH_PHONE = "+12485551234";
-const CHURCH_PHONE_DISPLAY = "(248) 555-1234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
 const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
+const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 
 export default function Hub() {
   return (
@@ -146,7 +146,8 @@ export default function Hub() {
             }
           />
           <HubTile
-            href="/give"
+            href={GIVE_URL || "#"}
+            external
             title="Give"
             sub="Support the ministry"
             icon={
