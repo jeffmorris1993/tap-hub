@@ -1,5 +1,6 @@
 import "server-only";
 import { generateText, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
 import { agentTools } from "./tools";
 import { supabaseAdmin } from "../supabase/server";
 
@@ -27,7 +28,7 @@ Behavior rules:
 - Never invent IDs. Never claim to do something you didn't actually call a
   tool for.`;
 
-const DEFAULT_MODEL = process.env.AGENT_MODEL || "anthropic/claude-sonnet-4-6";
+const DEFAULT_MODEL = process.env.AGENT_MODEL || "gpt-4o-mini";
 
 export type AgentRunResult = {
   text: string;
@@ -43,8 +44,8 @@ export type AgentRunInput = {
 };
 
 export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    const error = "AI_GATEWAY_API_KEY is not set on this deployment.";
+  if (!process.env.OPENAI_API_KEY) {
+    const error = "OPENAI_API_KEY is not set on this deployment.";
     await logAgentRun({ ...input, output: error, status: "error", toolCalls: [] });
     return { text: error, toolCalls: [], status: "error", error };
   }
@@ -61,7 +62,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
 
   try {
     const result = await generateText({
-      model: DEFAULT_MODEL,
+      model: openai(DEFAULT_MODEL),
       system: SYSTEM_PROMPT,
       prompt: userPrompt,
       tools: agentTools,
