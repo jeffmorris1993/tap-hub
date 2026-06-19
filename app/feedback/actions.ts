@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "../../lib/supabase/server";
+import { notifyPrayerTeam } from "../../lib/email/prayer";
 
 export type FeedbackInput = {
   kind: "feedback";
@@ -53,6 +54,15 @@ export async function submitPrayer(input: PrayerInput): Promise<FeedbackResult> 
     console.error("[prayer] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
-  // TODO(phase-3): if input.confidential, fire-and-forget email to PRAYER_TEAM_EMAIL via Resend.
+
+  if (input.confidential) {
+    await notifyPrayerTeam({
+      name: input.name?.trim() || null,
+      contact: input.contact?.trim() || null,
+      request: input.request.trim(),
+      prayerWall: input.prayerWall,
+    });
+  }
+
   return { ok: true, kind: "prayer" };
 }
