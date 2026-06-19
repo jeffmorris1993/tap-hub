@@ -3,13 +3,17 @@ import { PhoneShell } from "../components/PhoneShell";
 import { HubTopBar } from "../components/HubTopBar";
 import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
+import { getSundaySchedule } from "../lib/supabase/queries";
 
 const CHURCH_PHONE = "+12485551234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
 const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
 const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 
-export default function Hub() {
+export const revalidate = 60;
+
+export default async function Hub() {
+  const schedule = await getSundaySchedule();
   return (
     <PhoneShell>
       <div className="th-fade">
@@ -44,7 +48,7 @@ export default function Hub() {
           </p>
         </div>
 
-        <TodayBanner />
+        <TodayBanner schedule={schedule} />
 
         {/* I'm New feature */}
         <Link

@@ -2,28 +2,28 @@ import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
 import { SectionLabel } from "../../components/SectionLabel";
 import { MemoryMatch } from "../../components/MemoryMatch";
+import {
+  getTodaysKidsLesson,
+  getKidsPrograms,
+  getParentResources,
+} from "../../lib/supabase/queries";
 
-// Seed data — Phase 2 reads from Supabase.
-const TEACHING_TODAY = {
-  topic: "The Armor of God",
-  reference: "Ephesians 6:10–18",
-  teacher: "Standing firm in faith · Led by the Ignite team",
+export const revalidate = 60;
+
+const ICON_PATHS: Record<string, string> = {
+  book: "M4 5h11a2 2 0 012 2v12a3 3 0 00-3-3H4z M20 5h-3a2 2 0 00-2 2v12a3 3 0 013-3h2z",
+  "shield-check": "M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z M9.5 12l1.8 1.8 3.2-3.6",
+  family: "M12 8 m-3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0 M5 20c0-3.5 3-6 7-6s7 2.5 7 6",
+  envelope: "M3 5h18v14H3z M3 7l9 6 9-6",
 };
 
-const PROGRAMS = [
-  { age: "0–3", name: "Nursery", detail: "Loving care during all services · Room A" },
-  { age: "4–11", name: "Kids Church", detail: "Sundays 12 PM · Room B · worship + lesson" },
-  { age: "12–18", name: "Ignite Youth", detail: "Sun 10:30 AM & Wed 7 PM · Youth Hall" },
-];
+export default async function KidsYouth() {
+  const [lesson, programs, resources] = await Promise.all([
+    getTodaysKidsLesson(),
+    getKidsPrograms(),
+    getParentResources(),
+  ]);
 
-const PARENT_RESOURCES = [
-  { title: "This Week's Take-Home", sub: "Lesson + verse", iconPath: "M4 5h11a2 2 0 012 2v12a3 3 0 00-3-3H4z M20 5h-3a2 2 0 00-2 2v12a3 3 0 013-3h2z" },
-  { title: "Check-In & Safety", sub: "How drop-off works", iconPath: "M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z M9.5 12l1.8 1.8 3.2-3.6" },
-  { title: "Family Devotional", sub: "Daily at home", iconPath: "M12 8 m-3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0 M5 20c0-3.5 3-6 7-6s7 2.5 7 6" },
-  { title: "Ignite Newsletter", sub: "Youth updates", iconPath: "M3 5h18v14H3z M3 7l9 6 9-6" },
-];
-
-export default function KidsYouth() {
   return (
     <PhoneShell>
       <div className="th-slide" style={{ minHeight: "100vh" }}>
@@ -82,139 +82,149 @@ export default function KidsYouth() {
           </div>
 
           {/* today's lesson */}
-          <div
-            style={{
-              marginTop: "16px",
-              background: "linear-gradient(135deg,#15203a,#0f1626)",
-              border: "1px solid rgba(231,184,78,.3)",
-              borderRadius: "16px",
-              padding: "18px",
-            }}
-          >
+          {lesson && (
             <div
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                background: "rgba(231,184,78,.14)",
-                borderRadius: "20px",
-                padding: "5px 12px",
+                marginTop: "16px",
+                background: "linear-gradient(135deg,#15203a,#0f1626)",
+                border: "1px solid rgba(231,184,78,.3)",
+                borderRadius: "16px",
+                padding: "18px",
               }}
             >
-              <span
-                className="th-pulse"
-                style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#e7b84e" }}
-              />
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "#e7b84e",
-                }}
-              >
-                Teaching Today
-              </span>
-            </div>
-            <h3
-              style={{
-                fontFamily: "var(--font-anton)",
-                fontWeight: 400,
-                textTransform: "uppercase",
-                fontSize: "23px",
-                lineHeight: 1.03,
-                marginTop: "12px",
-              }}
-            >
-              {TEACHING_TODAY.topic}
-            </h3>
-            <p style={{ color: "#9aa3b8", fontSize: "13.5px", fontWeight: 600, marginTop: "6px" }}>
-              {TEACHING_TODAY.reference} · {TEACHING_TODAY.teacher}
-            </p>
-          </div>
-
-          {/* programming */}
-          <SectionLabel style={{ margin: "26px 0 12px" }}>Programming For All Ages</SectionLabel>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {PROGRAMS.map((p) => (
               <div
-                key={p.age}
                 style={{
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: "14px",
-                  background: "#121a2e",
-                  border: "1px solid rgba(244,241,234,.08)",
-                  borderRadius: "14px",
-                  padding: "15px 16px",
+                  gap: "8px",
+                  background: "rgba(231,184,78,.14)",
+                  borderRadius: "20px",
+                  padding: "5px 12px",
                 }}
               >
                 <span
+                  className="th-pulse"
+                  style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#e7b84e" }}
+                />
+                <span
                   style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "12px",
-                    background: "#1a2438",
-                    border: "1px solid rgba(231,184,78,.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    fontFamily: "var(--font-anton)",
-                    fontSize: "14px",
+                    fontSize: "10px",
+                    fontWeight: 800,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
                     color: "#e7b84e",
                   }}
                 >
-                  {p.age}
+                  Teaching Today
                 </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: "15px" }}>{p.name}</div>
-                  <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
-                    {p.detail}
-                  </div>
-                </div>
               </div>
-            ))}
-          </div>
-
-          {/* parent resources */}
-          <SectionLabel style={{ margin: "26px 0 12px" }}>Parent Resources</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            {PARENT_RESOURCES.map((r) => (
-              <div
-                key={r.title}
+              <h3
                 style={{
-                  background: "#121a2e",
-                  border: "1px solid rgba(244,241,234,.08)",
-                  borderRadius: "14px",
-                  padding: "15px",
+                  fontFamily: "var(--font-anton)",
+                  fontWeight: 400,
+                  textTransform: "uppercase",
+                  fontSize: "23px",
+                  lineHeight: 1.03,
+                  marginTop: "12px",
                 }}
               >
-                <span
-                  style={{
-                    width: "38px",
-                    height: "38px",
-                    borderRadius: "10px",
-                    background: "#1a2438",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={r.iconPath} />
-                  </svg>
-                </span>
-                <div style={{ fontWeight: 800, fontSize: "13.5px", marginTop: "11px", lineHeight: 1.2 }}>
-                  {r.title}
-                </div>
-                <div style={{ fontSize: "11.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "3px" }}>
-                  {r.sub}
-                </div>
+                {lesson.topic}
+              </h3>
+              <p style={{ color: "#9aa3b8", fontSize: "13.5px", fontWeight: 600, marginTop: "6px" }}>
+                {lesson.reference} · {lesson.teacher}
+              </p>
+            </div>
+          )}
+
+          {/* programming */}
+          {programs.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: "26px 0 12px" }}>Programming For All Ages</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {programs.map((p) => (
+                  <div
+                    key={p.age_group}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "14px",
+                      background: "#121a2e",
+                      border: "1px solid rgba(244,241,234,.08)",
+                      borderRadius: "14px",
+                      padding: "15px 16px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "12px",
+                        background: "#1a2438",
+                        border: "1px solid rgba(231,184,78,.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        fontFamily: "var(--font-anton)",
+                        fontSize: "14px",
+                        color: "#e7b84e",
+                      }}
+                    >
+                      {p.age_group}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: "15px" }}>{p.name}</div>
+                      <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
+                        {p.detail}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
+
+          {/* parent resources */}
+          {resources.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: "26px 0 12px" }}>Parent Resources</SectionLabel>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                {resources.map((r) => (
+                  <div
+                    key={r.title}
+                    style={{
+                      background: "#121a2e",
+                      border: "1px solid rgba(244,241,234,.08)",
+                      borderRadius: "14px",
+                      padding: "15px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        borderRadius: "10px",
+                        background: "#1a2438",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                        <path d={ICON_PATHS[r.icon_key] ?? ICON_PATHS.book} />
+                      </svg>
+                    </span>
+                    <div style={{ fontWeight: 800, fontSize: "13.5px", marginTop: "11px", lineHeight: 1.2 }}>
+                      {r.title}
+                    </div>
+                    <div style={{ fontSize: "11.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "3px" }}>
+                      {r.sub}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* kids game */}
           <SectionLabel style={{ margin: "26px 0 12px" }}>Games For Kids</SectionLabel>

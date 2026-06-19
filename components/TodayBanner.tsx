@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getTodayStatus, SEED_SUNDAY_SCHEDULE } from "../lib/clock";
+import { getTodayStatus, type ScheduleRow } from "../lib/clock";
 
-export function TodayBanner() {
-  const [status, setStatus] = useState(() => getTodayStatus(SEED_SUNDAY_SCHEDULE, new Date()));
+export function TodayBanner({ schedule }: { schedule: ScheduleRow[] }) {
+  const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
 
   useEffect(() => {
-    const tick = () => setStatus(getTodayStatus(SEED_SUNDAY_SCHEDULE, new Date()));
+    const tick = () => setStatus(getTodayStatus(schedule, new Date()));
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
-  }, []);
+  }, [schedule]);
 
   return (
     <Link

@@ -6,7 +6,7 @@ import { PhoneShell } from "../../../components/PhoneShell";
 import { BackBar } from "../../../components/BackBar";
 import { EventHero } from "../../../components/EventHero";
 import { submitEventSignup, type EventSignupResult } from "./actions";
-import type { EventRow } from "../../../lib/events";
+import type { DisplayEvent } from "../../../lib/events-display";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -33,7 +33,7 @@ function segmentStyle(on: boolean): React.CSSProperties {
   };
 }
 
-export function EventDetailView({ event }: { event: EventRow }) {
+export function EventDetailView({ event }: { event: DisplayEvent }) {
   const [role, setRole] = useState<"attendee" | "volunteer">("attendee");
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -181,11 +181,11 @@ export function EventDetailView({ event }: { event: EventRow }) {
                   <path d="M12 21s-7-4.5-7-10a7 7 0 1114 0c0 5.5-7 10-7 10z" />
                   <circle cx="12" cy="11" r="2.3" />
                 </svg>
-                <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.where}</span>
+                <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.location}</span>
               </div>
             </div>
             <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px" }}>
-              {event.longDescription}
+              {event.description_long}
             </p>
 
             <div
