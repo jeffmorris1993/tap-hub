@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       sender?: { email?: string; displayName?: string };
       argumentText?: string;
     };
+    space?: { name?: string };
     user?: { email?: string; displayName?: string };
   };
 
@@ -72,7 +73,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ text: "What can I help with?" });
   }
 
-  const result = await runAgent({ channel: "chat", sender: senderEmail, text: rawText });
+  // Persist conversation by Google Chat space — one DM per user, so the space
+  // ID gives us a stable per-person thread.
+  const threadKey = ev.space?.name || `direct:${senderEmail}`;
+  const result = await runAgent({
+    channel: "chat",
+    sender: senderEmail,
+    text: rawText,
+    threadKey,
+  });
   return NextResponse.json({ text: result.text });
 }
 

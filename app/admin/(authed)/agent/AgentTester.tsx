@@ -17,11 +17,20 @@ export function AgentTester({ examples }: { examples: string[] }) {
 
   function send(text: string) {
     if (!text.trim()) return;
+    const history = turns.flatMap((t) => [
+      { role: "user" as const, content: t.user },
+      { role: "assistant" as const, content: t.result.text },
+    ]);
     startTransition(async () => {
-      const result = await runAgentFromWeb(text);
+      const result = await runAgentFromWeb(text, history);
       setTurns((prev) => [...prev, { id: Date.now(), user: text, result }]);
       setInput("");
     });
+  }
+
+  function resetThread() {
+    setTurns([]);
+    setInput("");
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -158,17 +167,37 @@ export function AgentTester({ examples }: { examples: string[] }) {
       </div>
 
       <aside>
-        <div
-          style={{
-            fontSize: "10.5px",
-            fontWeight: 800,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "#9aa3b8",
-            marginBottom: "10px",
-          }}
-        >
-          Try these
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+          <div
+            style={{
+              fontSize: "10.5px",
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#9aa3b8",
+            }}
+          >
+            Try these
+          </div>
+          {turns.length > 0 && (
+            <button
+              type="button"
+              onClick={resetThread}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#9aa3b8",
+                fontSize: "10.5px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {examples.map((ex) => (
