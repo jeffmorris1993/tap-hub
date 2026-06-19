@@ -55,8 +55,6 @@ export default function Feedback() {
   const [prName, setPrName] = useState("");
   const [contact, setContact] = useState("");
   const [request, setRequest] = useState("");
-  const [confidential, setConfidential] = useState(true);
-  const [prayerWall, setPrayerWall] = useState(false);
 
   const [result, setResult] = useState<FeedbackResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -81,8 +79,6 @@ export default function Feedback() {
         name: prName,
         contact,
         request,
-        confidential,
-        prayerWall,
       });
       setResult(r);
     });
@@ -274,46 +270,36 @@ export default function Feedback() {
               placeholder="How can we pray for you?"
               style={{ ...inputStyle, resize: "vertical", marginBottom: "16px" }}
             />
-            <label
+            <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: "11px",
-                fontSize: "13.5px",
-                fontWeight: 600,
-                color: "#9aa3b8",
-                cursor: "pointer",
-                marginBottom: "12px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={confidential}
-                onChange={(e) => setConfidential(e.target.checked)}
-                style={{ width: "18px", height: "18px", accentColor: "#e7b84e", cursor: "pointer" }}
-              />
-              Keep confidential (pastoral team only)
-            </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "11px",
-                fontSize: "13.5px",
-                fontWeight: 600,
-                color: "#9aa3b8",
-                cursor: "pointer",
+                gap: "10px",
+                alignItems: "flex-start",
+                background: "rgba(231,184,78,.08)",
+                border: "1px solid rgba(231,184,78,.25)",
+                borderRadius: "11px",
+                padding: "12px 14px",
                 marginBottom: "22px",
               }}
             >
-              <input
-                type="checkbox"
-                checked={prayerWall}
-                onChange={(e) => setPrayerWall(e.target.checked)}
-                style={{ width: "18px", height: "18px", accentColor: "#e7b84e", cursor: "pointer" }}
-              />
-              Add to our church prayer wall
-            </label>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#e7b84e"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0, marginTop: "1px" }}
+              >
+                <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
+                <path d="M9.5 12l1.8 1.8 3.2-3.6" />
+              </svg>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#cdd3e0", lineHeight: 1.45 }}>
+                Your prayer request is confidential and goes only to our pastoral team.
+              </div>
+            </div>
             {result && !result.ok && (
               <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
                 {result.error}

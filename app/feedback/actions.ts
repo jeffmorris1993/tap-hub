@@ -16,8 +16,6 @@ export type PrayerInput = {
   name: string;
   contact: string;
   request: string;
-  confidential: boolean;
-  prayerWall: boolean;
 };
 
 export type FeedbackResult =
@@ -43,26 +41,23 @@ export async function submitFeedback(input: FeedbackInput): Promise<FeedbackResu
 export async function submitPrayer(input: PrayerInput): Promise<FeedbackResult> {
   if (!input.request?.trim()) return { ok: false, error: "Please share your prayer request." };
 
+  const name = input.name?.trim() || null;
+  const contact = input.contact?.trim() || null;
+  const request = input.request.trim();
+
   const { error } = await supabaseAdmin().from("prayer_requests").insert({
-    name: input.name?.trim() || null,
-    contact: input.contact?.trim() || null,
-    request: input.request.trim(),
-    confidential: input.confidential,
-    prayer_wall: input.prayerWall,
+    name,
+    contact,
+    request,
+    confidential: true,
+    prayer_wall: false,
   });
   if (error) {
     console.error("[prayer] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  if (input.confidential) {
-    await notifyPrayerTeam({
-      name: input.name?.trim() || null,
-      contact: input.contact?.trim() || null,
-      request: input.request.trim(),
-      prayerWall: input.prayerWall,
-    });
-  }
+  await notifyPrayerTeam({ name, contact, request, prayerWall: false });
 
   return { ok: true, kind: "prayer" };
 }
