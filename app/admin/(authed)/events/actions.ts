@@ -28,6 +28,7 @@ export type EventFormInput = {
   starts_at_local: string;
   ends_at_local: string;
   location: string;
+  cost: string | null;
   allow_volunteers: boolean;
   recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
   recurrence_byday: number | null;
@@ -95,6 +96,7 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
     ends_at,
     location,
     allow_volunteers: input.allow_volunteers,
+    cost: input.cost?.trim() ? input.cost.trim() : null,
     recurrence_kind: input.recurrence_kind,
     recurrence_byday: input.recurrence_kind === "weekly" || input.recurrence_kind === "biweekly"
       ? input.recurrence_byday
@@ -128,7 +130,7 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
 async function loadSnapshot(id: string): Promise<EventSnapshot | null> {
   const { data, error } = await supabaseAdmin()
     .from("events")
-    .select("id, slug, title, category, starts_at, location, description_long, recurrence_kind")
+    .select("id, slug, title, category, starts_at, location, description_long, cost, recurrence_kind")
     .eq("id", id)
     .limit(1);
   if (error || !data?.[0]) return null;

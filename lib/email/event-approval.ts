@@ -13,6 +13,7 @@ export type EventSnapshot = {
   starts_at: string;
   location: string;
   description_long: string;
+  cost: string | null;
   recurrence_label: string;
   recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
 };
@@ -35,6 +36,7 @@ function commonFields(ev: EventSnapshot, extra: Field[] = []): Field[] {
     { label: "When", value: fmtDate(ev.starts_at) },
     { label: "Where", value: ev.location },
     { label: "Category", value: ev.category },
+    { label: "Cost", value: ev.cost?.trim() || "Free" },
     { label: "Recurrence", value: ev.recurrence_label || "One-off" },
     ...extra,
   ];

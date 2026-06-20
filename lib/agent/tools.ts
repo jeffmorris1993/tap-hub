@@ -50,7 +50,7 @@ function timeToMinutes(t: string): number {
 async function snapshotById(id: string): Promise<EventSnapshot | null> {
   const { data, error } = await supabaseAdmin()
     .from("events")
-    .select("id, slug, title, category, starts_at, location, description_long, recurrence_kind")
+    .select("id, slug, title, category, starts_at, location, description_long, cost, recurrence_kind")
     .eq("id", id)
     .limit(1);
   if (error || !data?.[0]) return null;
@@ -63,7 +63,7 @@ async function snapshotById(id: string): Promise<EventSnapshot | null> {
 async function snapshotBySlug(slug: string): Promise<EventSnapshot | null> {
   const { data, error } = await supabaseAdmin()
     .from("events")
-    .select("id, slug, title, category, starts_at, location, description_long, recurrence_kind")
+    .select("id, slug, title, category, starts_at, location, description_long, cost, recurrence_kind")
     .eq("slug", slug)
     .limit(1);
   if (error || !data?.[0]) return null;
@@ -133,7 +133,8 @@ export function buildAgentTools(ctx: AgentContext) {
 
     create_event_draft: tool({
       description:
-        "Create a NEW event as a draft and (by default) immediately submit it for approval by the Bishop / Assistant Pastor. The event is NOT visible to the public until an approver approves it. Use this for any new event submission like 'add Resurrection Sunday Apr 5 at noon main sanctuary'.",
+        "Create a NEW event as a draft and (by default) immediately submit it for approval by the Bishop / Assistant Pastor. The event is NOT visible to the public until an approver approves it. " +
+        "BEFORE calling this tool, make sure you have explicit answers to all of: title, date, time, location, whether volunteers are needed, and whether there's a cost. If any of those are missing from the conversation, ASK a single short follow-up first instead of guessing.",
       inputSchema: z.object({
         title: z.string().min(1),
         descriptionLong: z.string().min(1),
@@ -141,7 +142,17 @@ export function buildAgentTools(ctx: AgentContext) {
         startsAtLocal: z.string().describe("Local datetime YYYY-MM-DDTHH:MM"),
         endsAtLocal: z.string().optional(),
         location: z.string().min(1),
-        allowVolunteers: z.boolean().default(true),
+        allowVolunteers: z
+          .boolean()
+          .describe(
+            "True if the event is explicitly soliciting volunteer signups (e.g. greeters, kitchen help, ushers). False otherwise. Ask the user — do NOT assume true.",
+          ),
+        cost: z
+          .string()
+          .nullable()
+          .describe(
+            "Cost description shown to visitors. Examples: '$15 per person', 'Free will offering', '$10 adults / $5 kids'. Pass null when the event is free. Ask the user if cost wasn't stated.",
+          ),
         recurrenceKind: z.enum(["none", "weekly", "biweekly", "monthly"]).default("none"),
         /** 0=Sun … 6=Sat; only needed for weekly/biweekly. */
         recurrenceByday: z.number().int().min(0).max(6).optional(),
@@ -165,6 +176,7 @@ export function buildAgentTools(ctx: AgentContext) {
           starts_at: startsAt.toISOString(),
           ends_at: endsAt && !isNaN(endsAt.getTime()) ? endsAt.toISOString() : null,
           location: input.location,
+          cost: input.cost?.trim() ? input.cost.trim() : null,
           allow_volunteers: input.allowVolunteers,
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,

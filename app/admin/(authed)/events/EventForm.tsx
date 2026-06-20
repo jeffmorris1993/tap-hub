@@ -76,6 +76,7 @@ type Initial = {
   starts_at?: string | null;
   ends_at?: string | null;
   location?: string;
+  cost?: string | null;
   allow_volunteers?: boolean;
   published?: boolean;
   approval_status?: ApprovalStatus;
@@ -108,6 +109,7 @@ export function EventForm({
   const [endsAt, setEndsAt] = useState(toLocalInputValue(initial?.ends_at ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
+  const [cost, setCost] = useState(initial?.cost ?? "");
   const [recurrenceKind, setRecurrenceKind] = useState<"none" | "weekly" | "biweekly" | "monthly">(
     initial?.recurrence_kind ?? "none",
   );
@@ -130,6 +132,7 @@ export function EventForm({
       ends_at_local: endsAt,
       location,
       allow_volunteers: allowVolunteers,
+      cost: cost.trim() || null,
       recurrence_kind: recurrenceKind,
       recurrence_byday: recurrenceKind === "weekly" || recurrenceKind === "biweekly" ? recurrenceByday : null,
       recurrence_until: recurrenceUntil || null,
@@ -395,6 +398,16 @@ export function EventForm({
           />
         </div>
       )}
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <label style={labelStyle}>Cost (optional)</label>
+        <input
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          placeholder='e.g. "$15 per person" or "Free will offering" — leave blank for free'
+          style={inputStyle}
+        />
+      </div>
 
       <label style={{ display: "flex", alignItems: "center", gap: "10px", color: "#cdd3e0", fontSize: "13.5px" }}>
         <input

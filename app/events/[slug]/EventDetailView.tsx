@@ -219,6 +219,15 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                 </svg>
                 <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.location}</span>
               </div>
+              {event.cost && event.cost.trim() && (
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M14.5 8h-3.5a1.8 1.8 0 100 3.5h2a1.8 1.8 0 110 3.5H9.5M12 6.5v1.5M12 16v1.5" />
+                  </svg>
+                  <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.cost.trim()}</span>
+                </div>
+              )}
             </div>
             <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px" }}>
               {event.description_long}

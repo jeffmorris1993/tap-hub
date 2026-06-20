@@ -130,6 +130,7 @@ export type AdminEventRow = {
   ends_at: string | null;
   location: string;
   description_long: string;
+  cost: string | null;
   allow_volunteers: boolean;
   published: boolean;
   approval_status: "draft" | "pending" | "approved" | "rejected";
@@ -145,7 +146,7 @@ export type AdminEventRow = {
 
 const ADMIN_EVENT_FIELDS =
   "id, slug, title, category, starts_at, ends_at, location, description_long, " +
-  "allow_volunteers, published, approval_status, approval_notes, submitted_by, " +
+  "cost, allow_volunteers, published, approval_status, approval_notes, submitted_by, " +
   "reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until";
 
 export async function listAllEvents(): Promise<AdminEventRow[]> {
