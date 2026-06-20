@@ -1,4 +1,4 @@
-export type RecurrenceKind = "none" | "weekly" | "biweekly" | "monthly";
+export type RecurrenceKind = "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
 
 export type RecurringEventFields = {
   starts_at: string;
@@ -25,17 +25,22 @@ function isAfterUntil(d: Date, untilIso: string | null): boolean {
   return d.getTime() > until.getTime();
 }
 
+function isWeekday(dow: number): boolean {
+  return dow >= 1 && dow <= 5;
+}
+
 /**
  * Return the next datetime at or after `fromDate` that this event occurs.
  * Returns null if the event is finished (one-off in the past, or recurrence
  * window has ended).
  *
- * For weekly/biweekly the day-of-week is taken from `recurrence_byday` if
- * set, else from the original start date.
- *
- * For monthly the day-of-month is derived from the original start date.
- * If a target month doesn't have that day (e.g. Feb 30), the occurrence
- * is skipped — we move to the next month.
+ *   none      — single instance at starts_at
+ *   daily     — every day from starts_at through recurrence_until
+ *   weekdays  — Mon-Fri only, from starts_at through recurrence_until
+ *   weekly    — same day-of-week (recurrence_byday or starts_at.getDay()),
+ *               every 7 days
+ *   biweekly  — same as weekly with 14-day stride aligned to starts_at
+ *   monthly   — same day-of-month as starts_at (skips invalid Feb 30 etc.)
  */
 export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Date | null {
   const start = new Date(event.starts_at);
@@ -48,6 +53,31 @@ export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Dat
   if (isAfterUntil(fromDate, event.recurrence_until)) return null;
 
   const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const startHour = Math.floor(startMinutes / 60);
+  const startMinute = startMinutes % 60;
+
+  if (event.recurrence_kind === "daily" || event.recurrence_kind === "weekdays") {
+    const weekdaysOnly = event.recurrence_kind === "weekdays";
+    // Walk forward from the later of (start, today) day-by-day until we
+    // find a day that matches the filter and whose time-of-day is still
+    // in the future. Cap iterations at 14 (covers any weekday gap).
+    const baseDate = start.getTime() > fromDate.getTime() ? start : fromDate;
+    let candidateDay = startOfDay(baseDate);
+    for (let i = 0; i < 14; i++) {
+      const dow = candidateDay.getDay();
+      if (!weekdaysOnly || isWeekday(dow)) {
+        const candidate = new Date(candidateDay);
+        candidate.setHours(startHour, startMinute, 0, 0);
+        if (candidate.getTime() >= fromDate.getTime()) {
+          if (isAfterUntil(candidate, event.recurrence_until)) return null;
+          return candidate;
+        }
+      }
+      candidateDay = addDays(candidateDay, 1);
+    }
+    return null;
+  }
+
   const wantDow = event.recurrence_byday ?? start.getDay();
 
   if (event.recurrence_kind === "weekly" || event.recurrence_kind === "biweekly") {
@@ -66,7 +96,7 @@ export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Dat
       const phaseOffset = ((daysSinceStart % 14) + 14) % 14;
       if (phaseOffset !== 0) candidate = addDays(candidate, 14 - phaseOffset);
     }
-    candidate.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+    candidate.setHours(startHour, startMinute, 0, 0);
     // If candidate is in the same day as fromDate but earlier in the day,
     // we need to advance one stride forward.
     if (candidate.getTime() < fromDate.getTime()) {
@@ -84,7 +114,7 @@ export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Dat
     let month = year === from.getFullYear() ? Math.max(start.getMonth(), from.getMonth()) : start.getMonth();
     // Try up to 24 months to find a valid occurrence (skips Feb 30, etc.).
     for (let i = 0; i < 24; i++) {
-      const candidate = new Date(year, month, wantDom, Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+      const candidate = new Date(year, month, wantDom, startHour, startMinute, 0, 0);
       const valid = candidate.getMonth() === month; // weeds out invalid Feb 30 → Mar 2
       if (valid && candidate.getTime() >= fromDate.getTime()) {
         if (isAfterUntil(candidate, event.recurrence_until)) return null;
@@ -113,6 +143,8 @@ export function hasOccurrenceOnDate(event: RecurringEventFields, dateIso: string
 
 const RECURRENCE_LABELS: Record<RecurrenceKind, string> = {
   none: "",
+  daily: "Daily",
+  weekdays: "Mon–Fri",
   weekly: "Every week",
   biweekly: "Every 2 weeks",
   monthly: "Every month",

@@ -55,7 +55,7 @@ async function snapshotById(id: string): Promise<EventSnapshot | null> {
     .limit(1);
   if (error || !data?.[0]) return null;
   const row = data[0] as unknown as EventSnapshot & {
-    recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+    recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   };
   return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
 }
@@ -68,7 +68,7 @@ async function snapshotBySlug(slug: string): Promise<EventSnapshot | null> {
     .limit(1);
   if (error || !data?.[0]) return null;
   const row = data[0] as unknown as EventSnapshot & {
-    recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+    recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   };
   return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
 }
@@ -153,10 +153,19 @@ export function buildAgentTools(ctx: AgentContext) {
           .describe(
             "Cost description shown to visitors. Examples: '$15 per person', 'Free will offering', '$10 adults / $5 kids'. Pass null when the event is free. Ask the user if cost wasn't stated.",
           ),
-        recurrenceKind: z.enum(["none", "weekly", "biweekly", "monthly"]).default("none"),
+        recurrenceKind: z
+          .enum(["none", "daily", "weekdays", "weekly", "biweekly", "monthly"])
+          .default("none")
+          .describe(
+            "Use 'daily' for multi-day events that run every day in a range (e.g. a 5-day conference). Use 'weekdays' for Mon–Fri runs (e.g. a 5-week summer program). Use 'weekly'/'biweekly'/'monthly' for a single day-of-week or day-of-month cadence. For 'daily' and 'weekdays' you MUST also set recurrenceUntil to the last day of the series.",
+          ),
         /** 0=Sun … 6=Sat; only needed for weekly/biweekly. */
         recurrenceByday: z.number().int().min(0).max(6).optional(),
-        recurrenceUntil: isoDate.optional(),
+        recurrenceUntil: isoDate
+          .optional()
+          .describe(
+            "Inclusive last date of the recurrence (e.g. 2026-07-29 for a Jul 24–29 convention). Required for daily/weekdays and optional for weekly/biweekly/monthly.",
+          ),
         submitForApproval: z.boolean().default(true).describe("Submit for review now? Defaults to true."),
         slug: z.string().optional(),
       }),

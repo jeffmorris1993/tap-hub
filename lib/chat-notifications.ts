@@ -16,7 +16,7 @@ export type EventChatSnapshot = {
   category: string;
   starts_at: string;
   location: string;
-  recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
 };
 
 function fmtWhen(iso: string): string {

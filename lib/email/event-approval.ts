@@ -15,7 +15,7 @@ export type EventSnapshot = {
   description_long: string;
   cost: string | null;
   recurrence_label: string;
-  recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
 };
 
 function fmtDate(iso: string): string {

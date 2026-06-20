@@ -30,7 +30,7 @@ export type EventFormInput = {
   location: string;
   cost: string | null;
   allow_volunteers: boolean;
-  recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   recurrence_byday: number | null;
   recurrence_until: string | null;
 };
@@ -134,7 +134,7 @@ async function loadSnapshot(id: string): Promise<EventSnapshot | null> {
     .eq("id", id)
     .limit(1);
   if (error || !data?.[0]) return null;
-  const row = data[0] as unknown as EventSnapshot & { recurrence_kind: "none" | "weekly" | "biweekly" | "monthly" };
+  const row = data[0] as unknown as EventSnapshot & { recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly" };
   return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
 }
 

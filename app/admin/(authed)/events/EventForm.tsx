@@ -16,6 +16,8 @@ import {
 const CATEGORIES = ["Worship", "Youth", "Community"] as const;
 const RECURRENCE_KINDS = [
   { value: "none", label: "Doesn't repeat" },
+  { value: "daily", label: "Every day (multi-day event)" },
+  { value: "weekdays", label: "Every weekday (Mon–Fri)" },
   { value: "weekly", label: "Every week" },
   { value: "biweekly", label: "Every 2 weeks" },
   { value: "monthly", label: "Every month" },
@@ -83,7 +85,7 @@ type Initial = {
   approval_notes?: string | null;
   submitted_by?: string | null;
   reviewed_by?: string | null;
-  recurrence_kind?: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind?: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   recurrence_byday?: number | null;
   recurrence_until?: string | null;
 };
@@ -110,7 +112,7 @@ export function EventForm({
   const [location, setLocation] = useState(initial?.location ?? "");
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
   const [cost, setCost] = useState(initial?.cost ?? "");
-  const [recurrenceKind, setRecurrenceKind] = useState<"none" | "weekly" | "biweekly" | "monthly">(
+  const [recurrenceKind, setRecurrenceKind] = useState<"none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly">(
     initial?.recurrence_kind ?? "none",
   );
   const [recurrenceByday, setRecurrenceByday] = useState<number | null>(initial?.recurrence_byday ?? null);

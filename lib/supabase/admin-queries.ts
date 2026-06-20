@@ -139,7 +139,7 @@ export type AdminEventRow = {
   reviewed_by: string | null;
   submitted_at: string | null;
   reviewed_at: string | null;
-  recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   recurrence_byday: number | null;
   recurrence_until: string | null;
 };
