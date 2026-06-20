@@ -8,6 +8,7 @@ import { SectionLabel } from "../../components/SectionLabel";
 import { ScheduleRow } from "../../components/ScheduleRow";
 import { LiveClock } from "../../components/LiveClock";
 import { getTodayStatus, type ScheduleRow as ClockRow } from "../../lib/clock";
+import { buildHero, type Hero } from "../../lib/hero";
 import type { DisplayEvent } from "../../lib/events-display";
 
 export type WeekRow = { day_label: string; title: string; detail: string };
@@ -39,36 +40,6 @@ function sundayRowsAsPreview(rows: ClockRow[]) {
     });
 }
 
-/** Build the "Plan Your Visit" hero from the Sunday schedule rows. */
-function buildSundayHero(rows: ClockRow[]): {
-  badge: "Plan Your Visit";
-  headline: string;
-  sub: string;
-} {
-  const sorted = [...rows].sort((a, b) => a.startsAtMinutes - b.startsAtMinutes);
-  // Headline = the worship service row (the main draw), or the last row
-  // if no explicit worship row exists.
-  const main =
-    sorted.find((r) => r.kind === "worship") ??
-    sorted[sorted.length - 1] ??
-    null;
-  const headline = main
-    ? `Sunday ${main.label} · ${minutesToTime(main.startsAtMinutes).combined}`
-    : "Join us this Sunday";
-  // Sub = the rows before the main service, framed as "doors open" context.
-  const earlier = sorted.filter((r) =>
-    main ? r.startsAtMinutes < main.startsAtMinutes : true,
-  );
-  let sub: string;
-  if (earlier.length > 0) {
-    const firstTime = minutesToTime(earlier[0].startsAtMinutes).combined;
-    const names = earlier.map((r) => r.label).join(", ");
-    sub = `Doors open at ${firstTime} for ${names}.`;
-  } else {
-    sub = "We'd love to meet you. Come hungry, come tired, come as you are.";
-  }
-  return { badge: "Plan Your Visit", headline, sub };
-}
 
 export function TodayView({
   schedule,
@@ -84,21 +55,23 @@ export function TodayView({
   todaysEvents: DisplayEvent[];
 }) {
   const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
+  const [hero, setHero] = useState<Hero>(() => buildHero(schedule, sundayFallback, new Date()));
 
   useEffect(() => {
-    const tick = () => setStatus(getTodayStatus(schedule, new Date()));
+    const tick = () => {
+      const now = new Date();
+      setStatus(getTodayStatus(schedule, now));
+      setHero(buildHero(schedule, sundayFallback, now));
+    };
+    tick();
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
-  }, [schedule]);
+  }, [schedule, sundayFallback]);
 
-  // When today has nothing scheduled (e.g. Saturday), build the hero +
-  // schedule rows from Sunday's data so the page isn't empty.
+  // When today has nothing scheduled (e.g. Saturday), show Sunday's rows
+  // below the hero so the page isn't empty.
   const fallbackRows = sundayRowsAsPreview(sundayFallback);
   const useFallback = status.rows.length === 0 && fallbackRows.length > 0;
-  const sundayHero = useFallback ? buildSundayHero(sundayFallback) : null;
-  const heroBadge = sundayHero ? sundayHero.badge : status.badge;
-  const heroHeadline = sundayHero ? sundayHero.headline : status.headline;
-  const heroSub = sundayHero ? sundayHero.sub : status.sub;
   const visibleRows = useFallback ? fallbackRows : status.rows;
   const scheduleLabel = useFallback ? "This Sunday's Schedule" : status.scheduleLabel;
 
@@ -140,7 +113,7 @@ export function TodayView({
                   color: "#e7b84e",
                 }}
               >
-                {heroBadge}
+                {hero.badge}
               </span>
             </div>
             <h2
@@ -148,15 +121,23 @@ export function TodayView({
                 fontFamily: "var(--font-anton)",
                 fontWeight: 400,
                 textTransform: "uppercase",
-                fontSize: "27px",
-                lineHeight: 1.02,
+                fontSize: hero.emphasis === "encouragement" ? "23px" : "27px",
+                lineHeight: hero.emphasis === "encouragement" ? 1.15 : 1.02,
                 marginTop: "14px",
               }}
             >
-              {heroHeadline}
+              {hero.headline}
             </h2>
-            <p style={{ color: "#9aa3b8", fontSize: "14px", fontWeight: 600, marginTop: "6px" }}>
-              {heroSub}
+            <p
+              style={{
+                color: "#9aa3b8",
+                fontSize: "14px",
+                fontWeight: hero.emphasis === "encouragement" ? 500 : 600,
+                fontStyle: hero.emphasis === "encouragement" ? "italic" : "normal",
+                marginTop: "6px",
+              }}
+            >
+              {hero.sub}
             </p>
           </div>
 
