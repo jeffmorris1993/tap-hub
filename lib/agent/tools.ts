@@ -10,6 +10,11 @@ import {
   notifySubmitterOfRejection,
   type EventSnapshot,
 } from "../email/event-approval";
+import {
+  pushSubmissionToApprovers,
+  pushApprovalToSubmitter,
+  pushRejectionToSubmitter,
+} from "../chat-notifications";
 
 function slugify(s: string): string {
   return s
@@ -180,7 +185,25 @@ export function buildAgentTools(ctx: AgentContext) {
 
         if (input.submitForApproval) {
           const snap = await snapshotById(id);
-          if (snap) await notifyApproversOfSubmission(snap, ctx.sender, getApproverEmails());
+          if (snap) {
+            const approvers = getApproverEmails();
+            await Promise.all([
+              notifyApproversOfSubmission(snap, ctx.sender, approvers),
+              pushSubmissionToApprovers(
+                {
+                  id: snap.id,
+                  slug: snap.slug,
+                  title: snap.title,
+                  category: snap.category,
+                  starts_at: snap.starts_at,
+                  location: snap.location,
+                  recurrence_kind: snap.recurrence_kind,
+                },
+                ctx.sender,
+                approvers,
+              ),
+            ]);
+          }
         }
 
         return {
@@ -249,7 +272,22 @@ export function buildAgentTools(ctx: AgentContext) {
 
         const snap = await snapshotById(row.id);
         if (snap && row.submitted_by) {
-          await notifySubmitterOfApproval(snap, row.submitted_by, ctx.sender);
+          await Promise.all([
+            notifySubmitterOfApproval(snap, row.submitted_by, ctx.sender),
+            pushApprovalToSubmitter(
+              {
+                id: snap.id,
+                slug: snap.slug,
+                title: snap.title,
+                category: snap.category,
+                starts_at: snap.starts_at,
+                location: snap.location,
+                recurrence_kind: snap.recurrence_kind,
+              },
+              row.submitted_by,
+              ctx.sender,
+            ),
+          ]);
         }
         return { ok: true, summary: `Approved "${slug}". It is now live on /events.` };
       },
@@ -289,7 +327,23 @@ export function buildAgentTools(ctx: AgentContext) {
 
         const snap = await snapshotById(row.id);
         if (snap && row.submitted_by) {
-          await notifySubmitterOfRejection(snap, row.submitted_by, ctx.sender, notes);
+          await Promise.all([
+            notifySubmitterOfRejection(snap, row.submitted_by, ctx.sender, notes),
+            pushRejectionToSubmitter(
+              {
+                id: snap.id,
+                slug: snap.slug,
+                title: snap.title,
+                category: snap.category,
+                starts_at: snap.starts_at,
+                location: snap.location,
+                recurrence_kind: snap.recurrence_kind,
+              },
+              row.submitted_by,
+              ctx.sender,
+              notes,
+            ),
+          ]);
         }
         return { ok: true, summary: `Rejected "${slug}" and notified the submitter.` };
       },
