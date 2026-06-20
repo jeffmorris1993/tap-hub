@@ -224,26 +224,30 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            <div
-              style={{
-                fontSize: "11.5px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "#cdd3e0",
-                margin: "24px 0 11px",
-              }}
-            >
-              I&apos;d like to —
-            </div>
-            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <button type="button" onClick={() => setRole("attendee")} style={segmentStyle(role === "attendee")}>
-                Attend
-              </button>
-              <button type="button" onClick={() => setRole("volunteer")} style={segmentStyle(role === "volunteer")}>
-                Volunteer
-              </button>
-            </div>
+            {event.allow_volunteers && (
+              <>
+                <div
+                  style={{
+                    fontSize: "11.5px",
+                    fontWeight: 800,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: "#cdd3e0",
+                    margin: "24px 0 11px",
+                  }}
+                >
+                  I&apos;d like to —
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                  <button type="button" onClick={() => setRole("attendee")} style={segmentStyle(role === "attendee")}>
+                    Attend
+                  </button>
+                  <button type="button" onClick={() => setRole("volunteer")} style={segmentStyle(role === "volunteer")}>
+                    Volunteer
+                  </button>
+                </div>
+              </>
+            )}
 
             <input
               value={name}
