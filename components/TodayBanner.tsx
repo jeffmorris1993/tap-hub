@@ -2,16 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getTodayStatus, type ScheduleRow } from "../lib/clock";
+import { type ScheduleRow } from "../lib/clock";
+import { buildHero } from "../lib/hero";
 
-export function TodayBanner({ schedule }: { schedule: ScheduleRow[] }) {
-  const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
+export function TodayBanner({
+  schedule,
+  sundayFallback,
+}: {
+  schedule: ScheduleRow[];
+  sundayFallback: ScheduleRow[];
+}) {
+  const [hero, setHero] = useState(() => buildHero(schedule, sundayFallback, new Date()));
 
   useEffect(() => {
-    const tick = () => setStatus(getTodayStatus(schedule, new Date()));
+    const tick = () => setHero(buildHero(schedule, sundayFallback, new Date()));
+    tick();
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
-  }, [schedule]);
+  }, [schedule, sundayFallback]);
+
+  const isEncouragement = hero.emphasis === "encouragement";
 
   return (
     <Link
@@ -49,23 +59,29 @@ export function TodayBanner({ schedule }: { schedule: ScheduleRow[] }) {
             color: "#e7b84e",
           }}
         >
-          Today at Neh Temple
+          {hero.badge}
         </div>
         <div
           style={{
             fontFamily: "var(--font-anton)",
             fontWeight: 400,
             textTransform: "uppercase",
-            fontSize: "15.5px",
+            fontSize: isEncouragement ? "13.5px" : "15.5px",
             marginTop: "3px",
             color: "#f4f1ea",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
+            // Encouragement verses can run long — let them wrap to two
+            // lines instead of getting truncated.
+            whiteSpace: isEncouragement ? "normal" : "nowrap",
+            overflow: isEncouragement ? "visible" : "hidden",
             textOverflow: "ellipsis",
             letterSpacing: "0.01em",
+            lineHeight: isEncouragement ? 1.25 : 1.05,
+            display: isEncouragement ? "-webkit-box" : "block",
+            WebkitLineClamp: isEncouragement ? 2 : undefined,
+            WebkitBoxOrient: isEncouragement ? "vertical" : undefined,
           }}
         >
-          {status.headline}
+          {hero.headline}
         </div>
         <div
           style={{
@@ -73,9 +89,13 @@ export function TodayBanner({ schedule }: { schedule: ScheduleRow[] }) {
             color: "#9aa3b8",
             fontWeight: 600,
             marginTop: "1px",
+            fontStyle: isEncouragement ? "italic" : "normal",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
-          {status.sub}
+          {hero.sub}
         </div>
       </div>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>

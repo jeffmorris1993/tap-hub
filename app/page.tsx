@@ -3,7 +3,8 @@ import { PhoneShell } from "../components/PhoneShell";
 import { HubTopBar } from "../components/HubTopBar";
 import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
-import { getTodaySchedule } from "../lib/supabase/queries";
+import { Greeting } from "../components/Greeting";
+import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
 
 const CHURCH_PHONE = "+12485551234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
@@ -13,7 +14,10 @@ const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 export const revalidate = 60;
 
 export default async function Hub() {
-  const schedule = await getTodaySchedule();
+  const [schedule, sundayFallback] = await Promise.all([
+    getTodaySchedule(),
+    getScheduleForDayOfWeek(0),
+  ]);
   return (
     <PhoneShell>
       <div className="th-fade">
@@ -31,7 +35,7 @@ export default async function Hub() {
               letterSpacing: "0.005em",
             }}
           >
-            Welcome.
+            <Greeting />
             <br />
             <span style={{ color: "#e7b84e" }}>Get plugged in.</span>
           </h1>
@@ -48,7 +52,7 @@ export default async function Hub() {
           </p>
         </div>
 
-        <TodayBanner schedule={schedule} />
+        <TodayBanner schedule={schedule} sundayFallback={sundayFallback} />
 
         {/* I'm New feature */}
         <Link
