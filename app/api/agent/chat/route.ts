@@ -180,12 +180,23 @@ function parseChatEvent(event: unknown): Parsed {
   const format: "legacy" | "addons" = isAddons ? "addons" : "legacy";
 
   if (isAddons) {
-    const eventType =
+    // The new Add-ons payload doesn't carry an explicit eventType. The
+    // event type is implied by which sub-object is present under `chat`:
+    //   messagePayload         → MESSAGE
+    //   addedToSpacePayload    → ADDED_TO_SPACE
+    //   removedFromSpacePayload→ REMOVED_FROM_SPACE
+    //   appCommandPayload      → APP_COMMAND
+    let eventType =
       get<string>(event, "chat.eventType") ||
       get<string>(event, "chat.type") ||
-      // Older variants placed the type at the root or under chat.messagePayload
       get<string>(event, "type") ||
       null;
+    if (!eventType) {
+      if (get(event, "chat.messagePayload")) eventType = "MESSAGE";
+      else if (get(event, "chat.addedToSpacePayload")) eventType = "ADDED_TO_SPACE";
+      else if (get(event, "chat.removedFromSpacePayload")) eventType = "REMOVED_FROM_SPACE";
+      else if (get(event, "chat.appCommandPayload")) eventType = "APP_COMMAND";
+    }
     const message =
       (get(event, "chat.messagePayload.message") as Record<string, unknown> | null) ||
       (get(event, "chat.message") as Record<string, unknown> | null) ||
