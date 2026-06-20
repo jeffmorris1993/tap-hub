@@ -39,31 +39,35 @@ function sundayRowsAsPreview(rows: ClockRow[]) {
     });
 }
 
-/** Build the "This Sunday" hero from the Sunday schedule rows. */
+/** Build the "Plan Your Visit" hero from the Sunday schedule rows. */
 function buildSundayHero(rows: ClockRow[]): {
-  badge: "This Sunday";
+  badge: "Plan Your Visit";
   headline: string;
   sub: string;
 } {
   const sorted = [...rows].sort((a, b) => a.startsAtMinutes - b.startsAtMinutes);
-  // Headline = the worship service row, or the last row if no explicit worship row.
+  // Headline = the worship service row (the main draw), or the last row
+  // if no explicit worship row exists.
   const main =
     sorted.find((r) => r.kind === "worship") ??
     sorted[sorted.length - 1] ??
     null;
   const headline = main
-    ? `${main.label} · ${minutesToTime(main.startsAtMinutes).combined}`
+    ? `Sunday ${main.label} · ${minutesToTime(main.startsAtMinutes).combined}`
     : "Join us this Sunday";
-  // Sub = the rows before the main service, joined with separators.
+  // Sub = the rows before the main service, framed as "doors open" context.
   const earlier = sorted.filter((r) =>
     main ? r.startsAtMinutes < main.startsAtMinutes : true,
   );
-  const sub = earlier.length
-    ? earlier
-        .map((r) => `${r.label} ${minutesToTime(r.startsAtMinutes).combined}`)
-        .join(" · ")
-    : "See the full schedule below.";
-  return { badge: "This Sunday", headline, sub };
+  let sub: string;
+  if (earlier.length > 0) {
+    const firstTime = minutesToTime(earlier[0].startsAtMinutes).combined;
+    const names = earlier.map((r) => r.label).join(", ");
+    sub = `Doors open at ${firstTime} for ${names}.`;
+  } else {
+    sub = "We'd love to meet you. Come hungry, come tired, come as you are.";
+  }
+  return { badge: "Plan Your Visit", headline, sub };
 }
 
 export function TodayView({
