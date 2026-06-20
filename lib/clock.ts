@@ -33,8 +33,10 @@ export type TodayStatus = {
   sub: string;
   scheduleLabel: string;
   rows: RowView[];
-  isSunday: boolean;
+  hasScheduleToday: boolean;
 };
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function formatTime(mins: number): { time: string; ampm: string } {
   let h = Math.floor(mins / 60);
@@ -46,53 +48,57 @@ function formatTime(mins: number): { time: string; ampm: string } {
 }
 
 /**
- * Pure today-status compute. `now` is injected so this is server-safe and unit-testable.
- * Mirrors the branching in the Claude Design prototype.
+ * Day-agnostic today-status compute. `schedule` is the rows for the current
+ * day_of_week (already filtered). `now` is injected so this is server-safe
+ * and unit-testable.
  */
 export function getTodayStatus(schedule: ScheduleRow[], now: Date): TodayStatus {
   const day = now.getDay();
   const mins = now.getHours() * 60 + now.getMinutes();
+  const dayName = DAY_NAMES[day];
   const isSunday = day === 0;
+
+  // Sort by start time so liveIdx/nextIdx logic is correct regardless of
+  // insertion order.
+  const sorted = [...schedule].sort((a, b) => a.startsAtMinutes - b.startsAtMinutes);
 
   let liveIdx = -1;
   let nextIdx = -1;
-  if (isSunday) {
-    schedule.forEach((s, i) => {
-      if (mins >= s.startsAtMinutes && mins < s.startsAtMinutes + s.durationMinutes) {
-        liveIdx = i;
-      }
-    });
-    nextIdx = schedule.findIndex((s) => mins < s.startsAtMinutes);
-  }
+  sorted.forEach((s, i) => {
+    if (mins >= s.startsAtMinutes && mins < s.startsAtMinutes + s.durationMinutes) {
+      liveIdx = i;
+    }
+  });
+  nextIdx = sorted.findIndex((s) => mins < s.startsAtMinutes);
 
   let badge: TodayBadge;
   let headline: string;
   let sub: string;
-  if (isSunday && liveIdx >= 0) {
+  if (sorted.length > 0 && liveIdx >= 0) {
     badge = "Happening Now";
-    headline = schedule[liveIdx].label;
-    sub = schedule[liveIdx].where;
-  } else if (isSunday && nextIdx >= 0) {
-    const s = schedule[nextIdx];
+    headline = sorted[liveIdx].label;
+    sub = sorted[liveIdx].where;
+  } else if (sorted.length > 0 && nextIdx >= 0) {
+    const s = sorted[nextIdx];
     const t = formatTime(s.startsAtMinutes);
     badge = "Up Next";
     headline = `${s.label} · ${t.time} ${t.ampm}`;
     sub = s.where;
-  } else if (isSunday) {
+  } else if (sorted.length > 0) {
     badge = "Today";
-    headline = "Thanks for worshiping with us";
-    sub = "See you Wednesday for Bible Class · 7 PM";
+    headline = isSunday ? "Thanks for worshiping with us" : `That's a wrap on ${dayName}`;
+    sub = isSunday ? "See you Wednesday for Bible Class · 7 PM" : "See you tomorrow.";
   } else {
     badge = "This Week";
     headline = "Worship Sunday · 12:00 PM";
     sub = "Prayer 10 AM · Sunday School 10:30 AM";
   }
 
-  const rows: RowView[] = schedule.map((s, i) => {
+  const rows: RowView[] = sorted.map((s, i) => {
     const t = formatTime(s.startsAtMinutes);
     let status: RowStatus = "soon";
-    if (isSunday && i === liveIdx) status = "live";
-    else if (isSunday && mins >= s.startsAtMinutes + s.durationMinutes) status = "done";
+    if (i === liveIdx) status = "live";
+    else if (mins >= s.startsAtMinutes + s.durationMinutes) status = "done";
     return {
       label: s.label,
       where: s.where,
@@ -106,13 +112,13 @@ export function getTodayStatus(schedule: ScheduleRow[], now: Date): TodayStatus 
     badge,
     headline,
     sub,
-    scheduleLabel: isSunday ? "Today's Schedule · Sunday" : "This Sunday's Schedule",
+    scheduleLabel: sorted.length > 0 ? `Today's Schedule · ${dayName}` : "This Sunday's Schedule",
     rows,
-    isSunday,
+    hasScheduleToday: sorted.length > 0,
   };
 }
 
-/** Seed Sunday schedule from the design — replaced by Supabase data in Phase 2. */
+/** Used as an offline/SSR fallback only. Live data comes from Supabase. */
 export const SEED_SUNDAY_SCHEDULE: ScheduleRow[] = [
   { kind: "prayer", startsAtMinutes: 600, durationMinutes: 30, label: "Morning Prayer", where: "Main Sanctuary" },
   { kind: "sunday_school", startsAtMinutes: 630, durationMinutes: 60, label: "Christian Education", where: "Sunday School · all ages" },

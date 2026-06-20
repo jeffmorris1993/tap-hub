@@ -3,7 +3,7 @@ import { PhoneShell } from "../components/PhoneShell";
 import { HubTopBar } from "../components/HubTopBar";
 import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
-import { getSundaySchedule } from "../lib/supabase/queries";
+import { getTodaySchedule } from "../lib/supabase/queries";
 
 const CHURCH_PHONE = "+12485551234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
@@ -13,7 +13,7 @@ const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 export const revalidate = 60;
 
 export default async function Hub() {
-  const schedule = await getSundaySchedule();
+  const schedule = await getTodaySchedule();
   return (
     <PhoneShell>
       <div className="th-fade">

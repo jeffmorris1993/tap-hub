@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
+import { hasOccurrenceOnDate, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
 
 export type EventCategory = "Worship" | "Youth" | "Community";
 
@@ -12,6 +13,9 @@ export type EventRow = {
   starts_at: string;
   ends_at: string | null;
   location: string;
+  recurrence_kind: RecurrenceKind;
+  recurrence_byday: number | null;
+  recurrence_until: string | null;
 };
 
 export type WeekLookaheadRow = {
@@ -39,13 +43,18 @@ export type ParentResourceRow = {
   url: string | null;
 };
 
-export async function getSundaySchedule(): Promise<ScheduleRow[]> {
+const EVENT_FIELDS =
+  "slug, title, description_long, category, starts_at, ends_at, location, " +
+  "recurrence_kind, recurrence_byday, recurrence_until";
+
+/** Today's standard schedule, filtered to the current day_of_week. */
+export async function getTodaySchedule(now: Date = new Date()): Promise<ScheduleRow[]> {
   const sb = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = now.toISOString().slice(0, 10);
   const { data, error } = await sb
     .from("schedule_today")
     .select("kind, label, starts_at_minutes, duration_minutes, location, active_from, active_until")
-    .eq("day_of_week", 0)
+    .eq("day_of_week", now.getDay())
     .or(`active_from.is.null,active_from.lte.${today}`)
     .or(`active_until.is.null,active_until.gte.${today}`)
     .order("starts_at_minutes", { ascending: true });
@@ -99,32 +108,40 @@ export async function getWeekLookahead(): Promise<WeekLookaheadRow[]> {
 }
 
 export async function listPublishedEvents(): Promise<EventRow[]> {
+  // RLS already filters published + approved.
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("events")
-    .select("slug, title, description_long, category, starts_at, ends_at, location")
+    .select(EVENT_FIELDS)
     .eq("published", true)
+    .eq("approval_status", "approved")
     .order("starts_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as EventRow[];
+  return (data ?? []) as unknown as EventRow[];
 }
 
 export async function getEventBySlug(slug: string): Promise<EventRow | null> {
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("events")
-    .select("slug, title, description_long, category, starts_at, ends_at, location")
+    .select(EVENT_FIELDS)
     .eq("slug", slug)
     .eq("published", true)
+    .eq("approval_status", "approved")
     .limit(1);
   if (error) throw error;
-  return (data?.[0] ?? null) as EventRow | null;
+  return (data?.[0] ?? null) as unknown as EventRow | null;
+}
+
+/** Events whose next computed occurrence falls on a specific date. */
+export async function listEventsOnDate(dateIso: string): Promise<EventRow[]> {
+  const events = await listPublishedEvents();
+  return events.filter((e) => hasOccurrenceOnDate(e as RecurringEventFields, dateIso));
 }
 
 export async function getTodaysKidsLesson(): Promise<KidsLessonRow | null> {
   const sb = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
-  // Latest lesson_date <= today.
   const { data, error } = await sb
     .from("kids_lesson")
     .select("topic, reference, teacher, lesson_date")

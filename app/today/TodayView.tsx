@@ -8,6 +8,7 @@ import { SectionLabel } from "../../components/SectionLabel";
 import { ScheduleRow } from "../../components/ScheduleRow";
 import { LiveClock } from "../../components/LiveClock";
 import { getTodayStatus, type ScheduleRow as ClockRow } from "../../lib/clock";
+import type { DisplayEvent } from "../../lib/events-display";
 
 export type WeekRow = { day_label: string; title: string; detail: string };
 export type EveningInfo = { label: string; where: string; time: string } | null;
@@ -16,10 +17,12 @@ export function TodayView({
   schedule,
   weekLookahead,
   evening,
+  todaysEvents,
 }: {
   schedule: ClockRow[];
   weekLookahead: WeekRow[];
   evening: EveningInfo;
+  todaysEvents: DisplayEvent[];
 }) {
   const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
 
@@ -141,6 +144,67 @@ export function TodayView({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* dynamic events happening today (one-offs and recurring instances) */}
+          {todaysEvents.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: "28px 0 14px" }}>Also Today</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {todaysEvents.map((e) => {
+                  const time = new Date(e.nextOccurrenceIso).toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <Link
+                      key={e.slug}
+                      href={`/events/${e.slug}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "14px",
+                        background: "#121a2e",
+                        border: "1px solid rgba(231,184,78,.28)",
+                        borderRadius: "13px",
+                        padding: "14px 16px",
+                        textDecoration: "none",
+                        color: "inherit",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "48px",
+                          height: "48px",
+                          borderRadius: "11px",
+                          background: "#1a2438",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          color: "#e7b84e",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          textAlign: "center",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {time}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: "14.5px" }}>{e.title}</div>
+                        <div style={{ fontSize: "12px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
+                          {e.location}
+                          {e.recurrenceLabel ? ` · ${e.recurrenceLabel}` : ""}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {/* this week */}
