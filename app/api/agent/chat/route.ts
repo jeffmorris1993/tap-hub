@@ -33,8 +33,13 @@ export async function POST(request: NextRequest) {
     contentType: request.headers.get("content-type") ?? "(none)",
     userAgent: request.headers.get("user-agent") ?? "(none)",
     bodyLen: rawBody.length,
-    bodyHead: rawBody.slice(0, 800),
   });
+  // Body is logged separately so it doesn't overflow Vercel's per-record
+  // truncation. Skip the giant authorizationEventObject JWT — it doesn't
+  // help us debug payload shape.
+  const bodyForLog = rawBody
+    .replace(/"authorizationEventObject"\s*:\s*\{[^}]*\}/g, '"authorizationEventObject":"(redacted)"');
+  console.log("[agent/chat] body", bodyForLog.slice(0, 4000));
 
   if (requiredKey && receivedKey !== requiredKey) {
     await logRow({
