@@ -8,46 +8,36 @@ export const maxDuration = 60;
 /**
  * Google Chat app webhook.
  *
- * Configure the Chat app in Google Cloud Console (Chat API → Configuration)
- * with HTTP endpoint URL:
- *   https://tap-hub.nehtemple.org/api/agent/chat?key=<your secret>
+ * Supports two payload formats:
+ * - Legacy "Chat-specific" format:    { type, message, space, user }
+ * - New Google Workspace Add-ons:     { commonEventObject,
+ *                                       authorizationEventObject,
+ *                                       chat: { eventType,
+ *                                               messagePayload: {
+ *                                                 message, space, ... } } }
  *
- * For now we authenticate via a shared secret in the `key` query param
- * (GOOGLE_CHAT_VERIFICATION_TOKEN). Sender authorization happens via the
- * @nehtemple.org allowlist on the user's workspace email.
+ * The user-agent `Google-gsuiteaddons` tells us which format we got.
+ * We auto-detect and respond in the matching shape.
  */
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);
 
-  // ---- Diagnostic logging ----------------------------------------------
   const receivedKey = url.searchParams.get("key") ?? "";
   const requiredKey = process.env.GOOGLE_CHAT_VERIFICATION_TOKEN ?? "";
-  const hasAuth = request.headers.has("authorization");
-  const ua = request.headers.get("user-agent") ?? "(none)";
-  const contentType = request.headers.get("content-type") ?? "(none)";
 
   const rawBody = await request.text();
   console.log("[agent/chat] request", {
     url: request.url,
-    pathname: url.pathname,
-    searchKeys: [...url.searchParams.keys()],
-    keyLen: receivedKey.length,
-    keyPrefix: receivedKey.slice(0, 6),
-    keySuffix: receivedKey.slice(-6),
-    expectedKeyLen: requiredKey.length,
-    expectedKeySet: requiredKey.length > 0,
     keyMatches: receivedKey === requiredKey,
-    hasAuthHeader: hasAuth,
-    contentType,
-    userAgent: ua,
+    hasAuthHeader: request.headers.has("authorization"),
+    contentType: request.headers.get("content-type") ?? "(none)",
+    userAgent: request.headers.get("user-agent") ?? "(none)",
     bodyLen: rawBody.length,
-    bodyHead: rawBody.slice(0, 200),
+    bodyHead: rawBody.slice(0, 800),
   });
 
-  // ---- Key check (now also logs blocked attempts to agent_runs) --------
   if (requiredKey && receivedKey !== requiredKey) {
     await logRow({
-      channel: "chat",
       sender: "(unauthorized webhook)",
       input: `key check failed (len ${receivedKey.length}, prefix ${receivedKey.slice(0, 8)}…, suffix …${receivedKey.slice(-8)}; expected len ${requiredKey.length})`,
       output: "401 Unauthorized — key mismatch",
@@ -56,14 +46,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ text: "Unauthorized." }, { status: 401 });
   }
 
-  // ---- Parse body ------------------------------------------------------
-  let event: unknown;
+  let event: AnyJson;
   try {
-    event = rawBody ? JSON.parse(rawBody) : {};
+    event = rawBody ? (JSON.parse(rawBody) as AnyJson) : {};
   } catch (err) {
-    console.error("[agent/chat] body parse error", err);
     await logRow({
-      channel: "chat",
       sender: "(parse error)",
       input: rawBody.slice(0, 500),
       output: `400 Bad JSON — ${err instanceof Error ? err.message : String(err)}`,
@@ -72,86 +59,70 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ text: "Invalid JSON." }, { status: 400 });
   }
 
-  const ev = event as {
-    type?: string;
-    message?: {
-      text?: string;
-      sender?: { email?: string; displayName?: string };
-      argumentText?: string;
-    };
-    space?: { name?: string };
-    user?: { email?: string; displayName?: string };
-  };
-
+  const parsed = parseChatEvent(event);
   console.log("[agent/chat] parsed", {
-    type: ev.type,
-    senderEmail: ev.message?.sender?.email ?? ev.user?.email,
-    senderName: ev.message?.sender?.displayName ?? ev.user?.displayName,
-    spaceName: ev.space?.name,
-    textPreview: (ev.message?.argumentText || ev.message?.text || "").slice(0, 120),
+    format: parsed.format,
+    eventType: parsed.eventType,
+    senderEmail: parsed.senderEmail,
+    senderName: parsed.senderName,
+    spaceName: parsed.spaceName,
+    textPreview: parsed.text.slice(0, 120),
   });
 
-  // ---- Standard event handling ----------------------------------------
-  if (ev.type === "ADDED_TO_SPACE") {
+  const wantsAddonsResponse = parsed.format === "addons";
+
+  if (parsed.eventType === "ADDED_TO_SPACE") {
+    const text =
+      "👋 TapHub assistant connected. Talk to me in plain English — schedule services, " +
+      "add events, post the youth lesson, or ask 'how many new visitors today'.";
     await logRow({
-      channel: "chat",
-      sender: ev.user?.email ?? "(unknown)",
+      sender: parsed.senderEmail ?? "(unknown)",
       input: "(ADDED_TO_SPACE event)",
       output: "Sent intro message.",
       status: "ok",
     });
-    return NextResponse.json({
-      text:
-        "👋 TapHub assistant connected. Talk to me in plain English — schedule services, " +
-        "add events, post the youth lesson, or ask 'how many new visitors today'.",
-    });
+    return NextResponse.json(buildResponse(text, wantsAddonsResponse));
   }
-  if (ev.type !== "MESSAGE") {
+
+  if (parsed.eventType !== "MESSAGE") {
     await logRow({
-      channel: "chat",
-      sender: ev.user?.email ?? "(unknown)",
-      input: `(${ev.type ?? "unknown"} event)`,
+      sender: parsed.senderEmail ?? "(unknown)",
+      input: `(${parsed.eventType ?? "unknown"} event, format=${parsed.format})`,
       output: "ignored (non-MESSAGE event)",
       status: "ok",
     });
-    return NextResponse.json({});
+    return NextResponse.json(buildResponse("", wantsAddonsResponse));
   }
 
-  const senderEmail = ev.message?.sender?.email ?? ev.user?.email ?? null;
-  const senderName = ev.message?.sender?.displayName ?? ev.user?.displayName ?? senderEmail ?? "(unknown)";
-  const rawText = (ev.message?.argumentText || ev.message?.text || "").trim();
-
-  if (!senderEmail || !isAllowedAgentSender(senderEmail)) {
+  if (!parsed.senderEmail || !isAllowedAgentSender(parsed.senderEmail)) {
     await logRow({
-      channel: "chat",
-      sender: senderName,
-      input: rawText,
-      output: `Sender not on allowlist (sender: ${senderEmail ?? "no-email"})`,
+      sender: parsed.senderName,
+      input: parsed.text,
+      output: `Sender not on allowlist (sender: ${parsed.senderEmail ?? "no-email"})`,
       status: "blocked",
     });
-    return NextResponse.json({
-      text: `Sorry, ${senderName} — agent access is restricted to @nehtemple.org accounts.`,
-    });
+    return NextResponse.json(
+      buildResponse(
+        `Sorry, ${parsed.senderName} — agent access is restricted to @nehtemple.org accounts.`,
+        wantsAddonsResponse,
+      ),
+    );
   }
 
-  if (!rawText) {
-    return NextResponse.json({ text: "What can I help with?" });
+  if (!parsed.text) {
+    return NextResponse.json(buildResponse("What can I help with?", wantsAddonsResponse));
   }
 
-  const threadKey = ev.space?.name || `direct:${senderEmail}`;
+  const threadKey = parsed.spaceName || `direct:${parsed.senderEmail}`;
   const result = await runAgent({
     channel: "chat",
-    sender: senderEmail,
-    text: rawText,
+    sender: parsed.senderEmail,
+    text: parsed.text,
     threadKey,
   });
-  return NextResponse.json({ text: result.text });
+  return NextResponse.json(buildResponse(result.text, wantsAddonsResponse));
 }
 
-/**
- * Allow GET so you can pop the URL in a browser to confirm DNS / SSL /
- * routing without needing to fake a POST. Returns a tiny JSON status.
- */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const receivedKey = url.searchParams.get("key") ?? "";
@@ -169,8 +140,119 @@ export async function GET(request: NextRequest) {
   });
 }
 
+// ----------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------
+
+type AnyJson = Record<string, unknown> | unknown[] | string | number | boolean | null;
+
+type Parsed = {
+  format: "legacy" | "addons";
+  eventType: string | null;
+  senderEmail: string | null;
+  senderName: string;
+  spaceName: string | null;
+  text: string;
+};
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function get<T = unknown>(obj: unknown, path: string): T | null {
+  let cur: unknown = obj;
+  for (const seg of path.split(".")) {
+    if (!isObject(cur)) return null;
+    cur = cur[seg];
+  }
+  return (cur ?? null) as T | null;
+}
+
+function parseChatEvent(event: unknown): Parsed {
+  // Detect format: the new Google Workspace Add-ons payload always has
+  // a `commonEventObject` at the root.
+  const isAddons = isObject(event) && "commonEventObject" in event;
+  const format: "legacy" | "addons" = isAddons ? "addons" : "legacy";
+
+  if (isAddons) {
+    const eventType =
+      get<string>(event, "chat.eventType") ||
+      get<string>(event, "chat.type") ||
+      // Older variants placed the type at the root or under chat.messagePayload
+      get<string>(event, "type") ||
+      null;
+    const message =
+      (get(event, "chat.messagePayload.message") as Record<string, unknown> | null) ||
+      (get(event, "chat.message") as Record<string, unknown> | null) ||
+      null;
+    const messageSender = message && isObject(message.sender) ? (message.sender as Record<string, unknown>) : null;
+    const chatUser = (get(event, "chat.user") as Record<string, unknown> | null) || null;
+    const space =
+      get<string>(event, "chat.messagePayload.space.name") ||
+      get<string>(event, "chat.messagePayload.message.space.name") ||
+      get<string>(event, "chat.space.name") ||
+      null;
+
+    const senderEmail =
+      (messageSender?.email as string | undefined) ||
+      (chatUser?.email as string | undefined) ||
+      null;
+    const senderName =
+      (messageSender?.displayName as string | undefined) ||
+      (chatUser?.displayName as string | undefined) ||
+      senderEmail ||
+      "(unknown)";
+    const text =
+      ((message?.argumentText as string | undefined) ||
+        (message?.text as string | undefined) ||
+        "").trim();
+
+    return { format, eventType, senderEmail, senderName, spaceName: space, text };
+  }
+
+  // Legacy format
+  const eventType = get<string>(event, "type");
+  const message = get(event, "message") as Record<string, unknown> | null;
+  const messageSender = message && isObject(message.sender) ? (message.sender as Record<string, unknown>) : null;
+  const user = get(event, "user") as Record<string, unknown> | null;
+  const senderEmail =
+    (messageSender?.email as string | undefined) || (user?.email as string | undefined) || null;
+  const senderName =
+    (messageSender?.displayName as string | undefined) ||
+    (user?.displayName as string | undefined) ||
+    senderEmail ||
+    "(unknown)";
+  const text =
+    ((message?.argumentText as string | undefined) ||
+      (message?.text as string | undefined) ||
+      "").trim();
+  const spaceName = get<string>(event, "space.name");
+  return { format, eventType, senderEmail, senderName, spaceName, text };
+}
+
+/**
+ * Builds the response in the format Google expects for the given inbound
+ * shape. The new Add-ons format wants a wrapped `hostAppDataAction` →
+ * `chatDataAction` → `createMessageAction` envelope. The legacy format
+ * just wants `{ text }`.
+ */
+function buildResponse(text: string, useAddonsFormat: boolean): Record<string, unknown> {
+  if (!useAddonsFormat) {
+    return text ? { text } : {};
+  }
+  if (!text) return {};
+  return {
+    hostAppDataAction: {
+      chatDataAction: {
+        createMessageAction: {
+          message: { text },
+        },
+      },
+    },
+  };
+}
+
 async function logRow(p: {
-  channel: "chat";
   sender: string;
   input: string;
   output: string;
@@ -178,7 +260,7 @@ async function logRow(p: {
 }) {
   try {
     await supabaseAdmin().from("agent_runs").insert({
-      channel: p.channel,
+      channel: "chat",
       sender: p.sender,
       input: p.input.slice(0, 4000),
       tool_calls: [],
