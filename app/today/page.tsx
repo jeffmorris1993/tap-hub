@@ -5,13 +5,14 @@ import {
   listEventsOnDate,
 } from "../../lib/supabase/queries";
 import { toDisplayEvent, sortByNextOccurrence } from "../../lib/events-display";
+import { detroitNow, detroitDateIso } from "../../lib/tz";
 import { TodayView } from "./TodayView";
 
 export const revalidate = 60;
 
 export default async function Today() {
-  const now = new Date();
-  const todayIso = now.toISOString().slice(0, 10);
+  const now = detroitNow();
+  const todayIso = detroitDateIso();
   const [schedule, weekLookahead, evening, todaysEventsRaw] = await Promise.all([
     getTodaySchedule(now),
     getWeekLookahead(),

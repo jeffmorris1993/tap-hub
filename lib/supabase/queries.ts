@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
 import { hasOccurrenceOnDate, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
+import { detroitNow, detroitDateIso } from "../tz";
 
 export type EventCategory = "Worship" | "Youth" | "Community";
 
@@ -47,10 +48,10 @@ const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
   "recurrence_kind, recurrence_byday, recurrence_until";
 
-/** Today's standard schedule, filtered to the current day_of_week. */
-export async function getTodaySchedule(now: Date = new Date()): Promise<ScheduleRow[]> {
+/** Today's standard schedule, filtered to the current day_of_week (Detroit-local). */
+export async function getTodaySchedule(now: Date = detroitNow()): Promise<ScheduleRow[]> {
   const sb = supabaseAdmin();
-  const today = now.toISOString().slice(0, 10);
+  const today = detroitDateIso();
   const { data, error } = await sb
     .from("schedule_today")
     .select("kind, label, starts_at_minutes, duration_minutes, location, active_from, active_until")
@@ -73,9 +74,9 @@ export async function getTodaySchedule(now: Date = new Date()): Promise<Schedule
 /** Returns evening worship for today's date, or null if none scheduled. */
 export async function getEveningTonight(): Promise<{ label: string; where: string; time: string } | null> {
   const sb = supabaseAdmin();
-  const today = new Date();
+  const today = detroitNow();
   const dow = today.getDay();
-  const isoDate = today.toISOString().slice(0, 10);
+  const isoDate = detroitDateIso();
   const { data, error } = await sb
     .from("schedule_today")
     .select("label, location, starts_at_minutes, active_from, active_until")
@@ -96,7 +97,7 @@ export async function getEveningTonight(): Promise<{ label: string; where: strin
 
 export async function getWeekLookahead(): Promise<WeekLookaheadRow[]> {
   const sb = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = detroitDateIso();
   const { data, error } = await sb
     .from("week_lookahead")
     .select("day_label, title, detail")
@@ -141,7 +142,7 @@ export async function listEventsOnDate(dateIso: string): Promise<EventRow[]> {
 
 export async function getTodaysKidsLesson(): Promise<KidsLessonRow | null> {
   const sb = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = detroitDateIso();
   const { data, error } = await sb
     .from("kids_lesson")
     .select("topic, reference, teacher, lesson_date")
