@@ -13,13 +13,40 @@ import type { DisplayEvent } from "../../lib/events-display";
 export type WeekRow = { day_label: string; title: string; detail: string };
 export type EveningInfo = { label: string; where: string; time: string } | null;
 
+function minutesToTime(mins: number): { time: string; ampm: string } {
+  let h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return { time: `${h}:${m < 10 ? "0" + m : m}`, ampm };
+}
+
+/** Render Sunday's schedule as "soon" rows (no live status — it's not today). */
+function sundayRowsAsPreview(rows: ClockRow[]) {
+  return [...rows]
+    .sort((a, b) => a.startsAtMinutes - b.startsAtMinutes)
+    .map((s) => {
+      const t = minutesToTime(s.startsAtMinutes);
+      return {
+        label: s.label,
+        where: s.where,
+        time: t.time,
+        ampm: t.ampm,
+        status: "soon" as const,
+      };
+    });
+}
+
 export function TodayView({
   schedule,
+  sundayFallback,
   weekLookahead,
   evening,
   todaysEvents,
 }: {
   schedule: ClockRow[];
+  sundayFallback: ClockRow[];
   weekLookahead: WeekRow[];
   evening: EveningInfo;
   todaysEvents: DisplayEvent[];
@@ -31,6 +58,13 @@ export function TodayView({
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
   }, [schedule]);
+
+  // When today has nothing scheduled (e.g. Saturday), show the upcoming
+  // Sunday's schedule with a "This Sunday" header so the page isn't empty.
+  const fallbackRows = sundayRowsAsPreview(sundayFallback);
+  const useFallback = status.rows.length === 0 && fallbackRows.length > 0;
+  const visibleRows = useFallback ? fallbackRows : status.rows;
+  const scheduleLabel = useFallback ? "This Sunday's Schedule" : status.scheduleLabel;
 
   return (
     <PhoneShell>
@@ -91,12 +125,16 @@ export function TodayView({
           </div>
 
           {/* schedule */}
-          <SectionLabel style={{ margin: "26px 0 14px" }}>{status.scheduleLabel}</SectionLabel>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {status.rows.map((row, i) => (
-              <ScheduleRow key={i} row={row} />
-            ))}
-          </div>
+          {visibleRows.length > 0 && (
+            <>
+              <SectionLabel style={{ margin: "26px 0 14px" }}>{scheduleLabel}</SectionLabel>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {visibleRows.map((row, i) => (
+                  <ScheduleRow key={i} row={row} />
+                ))}
+              </div>
+            </>
+          )}
 
           {/* evening / special */}
           {evening && (

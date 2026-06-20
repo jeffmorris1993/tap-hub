@@ -48,14 +48,14 @@ const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
   "recurrence_kind, recurrence_byday, recurrence_until";
 
-/** Today's standard schedule, filtered to the current day_of_week (Detroit-local). */
-export async function getTodaySchedule(now: Date = detroitNow()): Promise<ScheduleRow[]> {
+/** Standard schedule for a specific day_of_week (Detroit-local active-date filter). */
+export async function getScheduleForDayOfWeek(dayOfWeek: number): Promise<ScheduleRow[]> {
   const sb = supabaseAdmin();
   const today = detroitDateIso();
   const { data, error } = await sb
     .from("schedule_today")
     .select("kind, label, starts_at_minutes, duration_minutes, location, active_from, active_until")
-    .eq("day_of_week", now.getDay())
+    .eq("day_of_week", dayOfWeek)
     .or(`active_from.is.null,active_from.lte.${today}`)
     .or(`active_until.is.null,active_until.gte.${today}`)
     .order("starts_at_minutes", { ascending: true });
@@ -69,6 +69,11 @@ export async function getTodaySchedule(now: Date = detroitNow()): Promise<Schedu
       label: r.label,
       where: r.location,
     }));
+}
+
+/** Today's standard schedule. */
+export async function getTodaySchedule(now: Date = detroitNow()): Promise<ScheduleRow[]> {
+  return getScheduleForDayOfWeek(now.getDay());
 }
 
 /** Returns evening worship for today's date, or null if none scheduled. */
