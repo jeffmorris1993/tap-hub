@@ -13,13 +13,14 @@ import type { DisplayEvent } from "../../lib/events-display";
 export type WeekRow = { day_label: string; title: string; detail: string };
 export type EveningInfo = { label: string; where: string; time: string } | null;
 
-function minutesToTime(mins: number): { time: string; ampm: string } {
+function minutesToTime(mins: number): { time: string; ampm: string; combined: string } {
   let h = Math.floor(mins / 60);
   const m = mins % 60;
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12;
   if (h === 0) h = 12;
-  return { time: `${h}:${m < 10 ? "0" + m : m}`, ampm };
+  const time = `${h}:${m < 10 ? "0" + m : m}`;
+  return { time, ampm, combined: `${time} ${ampm}` };
 }
 
 /** Render Sunday's schedule as "soon" rows (no live status — it's not today). */
@@ -36,6 +37,33 @@ function sundayRowsAsPreview(rows: ClockRow[]) {
         status: "soon" as const,
       };
     });
+}
+
+/** Build the "This Sunday" hero from the Sunday schedule rows. */
+function buildSundayHero(rows: ClockRow[]): {
+  badge: "This Sunday";
+  headline: string;
+  sub: string;
+} {
+  const sorted = [...rows].sort((a, b) => a.startsAtMinutes - b.startsAtMinutes);
+  // Headline = the worship service row, or the last row if no explicit worship row.
+  const main =
+    sorted.find((r) => r.kind === "worship") ??
+    sorted[sorted.length - 1] ??
+    null;
+  const headline = main
+    ? `${main.label} · ${minutesToTime(main.startsAtMinutes).combined}`
+    : "Join us this Sunday";
+  // Sub = the rows before the main service, joined with separators.
+  const earlier = sorted.filter((r) =>
+    main ? r.startsAtMinutes < main.startsAtMinutes : true,
+  );
+  const sub = earlier.length
+    ? earlier
+        .map((r) => `${r.label} ${minutesToTime(r.startsAtMinutes).combined}`)
+        .join(" · ")
+    : "See the full schedule below.";
+  return { badge: "This Sunday", headline, sub };
 }
 
 export function TodayView({
@@ -59,10 +87,14 @@ export function TodayView({
     return () => clearInterval(id);
   }, [schedule]);
 
-  // When today has nothing scheduled (e.g. Saturday), show the upcoming
-  // Sunday's schedule with a "This Sunday" header so the page isn't empty.
+  // When today has nothing scheduled (e.g. Saturday), build the hero +
+  // schedule rows from Sunday's data so the page isn't empty.
   const fallbackRows = sundayRowsAsPreview(sundayFallback);
   const useFallback = status.rows.length === 0 && fallbackRows.length > 0;
+  const sundayHero = useFallback ? buildSundayHero(sundayFallback) : null;
+  const heroBadge = sundayHero ? sundayHero.badge : status.badge;
+  const heroHeadline = sundayHero ? sundayHero.headline : status.headline;
+  const heroSub = sundayHero ? sundayHero.sub : status.sub;
   const visibleRows = useFallback ? fallbackRows : status.rows;
   const scheduleLabel = useFallback ? "This Sunday's Schedule" : status.scheduleLabel;
 
@@ -104,7 +136,7 @@ export function TodayView({
                   color: "#e7b84e",
                 }}
               >
-                {status.badge}
+                {heroBadge}
               </span>
             </div>
             <h2
@@ -117,10 +149,10 @@ export function TodayView({
                 marginTop: "14px",
               }}
             >
-              {status.headline}
+              {heroHeadline}
             </h2>
             <p style={{ color: "#9aa3b8", fontSize: "14px", fontWeight: 600, marginTop: "6px" }}>
-              {status.sub}
+              {heroSub}
             </p>
           </div>
 
