@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { PhoneShell } from "../../../components/PhoneShell";
 import { BackBar } from "../../../components/BackBar";
-import { EventHero } from "../../../components/EventHero";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
 
@@ -118,44 +117,81 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
       <div className="th-slide" style={{ minHeight: "100vh" }}>
         <BackBar href="/events" title={event.title} />
         <div style={{ padding: "0 0 40px" }}>
-          <EventHero hue={event.hue} height={200}>
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "linear-gradient(to top, rgba(11,16,28,.95), transparent 60%)",
-              }}
-            />
-            <div style={{ position: "absolute", left: "18px", bottom: "16px", right: "18px" }}>
+          <div
+            style={{
+              position: "relative",
+              background: "linear-gradient(150deg,#1c2740,#0f1626)",
+              padding: "22px 18px 24px",
+              borderBottom: "1px solid rgba(231,184,78,.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: "66px",
+                  height: "66px",
+                  borderRadius: "15px",
+                  background: "#e7b84e",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  boxShadow: "0 12px 28px -12px rgba(231,184,78,.55)",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "#6b531a",
+                  }}
+                >
+                  {event.month}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-anton)",
+                    fontSize: "28px",
+                    color: "#0b101c",
+                    marginTop: "1px",
+                  }}
+                >
+                  {event.day}
+                </span>
+              </div>
               <span
                 style={{
                   display: "inline-block",
-                  background: "#e7b84e",
-                  color: "#6b531a",
+                  background: "rgba(231,184,78,.14)",
+                  color: "#e7b84e",
                   fontSize: "10px",
                   fontWeight: 800,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  padding: "5px 11px",
+                  padding: "6px 11px",
                   borderRadius: "6px",
                 }}
               >
                 {event.category}
               </span>
-              <h2
-                style={{
-                  fontFamily: "var(--font-anton)",
-                  fontWeight: 400,
-                  textTransform: "uppercase",
-                  fontSize: "26px",
-                  lineHeight: 1.02,
-                  marginTop: "10px",
-                }}
-              >
-                {event.title}
-              </h2>
             </div>
-          </EventHero>
+            <h2
+              style={{
+                fontFamily: "var(--font-anton)",
+                fontWeight: 400,
+                textTransform: "uppercase",
+                fontSize: "26px",
+                lineHeight: 1.02,
+                marginTop: "15px",
+              }}
+            >
+              {event.title}
+            </h2>
+          </div>
 
           <div style={{ padding: "20px 18px" }}>
             <div

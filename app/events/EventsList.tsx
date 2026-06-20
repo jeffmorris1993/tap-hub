@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
-import { EventHero } from "../../components/EventHero";
 import type { DisplayEvent } from "../../lib/events-display";
 import type { EventCategory } from "../../lib/supabase/queries";
 
@@ -60,116 +59,133 @@ export function EventsList({ events }: { events: DisplayEvent[] }) {
               key={e.slug}
               href={`/events/${e.slug}`}
               style={{
+                display: "flex",
                 background: "#121a2e",
                 border: "1px solid rgba(244,241,234,.08)",
                 borderRadius: "16px",
                 overflow: "hidden",
                 textDecoration: "none",
                 color: "inherit",
-                display: "block",
               }}
             >
-              <EventHero hue={e.hue}>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "12px",
-                    left: "12px",
-                    background: "#e7b84e",
-                    borderRadius: "9px",
-                    textAlign: "center",
-                    padding: "8px 12px",
-                    lineHeight: 1,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "#6b531a",
-                    }}
-                  >
-                    {e.month}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-anton)",
-                      fontSize: "21px",
-                      color: "#0b101c",
-                      marginTop: "2px",
-                    }}
-                  >
-                    {e.day}
-                  </div>
-                </div>
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: "78px",
+                  background: "linear-gradient(160deg,#1c2740,#131c30)",
+                  borderRight: "1px solid rgba(231,184,78,.16)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "3px",
+                }}
+              >
                 <span
                   style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "12px",
-                    background: "rgba(7,11,20,.82)",
-                    backdropFilter: "blur(4px)",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "#e7b84e",
+                  }}
+                >
+                  {e.month}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-anton)",
+                    fontSize: "33px",
+                    color: "#f4f1ea",
+                    lineHeight: 0.86,
+                  }}
+                >
+                  {e.day}
+                </span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0, padding: "15px 16px" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    background: "rgba(231,184,78,.14)",
                     color: "#e7b84e",
                     fontSize: "9.5px",
                     fontWeight: 800,
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    padding: "6px 10px",
+                    padding: "5px 9px",
                     borderRadius: "6px",
                   }}
                 >
                   {e.category}
                 </span>
-              </EventHero>
-              <div style={{ padding: "16px 16px 18px" }}>
-                <div
-                  style={{
-                    fontSize: "11.5px",
-                    fontWeight: 800,
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    color: "#e7b84e",
-                  }}
-                >
-                  {e.whenText}
-                </div>
                 <h3
                   style={{
                     fontFamily: "var(--font-anton)",
                     fontWeight: 400,
                     textTransform: "uppercase",
-                    fontSize: "19px",
-                    marginTop: "6px",
-                    lineHeight: 1.04,
+                    fontSize: "18px",
+                    marginTop: "9px",
+                    lineHeight: 1.05,
                   }}
                 >
                   {e.title}
                 </h3>
                 <div
                   style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    color: "#9aa3b8",
+                    marginTop: "8px",
+                  }}
+                >
+                  {e.whenText}
+                </div>
+                <div
+                  style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     marginTop: "12px",
+                    gap: "10px",
                   }}
                 >
                   <span
                     style={{
-                      fontSize: "12.5px",
+                      fontSize: "12px",
                       color: "#9aa3b8",
                       fontWeight: 700,
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "6px",
+                      minWidth: 0,
                     }}
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9aa3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#9aa3b8"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0 }}
+                    >
                       <path d="M12 21s-7-4.5-7-10a7 7 0 1114 0c0 5.5-7 10-7 10z" />
                       <circle cx="12" cy="11" r="2.3" />
                     </svg>
-                    {e.location}
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {e.location}
+                    </span>
                   </span>
                   <span
                     style={{
@@ -181,11 +197,18 @@ export function EventsList({ events }: { events: DisplayEvent[] }) {
                       fontWeight: 800,
                       letterSpacing: "0.04em",
                       textTransform: "uppercase",
+                      flexShrink: 0,
                     }}
                   >
                     Details
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                      <path d="M9 6l6 6-6 6" stroke="#e7b84e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M9 6l6 6-6 6"
+                        stroke="#e7b84e"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </span>
                 </div>
