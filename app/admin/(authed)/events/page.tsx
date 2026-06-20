@@ -14,15 +14,7 @@ const STATUS_PILL: Record<
   rejected: { bg: "rgba(181,50,65,.16)", color: "#ff8a8a", label: "Revisions requested" },
 };
 
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { fmtDateTime as fmt } from "../../../../lib/format";
 
 export default async function AdminEvents() {
   const [events, canApprove] = await Promise.all([listAllEvents(), currentUserCanApprove()]);

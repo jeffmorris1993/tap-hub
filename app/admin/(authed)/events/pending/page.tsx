@@ -4,15 +4,7 @@ import { currentUserCanApprove } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { fmtDateTime as fmt } from "../../../../../lib/format";
 
 export default async function PendingEvents() {
   const [events, canApprove] = await Promise.all([listPendingEvents(), currentUserCanApprove()]);

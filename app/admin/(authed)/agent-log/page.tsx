@@ -1,16 +1,7 @@
 import { supabaseAdmin } from "../../../../lib/supabase/server";
+import { fmtDateTime as fmtDate } from "../../../../lib/format";
 
 export const dynamic = "force-dynamic";
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 export default async function AgentLog() {
   const { data } = await supabaseAdmin()

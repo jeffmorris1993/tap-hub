@@ -83,15 +83,7 @@ async function loadTab(tab: Tab) {
   return await listSignups();
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { fmtDateTime as fmtDate } from "../../../../lib/format";
 
 const tableStyle: React.CSSProperties = {
   width: "100%",
