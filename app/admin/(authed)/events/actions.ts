@@ -12,6 +12,11 @@ import {
   notifySubmitterOfRejection,
   type EventSnapshot,
 } from "../../../../lib/email/event-approval";
+import {
+  pushSubmissionToApprovers,
+  pushApprovalToSubmitter,
+  pushRejectionToSubmitter,
+} from "../../../../lib/chat-notifications";
 
 export type EventFormInput = {
   id?: string;
@@ -147,7 +152,17 @@ export async function submitForApproval(id: string): Promise<EventActionResult> 
   if (error) return { ok: false, error: error.message };
 
   const snap = await loadSnapshot(id);
-  if (snap) await notifyApproversOfSubmission(snap, email, getApproverEmails());
+  if (snap) {
+    const approvers = getApproverEmails();
+    await Promise.all([
+      notifyApproversOfSubmission(snap, email, approvers),
+      pushSubmissionToApprovers(
+        { id: snap.id, slug: snap.slug, title: snap.title, category: snap.category, starts_at: snap.starts_at, location: snap.location, recurrence_kind: snap.recurrence_kind ?? "none" },
+        email,
+        approvers,
+      ),
+    ]);
+  }
 
   revalidateAllEventSurfaces();
   return { ok: true, id };
@@ -179,7 +194,16 @@ export async function approveEvent(id: string): Promise<EventActionResult> {
   if (error) return { ok: false, error: error.message };
 
   const snap = await loadSnapshot(id);
-  if (snap && submittedBy) await notifySubmitterOfApproval(snap, submittedBy, email);
+  if (snap && submittedBy) {
+    await Promise.all([
+      notifySubmitterOfApproval(snap, submittedBy, email),
+      pushApprovalToSubmitter(
+        { id: snap.id, slug: snap.slug, title: snap.title, category: snap.category, starts_at: snap.starts_at, location: snap.location, recurrence_kind: snap.recurrence_kind ?? "none" },
+        submittedBy,
+        email,
+      ),
+    ]);
+  }
 
   revalidateAllEventSurfaces();
   return { ok: true, id };
@@ -211,7 +235,17 @@ export async function rejectEvent(id: string, notes: string): Promise<EventActio
   if (error) return { ok: false, error: error.message };
 
   const snap = await loadSnapshot(id);
-  if (snap && submittedBy) await notifySubmitterOfRejection(snap, submittedBy, email, notes.trim());
+  if (snap && submittedBy) {
+    await Promise.all([
+      notifySubmitterOfRejection(snap, submittedBy, email, notes.trim()),
+      pushRejectionToSubmitter(
+        { id: snap.id, slug: snap.slug, title: snap.title, category: snap.category, starts_at: snap.starts_at, location: snap.location, recurrence_kind: snap.recurrence_kind ?? "none" },
+        submittedBy,
+        email,
+        notes.trim(),
+      ),
+    ]);
+  }
 
   revalidateAllEventSurfaces();
   return { ok: true, id };

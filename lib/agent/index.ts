@@ -128,11 +128,19 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     const text = result.text || "(no text response)";
 
     // Persist the new turn back to the thread when we have a threadKey.
+    // Also stash the participant email so we can DM them later for
+    // proactive notifications (e.g. approval pings) without waiting for
+    // them to message us first.
     if (input.threadKey) {
-      await appendToThread(input.channel, input.threadKey, [
-        { role: "user", content: input.text },
-        { role: "assistant", content: text },
-      ]);
+      await appendToThread(
+        input.channel,
+        input.threadKey,
+        [
+          { role: "user", content: input.text },
+          { role: "assistant", content: text },
+        ],
+        { participantEmail: input.sender.includes("@") ? input.sender : null },
+      );
     }
 
     await logAgentRun({ ...input, output: text, status: "ok", toolCalls });

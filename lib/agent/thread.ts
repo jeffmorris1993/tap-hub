@@ -26,21 +26,40 @@ export async function appendToThread(
   channel: AgentChannel,
   threadKey: string,
   newMessages: AgentMessage[],
+  opts?: { participantEmail?: string | null },
 ): Promise<void> {
   const prior = await loadThread(channel, threadKey);
   const all = [...prior, ...newMessages].slice(-MAX_MESSAGES);
+  const row: Record<string, unknown> = {
+    channel,
+    thread_key: threadKey,
+    messages: all,
+    updated_at: new Date().toISOString(),
+  };
+  if (opts?.participantEmail) row.participant_email = opts.participantEmail.toLowerCase();
   const { error } = await supabaseAdmin()
     .from("agent_threads")
-    .upsert(
-      {
-        channel,
-        thread_key: threadKey,
-        messages: all,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "channel,thread_key" },
-    );
+    .upsert(row, { onConflict: "channel,thread_key" });
   if (error) console.error("[agent/thread] save failed", error);
+}
+
+/** Look up the Chat space (or other thread key) for a given staff email. */
+export async function findThreadKeyByEmail(
+  channel: AgentChannel,
+  email: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("agent_threads")
+    .select("thread_key")
+    .eq("channel", channel)
+    .eq("participant_email", email.toLowerCase())
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.error("[agent/thread] lookup failed", error);
+    return null;
+  }
+  return (data?.[0]?.thread_key as string | undefined) ?? null;
 }
 
 export async function clearThread(channel: AgentChannel, threadKey: string): Promise<void> {
