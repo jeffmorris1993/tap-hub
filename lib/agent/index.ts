@@ -1,8 +1,9 @@
 import "server-only";
 import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { agentTools } from "./tools";
+import { buildAgentTools } from "./tools";
 import { supabaseAdmin } from "../supabase/server";
+import { isApprover } from "../approvers";
 import {
   loadThread,
   appendToThread,
@@ -30,6 +31,17 @@ How to handle vague requests:
 - Honor the conversation history. If the human just answered your follow-up
   question, treat their reply as the continuation of the same request.
 
+Event approval flow:
+- All NEW events go through Bishop / Assistant Pastor approval before they
+  appear on /events. Use create_event_draft (which submits for approval by
+  default). Tell the submitter "I submitted it for the Bishop to review."
+- When an approver asks about pending events, call list_pending_events.
+- approve_event and reject_event ONLY work for the Bishop and Assistant
+  Pastor. The user message tells you whether the current sender is an
+  approver. If they aren't, decline politely; don't even try the tool.
+- When rejecting, the approver must provide notes — ask for them if not
+  given.
+
 General behavior:
 - Be brief. Confirm what you did in one or two short sentences. No filler.
 - Today's date in ISO is provided in each user message.
@@ -40,8 +52,8 @@ General behavior:
   date / time / location so the human can verify.
 - If a tool returns ok:false, apologize once and explain the error in plain
   English. Don't retry without new info.
-- Never invent IDs. Never claim to do something you didn't actually call a
-  tool for.`;
+- Never invent IDs or slugs. Never claim to do something you didn't actually
+  call a tool for.`;
 
 const DEFAULT_MODEL = process.env.AGENT_MODEL || "gpt-4o-mini";
 
@@ -76,7 +88,10 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     month: "long",
     day: "numeric",
   })} (ISO ${today.toISOString().slice(0, 10)}). The church timezone is America/Detroit.`;
-  const userPrompt = `${localDateLine}\n\n${input.text}`;
+  const senderLine = `Sender: ${input.sender} (${
+    isApprover(input.sender) ? "IS an approver" : "is NOT an approver"
+  }). Only approvers may call approve_event or reject_event.`;
+  const userPrompt = `${localDateLine}\n${senderLine}\n\n${input.text}`;
 
   // Load persisted history if a threadKey is set; otherwise use the caller's
   // in-memory history (web tester passes its visible turns).
@@ -94,7 +109,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       model: openai(DEFAULT_MODEL),
       system: SYSTEM_PROMPT,
       messages,
-      tools: agentTools,
+      tools: buildAgentTools({ sender: input.sender }),
       stopWhen: stepCountIs(8),
     });
 

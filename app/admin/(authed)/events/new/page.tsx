@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { EventForm } from "../EventForm";
+import { currentUserCanApprove } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default function NewEvent() {
+export default async function NewEvent() {
+  const canApprove = await currentUserCanApprove();
   return (
     <div>
       <Link
@@ -24,7 +26,7 @@ export default function NewEvent() {
       >
         New event
       </h1>
-      <EventForm />
+      <EventForm canApprove={canApprove} />
     </div>
   );
 }

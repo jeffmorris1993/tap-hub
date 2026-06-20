@@ -13,6 +13,7 @@ export default async function AdminDashboard() {
     { label: "Feedback", value: counts.feedback, href: "/admin/submissions?tab=feedback" },
     { label: "Event signups", value: counts.signups, href: "/admin/submissions?tab=signups" },
     { label: "Published events", value: counts.publishedEvents, href: "/admin/events" },
+    { label: "Awaiting approval", value: counts.pendingEvents, href: "/admin/events/pending" },
   ];
 
   return (

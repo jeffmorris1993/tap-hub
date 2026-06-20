@@ -7,18 +7,24 @@ export type DashboardCounts = {
   prayers: number;
   signups: number;
   publishedEvents: number;
+  pendingEvents: number;
   recentVisitors24h: number;
 };
 
 export async function getDashboardCounts(): Promise<DashboardCounts> {
   const sb = supabaseAdmin();
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const [v, f, p, s, e, vRecent] = await Promise.all([
+  const [v, f, p, s, e, ep, vRecent] = await Promise.all([
     sb.from("visitors").select("*", { count: "exact", head: true }),
     sb.from("feedback").select("*", { count: "exact", head: true }),
     sb.from("prayer_requests").select("*", { count: "exact", head: true }),
     sb.from("event_signups").select("*", { count: "exact", head: true }),
-    sb.from("events").select("*", { count: "exact", head: true }).eq("published", true),
+    sb
+      .from("events")
+      .select("*", { count: "exact", head: true })
+      .eq("published", true)
+      .eq("approval_status", "approved"),
+    sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
     sb.from("visitors").select("*", { count: "exact", head: true }).gte("created_at", since24h),
   ]);
   return {
@@ -27,6 +33,7 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
     prayers: p.count ?? 0,
     signups: s.count ?? 0,
     publishedEvents: e.count ?? 0,
+    pendingEvents: ep.count ?? 0,
     recentVisitors24h: vRecent.count ?? 0,
   };
 }
@@ -125,27 +132,47 @@ export type AdminEventRow = {
   description_long: string;
   allow_volunteers: boolean;
   published: boolean;
+  approval_status: "draft" | "pending" | "approved" | "rejected";
+  approval_notes: string | null;
+  submitted_by: string | null;
+  reviewed_by: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  recurrence_kind: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_byday: number | null;
+  recurrence_until: string | null;
 };
+
+const ADMIN_EVENT_FIELDS =
+  "id, slug, title, category, starts_at, ends_at, location, description_long, " +
+  "allow_volunteers, published, approval_status, approval_notes, submitted_by, " +
+  "reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until";
 
 export async function listAllEvents(): Promise<AdminEventRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("events")
-    .select(
-      "id, slug, title, category, starts_at, ends_at, location, description_long, allow_volunteers, published",
-    )
+    .select(ADMIN_EVENT_FIELDS)
     .order("starts_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as unknown as AdminEventRow[];
+}
+
+export async function listPendingEvents(): Promise<AdminEventRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("events")
+    .select(ADMIN_EVENT_FIELDS)
+    .eq("approval_status", "pending")
+    .order("submitted_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as AdminEventRow[];
 }
 
 export async function getAdminEventById(id: string): Promise<AdminEventRow | null> {
   const { data, error } = await supabaseAdmin()
     .from("events")
-    .select(
-      "id, slug, title, category, starts_at, ends_at, location, description_long, allow_volunteers, published",
-    )
+    .select(ADMIN_EVENT_FIELDS)
     .eq("id", id)
     .limit(1);
   if (error) throw error;
-  return data?.[0] ?? null;
+  return (data?.[0] ?? null) as unknown as AdminEventRow | null;
 }

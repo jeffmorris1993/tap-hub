@@ -2,9 +2,35 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { saveEvent, deleteEvent, type EventFormInput } from "./actions";
+import {
+  saveEvent,
+  submitForApproval,
+  approveEvent,
+  rejectEvent,
+  deleteEvent,
+  unpublishEvent,
+  republishEvent,
+  type EventFormInput,
+} from "./actions";
 
 const CATEGORIES = ["Worship", "Youth", "Community"] as const;
+const RECURRENCE_KINDS = [
+  { value: "none", label: "Doesn't repeat" },
+  { value: "weekly", label: "Every week" },
+  { value: "biweekly", label: "Every 2 weeks" },
+  { value: "monthly", label: "Every month" },
+] as const;
+const DOW_OPTIONS = [
+  { value: 0, label: "Sunday" },
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" },
+];
+
+type ApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -34,6 +60,13 @@ function toLocalInputValue(iso: string | null): string {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 }
 
+const STATUS_STYLES: Record<ApprovalStatus, { bg: string; color: string; label: string }> = {
+  draft: { bg: "rgba(154,163,184,.16)", color: "#cdd3e0", label: "Draft" },
+  pending: { bg: "rgba(231,184,78,.16)", color: "#e7b84e", label: "Awaiting approval" },
+  approved: { bg: "rgba(78,184,107,.16)", color: "#7ed996", label: "Approved" },
+  rejected: { bg: "rgba(181,50,65,.16)", color: "#ff8a8a", label: "Revisions requested" },
+};
+
 type Initial = {
   id?: string;
   slug?: string;
@@ -45,12 +78,27 @@ type Initial = {
   location?: string;
   allow_volunteers?: boolean;
   published?: boolean;
+  approval_status?: ApprovalStatus;
+  approval_notes?: string | null;
+  submitted_by?: string | null;
+  reviewed_by?: string | null;
+  recurrence_kind?: "none" | "weekly" | "biweekly" | "monthly";
+  recurrence_byday?: number | null;
+  recurrence_until?: string | null;
 };
 
-export function EventForm({ initial }: { initial?: Initial }) {
+export function EventForm({
+  initial,
+  canApprove,
+}: {
+  initial?: Initial;
+  canApprove: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
 
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -60,12 +108,19 @@ export function EventForm({ initial }: { initial?: Initial }) {
   const [endsAt, setEndsAt] = useState(toLocalInputValue(initial?.ends_at ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
-  const [published, setPublished] = useState(initial?.published ?? true);
+  const [recurrenceKind, setRecurrenceKind] = useState<"none" | "weekly" | "biweekly" | "monthly">(
+    initial?.recurrence_kind ?? "none",
+  );
+  const [recurrenceByday, setRecurrenceByday] = useState<number | null>(initial?.recurrence_byday ?? null);
+  const [recurrenceUntil, setRecurrenceUntil] = useState<string>(initial?.recurrence_until ?? "");
 
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const payload: EventFormInput = {
+  const status = (initial?.approval_status ?? "draft") as ApprovalStatus;
+  const statusStyle = STATUS_STYLES[status];
+  const isExisting = !!initial?.id;
+  const canSubmit = !isExisting || status === "draft" || status === "rejected";
+
+  function buildPayload(): EventFormInput {
+    return {
       id: initial?.id,
       slug,
       title,
@@ -75,10 +130,67 @@ export function EventForm({ initial }: { initial?: Initial }) {
       ends_at_local: endsAt,
       location,
       allow_volunteers: allowVolunteers,
-      published,
+      recurrence_kind: recurrenceKind,
+      recurrence_byday: recurrenceKind === "weekly" || recurrenceKind === "biweekly" ? recurrenceByday : null,
+      recurrence_until: recurrenceUntil || null,
     };
+  }
+
+  function onSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
     startTransition(async () => {
-      const r = await saveEvent(payload);
+      const r = await saveEvent(buildPayload());
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      if (!initial?.id) router.push(`/admin/events/${r.id}`);
+      router.refresh();
+    });
+  }
+
+  function onSubmitForApproval() {
+    setError(null);
+    startTransition(async () => {
+      const saveResult = await saveEvent(buildPayload());
+      if (!saveResult.ok) {
+        setError(saveResult.error);
+        return;
+      }
+      const r = await submitForApproval(saveResult.id);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      router.push("/admin/events");
+      router.refresh();
+    });
+  }
+
+  function onApprove() {
+    if (!initial?.id) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await approveEvent(initial.id as string);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      router.push("/admin/events");
+      router.refresh();
+    });
+  }
+
+  function onReject() {
+    if (!initial?.id) return;
+    setError(null);
+    if (!showRejectBox) {
+      setShowRejectBox(true);
+      return;
+    }
+    startTransition(async () => {
+      const r = await rejectEvent(initial.id as string, rejectNotes);
       if (!r.ok) {
         setError(r.error);
         return;
@@ -96,8 +208,85 @@ export function EventForm({ initial }: { initial?: Initial }) {
     });
   }
 
+  function onUnpublish() {
+    if (!initial?.id) return;
+    startTransition(async () => {
+      await unpublishEvent(initial.id as string);
+      router.refresh();
+    });
+  }
+
+  function onRepublish() {
+    if (!initial?.id) return;
+    startTransition(async () => {
+      await republishEvent(initial.id as string);
+      router.refresh();
+    });
+  }
+
+  const needsBydayPicker = recurrenceKind === "weekly" || recurrenceKind === "biweekly";
+
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+    <form onSubmit={onSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      {/* Status banner */}
+      {isExisting && (
+        <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <span
+            style={{
+              background: statusStyle.bg,
+              color: statusStyle.color,
+              fontSize: "11.5px",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              padding: "6px 11px",
+              borderRadius: "7px",
+            }}
+          >
+            {statusStyle.label}
+          </span>
+          {initial?.submitted_by && (
+            <span style={{ color: "#9aa3b8", fontSize: "12.5px" }}>
+              Submitted by {initial.submitted_by}
+            </span>
+          )}
+          {initial?.published && status === "approved" && (
+            <span
+              style={{
+                background: "rgba(78,184,107,.15)",
+                color: "#7ed996",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "4px 9px",
+                borderRadius: "6px",
+              }}
+            >
+              Live on /events
+            </span>
+          )}
+        </div>
+      )}
+      {status === "rejected" && initial?.approval_notes && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            background: "rgba(181,50,65,.08)",
+            border: "1px solid rgba(181,50,65,.35)",
+            borderRadius: "12px",
+            padding: "14px 16px",
+          }}
+        >
+          <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#ff8a8a", marginBottom: "6px" }}>
+            Notes from {initial.reviewed_by ?? "the approver"}
+          </div>
+          <div style={{ color: "#f4f1ea", fontSize: "14px", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+            {initial.approval_notes}
+          </div>
+        </div>
+      )}
+
       <div style={{ gridColumn: "1 / -1" }}>
         <label style={labelStyle}>Title</label>
         <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} required />
@@ -161,6 +350,52 @@ export function EventForm({ initial }: { initial?: Initial }) {
         />
       </div>
 
+      {/* Recurrence */}
+      <div>
+        <label style={labelStyle}>Recurrence</label>
+        <select
+          value={recurrenceKind}
+          onChange={(e) => setRecurrenceKind(e.target.value as typeof recurrenceKind)}
+          style={{ ...inputStyle, WebkitAppearance: "none", appearance: "none" }}
+        >
+          {RECURRENCE_KINDS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {needsBydayPicker ? (
+        <div>
+          <label style={labelStyle}>Day of week</label>
+          <select
+            value={recurrenceByday ?? ""}
+            onChange={(e) => setRecurrenceByday(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+            style={{ ...inputStyle, WebkitAppearance: "none", appearance: "none" }}
+          >
+            <option value="">Use start day</option>
+            {DOW_OPTIONS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div />
+      )}
+      {recurrenceKind !== "none" && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Recurrence ends (optional)</label>
+          <input
+            type="date"
+            value={recurrenceUntil}
+            onChange={(e) => setRecurrenceUntil(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+      )}
+
       <label style={{ display: "flex", alignItems: "center", gap: "10px", color: "#cdd3e0", fontSize: "13.5px" }}>
         <input
           type="checkbox"
@@ -170,41 +405,142 @@ export function EventForm({ initial }: { initial?: Initial }) {
         />
         Allow volunteer signups
       </label>
-      <label style={{ display: "flex", alignItems: "center", gap: "10px", color: "#cdd3e0", fontSize: "13.5px" }}>
-        <input
-          type="checkbox"
-          checked={published}
-          onChange={(e) => setPublished(e.target.checked)}
-          style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
-        />
-        Published (visible on /events)
-      </label>
+      <div />
 
       {error && (
         <div style={{ gridColumn: "1 / -1", color: "#ff8a8a", fontSize: "13px", fontWeight: 700 }}>{error}</div>
       )}
 
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: "10px", marginTop: "8px" }}>
+      {/* Action bar */}
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
         <button
           type="submit"
           disabled={pending}
           style={{
-            background: "#e7b84e",
-            color: "#0b101c",
+            background: "#1a2438",
+            color: "#cdd3e0",
             fontWeight: 800,
             fontSize: "13px",
             letterSpacing: "0.05em",
             textTransform: "uppercase",
             padding: "12px 22px",
             borderRadius: "10px",
-            border: "none",
+            border: "1px solid rgba(244,241,234,.14)",
             cursor: pending ? "wait" : "pointer",
             opacity: pending ? 0.7 : 1,
           }}
         >
-          {pending ? "Saving…" : initial?.id ? "Save changes" : "Create event"}
+          {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
         </button>
-        {initial?.id && (
+        {canSubmit && (
+          <button
+            type="button"
+            onClick={onSubmitForApproval}
+            disabled={pending}
+            style={{
+              background: "#e7b84e",
+              color: "#0b101c",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "none",
+              cursor: pending ? "wait" : "pointer",
+              opacity: pending ? 0.7 : 1,
+            }}
+          >
+            Submit for approval
+          </button>
+        )}
+        {canApprove && status === "pending" && (
+          <>
+            <button
+              type="button"
+              onClick={onApprove}
+              disabled={pending}
+              style={{
+                background: "rgba(78,184,107,.22)",
+                color: "#7ed996",
+                fontWeight: 800,
+                fontSize: "13px",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "12px 22px",
+                borderRadius: "10px",
+                border: "1px solid rgba(78,184,107,.4)",
+                cursor: pending ? "wait" : "pointer",
+              }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={onReject}
+              disabled={pending}
+              style={{
+                background: "rgba(181,50,65,.18)",
+                color: "#ff8a8a",
+                fontWeight: 800,
+                fontSize: "13px",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "12px 22px",
+                borderRadius: "10px",
+                border: "1px solid rgba(181,50,65,.4)",
+                cursor: pending ? "wait" : "pointer",
+              }}
+            >
+              {showRejectBox ? "Send rejection" : "Reject…"}
+            </button>
+          </>
+        )}
+        {canApprove && status === "approved" && initial?.published && (
+          <button
+            type="button"
+            onClick={onUnpublish}
+            disabled={pending}
+            style={{
+              background: "transparent",
+              color: "#cdd3e0",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(244,241,234,.14)",
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            Unpublish
+          </button>
+        )}
+        {canApprove && status === "approved" && !initial?.published && (
+          <button
+            type="button"
+            onClick={onRepublish}
+            disabled={pending}
+            style={{
+              background: "#1a2438",
+              color: "#e7b84e",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(231,184,78,.4)",
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            Republish
+          </button>
+        )}
+        {canApprove && initial?.id && (
           <button
             type="button"
             onClick={onDelete}
@@ -220,13 +556,30 @@ export function EventForm({ initial }: { initial?: Initial }) {
               borderRadius: "10px",
               border: "1px solid rgba(255,138,138,.3)",
               cursor: pending ? "wait" : "pointer",
-              marginLeft: "auto",
             }}
           >
             Delete
           </button>
         )}
       </div>
+
+      {/* Reject notes box */}
+      {showRejectBox && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Rejection notes (sent to submitter)</label>
+          <textarea
+            value={rejectNotes}
+            onChange={(e) => setRejectNotes(e.target.value)}
+            rows={4}
+            placeholder="What needs to change before this can be approved?"
+            style={{ ...inputStyle, resize: "vertical" }}
+            autoFocus
+          />
+          <div style={{ marginTop: "8px", color: "#9aa3b8", fontSize: "12.5px" }}>
+            Click <strong>Reject…</strong> a second time to send.
+          </div>
+        </div>
+      )}
     </form>
   );
 }

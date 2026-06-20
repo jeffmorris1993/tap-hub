@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminEventById } from "../../../../../lib/supabase/admin-queries";
 import { EventForm } from "../EventForm";
+import { currentUserCanApprove } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditEvent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const event = await getAdminEventById(id);
+  const [event, canApprove] = await Promise.all([getAdminEventById(id), currentUserCanApprove()]);
   if (!event) notFound();
 
   return (
@@ -30,7 +31,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
       >
         Edit event
       </h1>
-      <EventForm initial={event} />
+      <EventForm initial={event} canApprove={canApprove} />
     </div>
   );
 }
