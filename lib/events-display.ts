@@ -87,21 +87,21 @@ export type DisplayEvent = EventRow & {
   whenText: string;
   recurrenceLabel: string;
   hue: number;
-  /** The next occurrence date used to render the card. May equal starts_at for one-offs. */
-  nextOccurrenceIso: string;
+  /** ISO timestamp of the next upcoming occurrence, or null when none remain. */
+  nextOccurrenceIso: string | null;
+  /** True when there's a future occurrence visitors can still sign up for. */
+  signupOpen: boolean;
 };
 
 /** Builds the card-ready event using its next occurrence on or after `fromDate`. */
 export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): DisplayEvent {
-  const next = nextOccurrence(row as RecurringEventFields, fromDate) ?? new Date(row.starts_at);
-  // For bounded recurring or continuous multi-day, pin the chip to day 1.
-  // Otherwise show the next occurrence (e.g. next Wednesday for weekly events).
-  const useStartForChip =
-    (row.recurrence_kind === "daily" ||
-      row.recurrence_kind === "weekdays" ||
-      (row.recurrence_kind === "none" && row.ends_at)) &&
-    new Date(row.starts_at).getTime() <= next.getTime();
-  const chipDate = useStartForChip ? new Date(row.starts_at) : next;
+  const next = nextOccurrence(row as RecurringEventFields, fromDate);
+  // Chip date prefers the next upcoming occurrence so visitors see the
+  // soonest day they can attend (e.g. next Monday for an ongoing weekdays
+  // run that started last week). Falls back to starts_at only when the
+  // event has no future occurrence — past one-offs, finished recurrences,
+  // or multi-day continuous blocks already in progress.
+  const chipDate = next ?? new Date(row.starts_at);
   const chip = formatEventDateChip(chipDate);
   return {
     ...row,
@@ -110,11 +110,20 @@ export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): Disp
     whenText: formatWhenText(row, fromDate),
     recurrenceLabel: recurrenceLabel(row.recurrence_kind),
     hue: hueFromSlug(row.slug),
-    nextOccurrenceIso: next.toISOString(),
+    nextOccurrenceIso: next ? next.toISOString() : null,
+    signupOpen: next !== null,
   };
 }
 
-/** Sort display events by their next occurrence date, ascending. */
+/** Sort display events by their next occurrence date, ascending. Events with
+ *  no upcoming occurrence sort to the bottom (least relevant). */
 export function sortByNextOccurrence(events: DisplayEvent[]): DisplayEvent[] {
-  return [...events].sort((a, b) => a.nextOccurrenceIso.localeCompare(b.nextOccurrenceIso));
+  return [...events].sort((a, b) => {
+    if (a.nextOccurrenceIso && b.nextOccurrenceIso) {
+      return a.nextOccurrenceIso.localeCompare(b.nextOccurrenceIso);
+    }
+    if (a.nextOccurrenceIso) return -1;
+    if (b.nextOccurrenceIso) return 1;
+    return 0;
+  });
 }

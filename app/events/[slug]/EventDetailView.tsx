@@ -233,69 +233,91 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            {event.allow_volunteers && (
+            {event.signupOpen ? (
               <>
-                <div
+                {event.allow_volunteers && (
+                  <>
+                    <div
+                      style={{
+                        fontSize: "11.5px",
+                        fontWeight: 800,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#cdd3e0",
+                        margin: "24px 0 11px",
+                      }}
+                    >
+                      I&apos;d like to —
+                    </div>
+                    <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                      <button type="button" onClick={() => setRole("attendee")} style={segmentStyle(role === "attendee")}>
+                        Attend
+                      </button>
+                      <button type="button" onClick={() => setRole("volunteer")} style={segmentStyle(role === "volunteer")}>
+                        Volunteer
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  style={{ ...inputStyle, marginBottom: "12px" }}
+                />
+                <input
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  placeholder="Email or phone"
+                  style={{ ...inputStyle, marginBottom: "18px" }}
+                />
+                {result && !result.ok && (
+                  <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
+                    {result.error}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={onSubmit}
+                  disabled={pending}
                   style={{
-                    fontSize: "11.5px",
+                    width: "100%",
+                    background: "#e7b84e",
+                    color: "#0b101c",
                     fontWeight: 800,
-                    letterSpacing: "0.1em",
+                    fontSize: "14px",
+                    letterSpacing: "0.05em",
                     textTransform: "uppercase",
-                    color: "#cdd3e0",
-                    margin: "24px 0 11px",
+                    padding: "17px",
+                    borderRadius: "12px",
+                    border: "none",
+                    cursor: pending ? "wait" : "pointer",
+                    opacity: pending ? 0.7 : 1,
                   }}
                 >
-                  I&apos;d like to —
-                </div>
-                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-                  <button type="button" onClick={() => setRole("attendee")} style={segmentStyle(role === "attendee")}>
-                    Attend
-                  </button>
-                  <button type="button" onClick={() => setRole("volunteer")} style={segmentStyle(role === "volunteer")}>
-                    Volunteer
-                  </button>
-                </div>
+                  {pending ? "Sending…" : role === "volunteer" ? "Sign Up to Volunteer" : "Sign Up to Attend"}
+                </button>
               </>
-            )}
-
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              style={{ ...inputStyle, marginBottom: "12px" }}
-            />
-            <input
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder="Email or phone"
-              style={{ ...inputStyle, marginBottom: "18px" }}
-            />
-            {result && !result.ok && (
-              <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
-                {result.error}
+            ) : (
+              <div
+                style={{
+                  marginTop: "24px",
+                  background: "rgba(154,163,184,.08)",
+                  border: "1px solid rgba(154,163,184,.25)",
+                  borderRadius: "12px",
+                  padding: "16px 18px",
+                  textAlign: "center",
+                  color: "#cdd3e0",
+                  fontSize: "13.5px",
+                  fontWeight: 600,
+                  lineHeight: 1.55,
+                }}
+              >
+                This event has already started — online signups are closed.
+                If you&apos;d still like to come, walk-ins are welcome.
               </div>
             )}
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={pending}
-              style={{
-                width: "100%",
-                background: "#e7b84e",
-                color: "#0b101c",
-                fontWeight: 800,
-                fontSize: "14px",
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                padding: "17px",
-                borderRadius: "12px",
-                border: "none",
-                cursor: pending ? "wait" : "pointer",
-                opacity: pending ? 0.7 : 1,
-              }}
-            >
-              {pending ? "Sending…" : role === "volunteer" ? "Sign Up to Volunteer" : "Sign Up to Attend"}
-            </button>
           </div>
         </div>
       </div>
