@@ -466,7 +466,7 @@ export function EventForm({
               opacity: pending ? 0.7 : 1,
             }}
           >
-            Submit for approval
+            {canApprove ? "Publish" : "Submit for approval"}
           </button>
         )}
         {canApprove && status === "pending" && (

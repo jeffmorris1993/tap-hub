@@ -140,6 +140,13 @@ async function loadSnapshot(id: string): Promise<EventSnapshot | null> {
 
 export async function submitForApproval(id: string): Promise<EventActionResult> {
   const { email } = await requireAdmin();
+
+  // Approvers don't need to send their own events through the queue.
+  // Auto-approve + publish in one step.
+  if (isApprover(email)) {
+    return publishDirectly(id, email);
+  }
+
   const sb = supabaseAdmin();
   const { error } = await sb
     .from("events")
@@ -166,6 +173,32 @@ export async function submitForApproval(id: string): Promise<EventActionResult> 
     ]);
   }
 
+  revalidateAllEventSurfaces();
+  return { ok: true, id };
+}
+
+/** Approver-only: publish an event immediately without going through the queue. */
+export async function publishEvent(id: string): Promise<EventActionResult> {
+  const { email } = await requireAdmin();
+  if (!isApprover(email)) return { ok: false, error: "Only approvers can publish directly." };
+  return publishDirectly(id, email);
+}
+
+async function publishDirectly(id: string, email: string): Promise<EventActionResult> {
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin()
+    .from("events")
+    .update({
+      approval_status: "approved",
+      submitted_by: email,
+      submitted_at: now,
+      reviewed_by: email,
+      reviewed_at: now,
+      approval_notes: null,
+      published: true,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
   revalidateAllEventSurfaces();
   return { ok: true, id };
 }

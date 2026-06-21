@@ -133,7 +133,8 @@ export function buildAgentTools(ctx: AgentContext) {
 
     create_event_draft: tool({
       description:
-        "Create a NEW event as a draft and (by default) immediately submit it for approval by the Bishop / Assistant Pastor. The event is NOT visible to the public until an approver approves it. " +
+        "Create a NEW event. By default it's submitted for review immediately. " +
+        "If the sender is the Bishop or Assistant Pastor (an approver), the event skips the queue and publishes directly — they do not need their own events approved. " +
         "BEFORE calling this tool, make sure you have explicit answers to all of: title, date, time, location, whether volunteers are needed, and whether there's a cost. If any of those are missing from the conversation, ASK a single short follow-up first instead of guessing.",
       inputSchema: z.object({
         title: z.string().min(1),
@@ -177,6 +178,14 @@ export function buildAgentTools(ctx: AgentContext) {
         const wantsRecurrenceByday =
           input.recurrenceKind === "weekly" || input.recurrenceKind === "biweekly";
 
+        // Approvers' own events skip the queue and publish directly. The
+        // submitForApproval input still toggles "publish now vs. save as
+        // draft" for them — it just maps to approved+published instead of
+        // pending.
+        const wantsToPublishOrSubmit = input.submitForApproval;
+        const isSenderApprover = senderIsApprover;
+        const nowIso = new Date().toISOString();
+
         const insertPayload = {
           slug,
           title: input.title,
@@ -190,10 +199,16 @@ export function buildAgentTools(ctx: AgentContext) {
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,
           recurrence_until: input.recurrenceUntil ?? null,
-          approval_status: input.submitForApproval ? "pending" : "draft",
-          submitted_by: input.submitForApproval ? ctx.sender : null,
-          submitted_at: input.submitForApproval ? new Date().toISOString() : null,
-          published: false,
+          approval_status: !wantsToPublishOrSubmit
+            ? "draft"
+            : isSenderApprover
+              ? "approved"
+              : "pending",
+          submitted_by: wantsToPublishOrSubmit ? ctx.sender : null,
+          submitted_at: wantsToPublishOrSubmit ? nowIso : null,
+          reviewed_by: wantsToPublishOrSubmit && isSenderApprover ? ctx.sender : null,
+          reviewed_at: wantsToPublishOrSubmit && isSenderApprover ? nowIso : null,
+          published: wantsToPublishOrSubmit && isSenderApprover,
         };
 
         const { data, error } = await supabaseAdmin()
@@ -204,7 +219,8 @@ export function buildAgentTools(ctx: AgentContext) {
         if (error) return { ok: false, error: error.message };
         const id = data?.[0]?.id as string;
 
-        if (input.submitForApproval) {
+        // Only notify approvers when a non-approver submitted for review.
+        if (wantsToPublishOrSubmit && !isSenderApprover) {
           const snap = await snapshotById(id);
           if (snap) {
             const approvers = getApproverEmails();
@@ -227,14 +243,16 @@ export function buildAgentTools(ctx: AgentContext) {
           }
         }
 
-        return {
-          ok: true,
-          id,
-          slug,
-          summary: input.submitForApproval
-            ? `Created "${input.title}" and submitted it for approval. The Bishop and Assistant Pastor have been notified.`
-            : `Created "${input.title}" as a draft. Not submitted yet.`,
-        };
+        let summary: string;
+        if (!wantsToPublishOrSubmit) {
+          summary = `Created "${input.title}" as a draft. Not submitted yet.`;
+        } else if (isSenderApprover) {
+          summary = `Created "${input.title}" and published it. It's live on /events now.`;
+        } else {
+          summary = `Created "${input.title}" and submitted it for approval. The Bishop and Assistant Pastor have been notified.`;
+        }
+
+        return { ok: true, id, slug, summary };
       },
     }),
 
