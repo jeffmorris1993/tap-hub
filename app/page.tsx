@@ -143,18 +143,6 @@ export default async function Hub() {
             }
           />
           <HubTile
-            href="/kids-youth"
-            title="Kids + Youth"
-            sub="Ignite & all ages"
-            icon={
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="8" r="2.4" />
-                <circle cx="16" cy="9.5" r="1.9" />
-                <path d="M4 19c0-3 2.2-4.8 5-4.8s5 1.8 5 4.8M14.5 19c0-2 .9-3.3 2.8-3.7" />
-              </svg>
-            }
-          />
-          <HubTile
             href={GIVE_URL || "#"}
             external
             title="Give"
