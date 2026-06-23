@@ -129,6 +129,14 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   todayStart.setHours(0, 0, 0, 0);
 
   const fromEvents: Announcement[] = events.flatMap((e) => {
+    // Skip events that have already kicked off. For a one-time event the
+    // nextOccurrence check below catches it; for a recurring series we
+    // need this explicit gate so a multi-week program doesn't keep
+    // announcing itself every day after it starts. Once an event is
+    // "ongoing" it lives on the Events page, not the Announcements tab.
+    const firstStart = new Date(e.starts_at);
+    if (firstStart.getTime() <= now.getTime()) return [];
+
     const next = nextOccurrence(e as RecurringEventFields, todayStart);
     if (!next) return [];
     const startIso = next.toISOString();
