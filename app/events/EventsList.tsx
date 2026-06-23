@@ -1,17 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
 import type { DisplayEvent } from "../../lib/events-display";
 import type { EventCategory } from "../../lib/supabase/queries";
 
+const POLL_INTERVAL_MS = 30_000;
+
 const TABS: ("All" | EventCategory)[] = ["All", "Worship", "Youth", "Community"];
 
 export function EventsList({ events }: { events: DisplayEvent[] }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<(typeof TABS)[number]>("All");
   const list = filter === "All" ? events : events.filter((e) => e.category === filter);
+
+  // Poll for new/changed events. router.refresh() re-runs the parent
+  // server component (which re-fetches from Supabase) and swaps in fresh
+  // props without dropping client state like the filter selection.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const id = setInterval(tick, POLL_INTERVAL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [router]);
 
   return (
     <PhoneShell>
