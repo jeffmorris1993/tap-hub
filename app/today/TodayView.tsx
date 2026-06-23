@@ -207,7 +207,8 @@ export function TodayView({
               <SectionLabel style={{ margin: "28px 0 14px" }}>Also Today</SectionLabel>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {todaysEvents.map((e) => {
-                  const time = new Date(e.nextOccurrenceIso ?? e.starts_at).toLocaleTimeString(undefined, {
+                  const time = new Date(e.nextOccurrenceIso ?? e.starts_at).toLocaleTimeString("en-US", {
+                    timeZone: "America/Detroit",
                     hour: "numeric",
                     minute: "2-digit",
                   });

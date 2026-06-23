@@ -47,11 +47,14 @@ function slugify(s: string): string {
     .slice(0, 80);
 }
 
+// Imported here (not at top) so we keep this file's import block minimal.
+import { localToUtcIso } from "../../../../lib/tz";
+
 function toIso(localValue: string): string | null {
-  if (!localValue) return null;
-  const d = new Date(localValue);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+  // Interpret the form's datetime-local string as wall-clock time in the
+  // church's timezone (Detroit) — otherwise Vercel's UTC server would
+  // store "9 AM" as 9 AM UTC = 5 AM EDT.
+  return localToUtcIso(localValue);
 }
 
 async function requireAdmin(): Promise<{ email: string }> {

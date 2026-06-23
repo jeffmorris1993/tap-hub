@@ -3,6 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { supabaseAdmin } from "../supabase/server";
 import { isApprover, getApproverEmails } from "../approvers";
+import { localToUtcIso } from "../tz";
 import { recurrenceLabel } from "../events-occurrence";
 import {
   notifyApproversOfSubmission,
@@ -140,8 +141,17 @@ export function buildAgentTools(ctx: AgentContext) {
         title: z.string().min(1),
         descriptionLong: z.string().min(1),
         category: z.enum(["Worship", "Youth", "Community"]),
-        startsAtLocal: z.string().describe("Local datetime YYYY-MM-DDTHH:MM"),
-        endsAtLocal: z.string().optional(),
+        startsAtLocal: z
+          .string()
+          .describe(
+            "Local Detroit wall-clock datetime, format YYYY-MM-DDTHH:MM (e.g. '2026-07-04T18:00' = 6:00 PM EDT on July 4). Do NOT convert to UTC — the server interprets this as the church's timezone.",
+          ),
+        endsAtLocal: z
+          .string()
+          .optional()
+          .describe(
+            "Same format as startsAtLocal — local Detroit wall-clock datetime. The server converts to UTC.",
+          ),
         location: z.string().min(1),
         allowVolunteers: z
           .boolean()
@@ -171,9 +181,14 @@ export function buildAgentTools(ctx: AgentContext) {
         slug: z.string().optional(),
       }),
       execute: async (input) => {
-        const startsAt = new Date(input.startsAtLocal);
-        if (isNaN(startsAt.getTime())) return { ok: false, error: "startsAtLocal is invalid" };
-        const endsAt = input.endsAtLocal ? new Date(input.endsAtLocal) : null;
+        // Interpret incoming wall-clock times as Detroit-local (not UTC)
+        // before persisting. Otherwise "9:00 AM" stored on Vercel ends up
+        // as 9 AM UTC = 5 AM EDT in the church's display.
+        const startsAtIso = localToUtcIso(input.startsAtLocal);
+        if (!startsAtIso) return { ok: false, error: "startsAtLocal is invalid (use YYYY-MM-DDTHH:MM)" };
+        const startsAt = new Date(startsAtIso);
+        const endsAtIso = input.endsAtLocal ? localToUtcIso(input.endsAtLocal) : null;
+        const endsAt = endsAtIso ? new Date(endsAtIso) : null;
         const slug = slugify(input.slug || input.title) || `event-${Date.now()}`;
         const wantsRecurrenceByday =
           input.recurrenceKind === "weekly" || input.recurrenceKind === "biweekly";

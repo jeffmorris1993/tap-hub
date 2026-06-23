@@ -1,5 +1,6 @@
 import type { EventRow } from "./supabase/queries";
 import { nextOccurrence, recurrenceLabel, type RecurringEventFields } from "./events-occurrence";
+import { CHURCH_TZ } from "./tz";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -14,11 +15,15 @@ export function formatEventDateChip(d: Date): { month: string; day: string } {
   return { month: MONTHS[d.getMonth()], day: String(d.getDate()).padStart(2, "0") };
 }
 
+// All event-card date/time formatting uses the church's timezone so
+// SSR on Vercel (UTC) doesn't accidentally render times shifted 4–5
+// hours from what the church expects.
 function fmtTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString("en-US", { timeZone: CHURCH_TZ, hour: "numeric", minute: "2-digit" });
 }
 function fmtFullDate(d: Date): string {
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
+    timeZone: CHURCH_TZ,
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -26,7 +31,8 @@ function fmtFullDate(d: Date): string {
   });
 }
 function fmtRangeDate(d: Date, withYear = false): string {
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
+    timeZone: CHURCH_TZ,
     month: "short",
     day: "numeric",
     ...(withYear ? { year: "numeric" } : {}),
