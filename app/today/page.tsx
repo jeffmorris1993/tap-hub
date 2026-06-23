@@ -22,7 +22,9 @@ export default async function Today() {
       getScheduleForDayOfWeek(0),
       getWeekLookahead(),
       getEveningTonight(),
-      listEventsOnDate(todayIso, new Date()),
+      // Don't pass `now` — we want events to stay visible all day with a
+      // "Done" badge once they end, matching the standard schedule rows.
+      listEventsOnDate(todayIso),
     ]);
   const todaysEvents = sortByNextOccurrence(
     todaysEventsRaw.map((e) => toDisplayEvent(e, now)),
