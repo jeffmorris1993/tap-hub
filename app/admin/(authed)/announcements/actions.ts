@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminUser } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
+import { isApprover } from "../../../../lib/approvers";
 import type { AnnouncementCategory } from "../../../../lib/announcement-types";
+
+export type ApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
 export type AnnouncementInput = {
   id?: string;
@@ -12,9 +15,8 @@ export type AnnouncementInput = {
   title: string;
   body: string;
   date_label: string | null;
-  expires_at: string | null; // ISO date or datetime, or null
+  expires_at: string | null;
   pinned: boolean;
-  published: boolean;
   link_url: string | null;
   action_label: string | null;
 };
@@ -29,9 +31,19 @@ async function requireAdmin() {
   return user;
 }
 
+function bustCaches() {
+  revalidatePath("/announcements");
+  revalidatePath("/");
+  revalidatePath("/admin/announcements");
+}
+
+/** Save (insert or update) without changing the approval state.
+ *  - Brand-new announcements are saved as drafts; submit-for-approval is a separate action.
+ *  - Edits to an existing announcement preserve its approval_status. */
 export async function saveAnnouncement(input: AnnouncementInput): Promise<AnnouncementResult> {
+  let user;
   try {
-    await requireAdmin();
+    user = await requireAdmin();
   } catch {
     return { ok: false, error: "Not authorized." };
   }
@@ -47,38 +59,169 @@ export async function saveAnnouncement(input: AnnouncementInput): Promise<Announ
     return { ok: false, error: "Add a label for the action button (or remove the link)." };
   }
 
-  const payload = {
+  const baseFields = {
     category: input.category,
     title,
     body,
     date_label: dateLabel,
     expires_at: input.expires_at,
     pinned: input.pinned,
-    published: input.published,
     link_url: linkUrl,
     action_label: actionLabel,
   };
 
   const sb = supabaseAdmin();
   if (input.id) {
-    const { error } = await sb.from("announcements").update(payload).eq("id", input.id);
+    const { error } = await sb.from("announcements").update(baseFields).eq("id", input.id);
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/announcements");
-    revalidatePath("/");
-    revalidatePath("/admin/announcements");
+    bustCaches();
     return { ok: true, id: input.id };
   }
 
+  // New row → save as draft, unpublished. The user moves it forward
+  // explicitly with "Submit for approval" / "Publish".
   const { data, error } = await sb
     .from("announcements")
-    .insert(payload)
+    .insert({
+      ...baseFields,
+      approval_status: "draft",
+      published: false,
+      submitted_by: user.email ?? null,
+    })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/announcements");
-  revalidatePath("/");
-  revalidatePath("/admin/announcements");
+  bustCaches();
   return { ok: true, id: (data as { id: string }).id };
+}
+
+/** Move a draft / rejected announcement to pending. Approvers' announcements
+ *  skip the queue and publish immediately (matches the events flow). */
+export async function submitAnnouncementForApproval(id: string): Promise<AnnouncementResult> {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: "Not authorized." };
+  }
+  const email = user.email ?? "";
+  const senderIsApprover = isApprover(email);
+  const nowIso = new Date().toISOString();
+
+  const payload = senderIsApprover
+    ? {
+        approval_status: "approved" as const,
+        submitted_by: email,
+        submitted_at: nowIso,
+        reviewed_by: email,
+        reviewed_at: nowIso,
+        approval_notes: null,
+        published: true,
+      }
+    : {
+        approval_status: "pending" as const,
+        submitted_by: email,
+        submitted_at: nowIso,
+        reviewed_by: null,
+        reviewed_at: null,
+        approval_notes: null,
+        published: false,
+      };
+
+  const { error } = await supabaseAdmin().from("announcements").update(payload).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  bustCaches();
+  return { ok: true, id };
+}
+
+export async function approveAnnouncement(id: string): Promise<AnnouncementResult> {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: "Not authorized." };
+  }
+  if (!isApprover(user.email)) {
+    return { ok: false, error: "Only approvers can approve announcements." };
+  }
+  const { error } = await supabaseAdmin()
+    .from("announcements")
+    .update({
+      approval_status: "approved",
+      reviewed_by: user.email,
+      reviewed_at: new Date().toISOString(),
+      approval_notes: null,
+      published: true,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  bustCaches();
+  return { ok: true, id };
+}
+
+export async function rejectAnnouncement(id: string, notes: string): Promise<AnnouncementResult> {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: "Not authorized." };
+  }
+  if (!isApprover(user.email)) {
+    return { ok: false, error: "Only approvers can reject announcements." };
+  }
+  const trimmed = notes.trim();
+  if (!trimmed) return { ok: false, error: "Add a short note about what needs to change." };
+  const { error } = await supabaseAdmin()
+    .from("announcements")
+    .update({
+      approval_status: "rejected",
+      reviewed_by: user.email,
+      reviewed_at: new Date().toISOString(),
+      approval_notes: trimmed,
+      published: false,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  bustCaches();
+  return { ok: true, id };
+}
+
+export async function unpublishAnnouncement(id: string): Promise<AnnouncementResult> {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: "Not authorized." };
+  }
+  if (!isApprover(user.email)) {
+    return { ok: false, error: "Only approvers can unpublish announcements." };
+  }
+  const { error } = await supabaseAdmin()
+    .from("announcements")
+    .update({ published: false })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  bustCaches();
+  return { ok: true, id };
+}
+
+export async function republishAnnouncement(id: string): Promise<AnnouncementResult> {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: "Not authorized." };
+  }
+  if (!isApprover(user.email)) {
+    return { ok: false, error: "Only approvers can republish announcements." };
+  }
+  const { error } = await supabaseAdmin()
+    .from("announcements")
+    .update({ published: true })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  bustCaches();
+  return { ok: true, id };
 }
 
 export async function deleteAnnouncement(id: string): Promise<void> {
@@ -86,8 +229,11 @@ export async function deleteAnnouncement(id: string): Promise<void> {
   const sb = supabaseAdmin();
   const { error } = await sb.from("announcements").delete().eq("id", id);
   if (error) throw error;
-  revalidatePath("/announcements");
-  revalidatePath("/");
-  revalidatePath("/admin/announcements");
+  bustCaches();
   redirect("/admin/announcements");
+}
+
+export async function currentUserCanApprove(): Promise<boolean> {
+  const user = await getAdminUser();
+  return isApprover(user?.email ?? null);
 }

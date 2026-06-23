@@ -143,6 +143,9 @@ const FLASH_MESSAGES: Record<string, { kind: ToastKind; message: string }> = {
   "event-republished": { kind: "success", message: "Event republished." },
   "announcement-saved": { kind: "success", message: "Announcement saved." },
   "announcement-deleted": { kind: "success", message: "Announcement deleted." },
+  "announcement-submitted": { kind: "success", message: "Submitted for approval." },
+  "announcement-approved": { kind: "success", message: "Announcement approved + published." },
+  "announcement-rejected": { kind: "success", message: "Announcement sent back to the submitter." },
 };
 
 function popFlash(key: string | null): { kind: ToastKind; message: string } | null {

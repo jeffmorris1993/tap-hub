@@ -26,13 +26,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getAdminUser();
   if (!user) redirect("/admin/login");
 
-  // Pull the pending-events count once for the sidebar badge — same query
-  // the queue page uses, lightweight HEAD count.
-  const { count } = await supabaseAdmin()
-    .from("events")
-    .select("*", { count: "exact", head: true })
-    .eq("approval_status", "pending");
-  const pendingCount = count ?? 0;
+  // Pull the pending counts once for the sidebar badges — lightweight
+  // HEAD counts on both events and announcements.
+  const sb = supabaseAdmin();
+  const [{ count: eventsPending }, { count: annPending }] = await Promise.all([
+    sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
+    sb.from("announcements").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
+  ]);
+  const pendingCount = eventsPending ?? 0;
+  const pendingAnnouncementsCount = annPending ?? 0;
 
   const email = user.email ?? "(unknown)";
   const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
@@ -52,7 +54,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     initials,
   };
 
-  const nav = buildNav(pendingCount);
+  const nav = buildNav(pendingCount, pendingAnnouncementsCount);
 
   return (
     <AdminShell persona={persona} nav={nav}>

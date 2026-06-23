@@ -430,6 +430,189 @@ export function buildAgentTools(ctx: AgentContext) {
       },
     }),
 
+    create_announcement: tool({
+      description:
+        "Post a one-off announcement (parking lot closure, new members class, choir rehearsal moved, etc.). " +
+        "Announcements ALWAYS go through Bishop / Assistant Pastor approval before they appear on the public Announcements tab — except when an approver submits them, in which case they publish immediately. " +
+        "Do NOT use this for events that need their own page on /events — use create_event_draft instead. Use create_announcement for short news/notices that don't need RSVPs. " +
+        "BEFORE calling, make sure you have: category, a short title, the body, and ideally a display date/when. If any is missing, ASK one short follow-up first.",
+      inputSchema: z.object({
+        category: z
+          .enum(["Important", "Ministry", "Facilities", "Event"])
+          .describe(
+            "Important = urgent / time-sensitive notices the whole church should see. " +
+              "Ministry = ministry-specific news (new members class, choir, etc.). " +
+              "Facilities = building / parking / closures. " +
+              "Event = a teaser for something on the calendar. Most one-off church news fits Ministry.",
+          ),
+        title: z.string().min(1).max(120),
+        body: z.string().min(1).describe("2–5 sentences. Plain text; no markdown."),
+        dateLabel: z
+          .string()
+          .optional()
+          .describe(
+            'Free-form display date shown on the card, e.g. "Sun, Mar 1 · 10:30 AM", "Jan 6 – 26", "Weekend of Mar 7". Omit when there is no specific date.',
+          ),
+        pinned: z
+          .boolean()
+          .default(false)
+          .describe("Pin to the top of the Announcements tab. Use sparingly — for the most important items."),
+        expiresOn: isoDate
+          .optional()
+          .describe(
+            "Auto-hide the announcement after this date (YYYY-MM-DD). Use for time-bounded notices like a one-weekend parking closure. End of that day, local time.",
+          ),
+        linkUrl: z
+          .string()
+          .optional()
+          .describe(
+            "Optional URL or app path the card's CTA button opens, e.g. '/events' or 'https://…'. Requires actionLabel.",
+          ),
+        actionLabel: z
+          .string()
+          .optional()
+          .describe('Label for the CTA button, e.g. "Sign up", "Learn more". Required if linkUrl is set.'),
+        submitForApproval: z
+          .boolean()
+          .default(true)
+          .describe("Submit for review now? Defaults to true. Set false to keep as a draft."),
+      }),
+      execute: async (input) => {
+        if (input.linkUrl && !input.actionLabel) {
+          return { ok: false, error: "actionLabel is required when linkUrl is set." };
+        }
+        const wantsToPublishOrSubmit = input.submitForApproval;
+        const nowIso = new Date().toISOString();
+        const expiresAt = input.expiresOn
+          ? new Date(input.expiresOn + "T23:59:59").toISOString()
+          : null;
+
+        const payload = {
+          category: input.category,
+          title: input.title,
+          body: input.body,
+          date_label: input.dateLabel ?? null,
+          expires_at: expiresAt,
+          pinned: input.pinned ?? false,
+          link_url: input.linkUrl ?? null,
+          action_label: input.actionLabel ?? null,
+          approval_status: !wantsToPublishOrSubmit
+            ? "draft"
+            : senderIsApprover
+              ? "approved"
+              : "pending",
+          submitted_by: wantsToPublishOrSubmit ? ctx.sender : null,
+          submitted_at: wantsToPublishOrSubmit ? nowIso : null,
+          reviewed_by: wantsToPublishOrSubmit && senderIsApprover ? ctx.sender : null,
+          reviewed_at: wantsToPublishOrSubmit && senderIsApprover ? nowIso : null,
+          published: wantsToPublishOrSubmit && senderIsApprover,
+        };
+
+        const { data, error } = await supabaseAdmin()
+          .from("announcements")
+          .insert(payload)
+          .select("id, title")
+          .limit(1);
+        if (error) return { ok: false, error: error.message };
+        const id = data?.[0]?.id as string;
+
+        let summary: string;
+        if (!wantsToPublishOrSubmit) {
+          summary = `Saved announcement "${input.title}" as a draft. Not submitted yet.`;
+        } else if (senderIsApprover) {
+          summary = `Posted "${input.title}" to /announcements.`;
+        } else {
+          summary = `Submitted "${input.title}" for approval. The Bishop and Assistant Pastor will be notified.`;
+        }
+        return { ok: true, id, summary };
+      },
+    }),
+
+    list_pending_announcements: tool({
+      description:
+        "List announcements that are currently waiting on approval. Use when an approver asks 'what announcements need my review' or similar.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data, error } = await supabaseAdmin()
+          .from("announcements")
+          .select("id, category, title, body, date_label, submitted_by, submitted_at")
+          .eq("approval_status", "pending")
+          .order("submitted_at", { ascending: true });
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, count: data?.length ?? 0, announcements: data ?? [] };
+      },
+    }),
+
+    approve_announcement: tool({
+      description:
+        "Approve a pending announcement so it appears on /announcements. RESTRICTED to approvers. Identify by id (from list_pending_announcements) or by exact title.",
+      inputSchema: z.object({
+        id: z.string().uuid().optional(),
+        title: z.string().min(1).optional(),
+      }),
+      execute: async ({ id, title }) => {
+        if (!senderIsApprover) {
+          return { ok: false, error: "Only the Bishop or Assistant Pastor can approve announcements." };
+        }
+        if (!id && !title) return { ok: false, error: "Pass either id or title." };
+        const sb = supabaseAdmin();
+        const query = sb.from("announcements").select("id, title, approval_status").limit(1);
+        const { data, error } = id ? await query.eq("id", id) : await query.eq("title", title!);
+        if (error) return { ok: false, error: error.message };
+        const row = data?.[0] as { id: string; title: string; approval_status: string } | undefined;
+        if (!row) return { ok: false, error: "No matching announcement found." };
+        if (row.approval_status === "approved") {
+          return { ok: false, error: `"${row.title}" is already approved.` };
+        }
+        const upd = await sb
+          .from("announcements")
+          .update({
+            approval_status: "approved",
+            reviewed_by: ctx.sender,
+            reviewed_at: new Date().toISOString(),
+            approval_notes: null,
+            published: true,
+          })
+          .eq("id", row.id);
+        if (upd.error) return { ok: false, error: upd.error.message };
+        return { ok: true, summary: `Approved "${row.title}". It's live on /announcements.` };
+      },
+    }),
+
+    reject_announcement: tool({
+      description:
+        "Reject a pending announcement with notes for the submitter. RESTRICTED to approvers. Pass id or title plus notes.",
+      inputSchema: z.object({
+        id: z.string().uuid().optional(),
+        title: z.string().min(1).optional(),
+        notes: z.string().min(1).describe("Short explanation of what needs to change."),
+      }),
+      execute: async ({ id, title, notes }) => {
+        if (!senderIsApprover) {
+          return { ok: false, error: "Only the Bishop or Assistant Pastor can reject announcements." };
+        }
+        if (!id && !title) return { ok: false, error: "Pass either id or title." };
+        const sb = supabaseAdmin();
+        const query = sb.from("announcements").select("id, title").limit(1);
+        const { data, error } = id ? await query.eq("id", id) : await query.eq("title", title!);
+        if (error) return { ok: false, error: error.message };
+        const row = data?.[0] as { id: string; title: string } | undefined;
+        if (!row) return { ok: false, error: "No matching announcement found." };
+        const upd = await sb
+          .from("announcements")
+          .update({
+            approval_status: "rejected",
+            reviewed_by: ctx.sender,
+            reviewed_at: new Date().toISOString(),
+            approval_notes: notes,
+            published: false,
+          })
+          .eq("id", row.id);
+        if (upd.error) return { ok: false, error: upd.error.message };
+        return { ok: true, summary: `Rejected "${row.title}" and notified the submitter.` };
+      },
+    }),
+
     list_recent_submissions: tool({
       description:
         "Quick count of recent inbox items. Use for 'how many prayer requests this week' or 'any new visitors today'.",

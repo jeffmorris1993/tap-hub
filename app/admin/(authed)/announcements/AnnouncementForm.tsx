@@ -2,7 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { saveAnnouncement, deleteAnnouncement, type AnnouncementInput } from "./actions";
+import {
+  saveAnnouncement,
+  submitAnnouncementForApproval,
+  approveAnnouncement,
+  rejectAnnouncement,
+  unpublishAnnouncement,
+  republishAnnouncement,
+  deleteAnnouncement,
+  type AnnouncementInput,
+  type ApprovalStatus,
+} from "./actions";
 import { ANNOUNCEMENT_CATEGORIES, type AnnouncementCategory } from "../../../../lib/announcement-types";
 import { useToast } from "../Toaster";
 
@@ -17,6 +27,10 @@ type Initial = {
   published?: boolean;
   link_url?: string | null;
   action_label?: string | null;
+  approval_status?: ApprovalStatus;
+  approval_notes?: string | null;
+  submitted_by?: string | null;
+  reviewed_by?: string | null;
 };
 
 const inputStyle: React.CSSProperties = {
@@ -41,15 +55,30 @@ const labelStyle: React.CSSProperties = {
   marginBottom: "6px",
 };
 
+const STATUS_STYLES: Record<ApprovalStatus, { bg: string; color: string; label: string }> = {
+  draft: { bg: "rgba(154,163,184,.16)", color: "#cdd3e0", label: "Draft" },
+  pending: { bg: "rgba(231,184,78,.16)", color: "#e7b84e", label: "Awaiting approval" },
+  approved: { bg: "rgba(78,184,107,.16)", color: "#7ed996", label: "Approved" },
+  rejected: { bg: "rgba(181,50,65,.16)", color: "#ff8a8a", label: "Revisions requested" },
+};
+
 function toLocalDate(iso: string | null | undefined): string {
   if (!iso) return "";
   return iso.slice(0, 10);
 }
 
-export function AnnouncementForm({ initial }: { initial?: Initial }) {
+export function AnnouncementForm({
+  initial,
+  canApprove,
+}: {
+  initial?: Initial;
+  canApprove: boolean;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
 
   const [category, setCategory] = useState<AnnouncementCategory>(initial?.category ?? "Ministry");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -57,9 +86,13 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
   const [dateLabel, setDateLabel] = useState(initial?.date_label ?? "");
   const [expiresAt, setExpiresAt] = useState(toLocalDate(initial?.expires_at ?? null));
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
-  const [published, setPublished] = useState(initial?.published ?? true);
   const [linkUrl, setLinkUrl] = useState(initial?.link_url ?? "");
   const [actionLabel, setActionLabel] = useState(initial?.action_label ?? "");
+
+  const status: ApprovalStatus = initial?.approval_status ?? "draft";
+  const statusStyle = STATUS_STYLES[status];
+  const isExisting = !!initial?.id;
+  const canSubmit = !isExisting || status === "draft" || status === "rejected";
 
   function buildPayload(): AnnouncementInput {
     return {
@@ -68,14 +101,20 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
       title,
       body,
       date_label: dateLabel || null,
-      expires_at: expiresAt
-        ? new Date(expiresAt + "T23:59:59").toISOString()
-        : null,
+      expires_at: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
       pinned,
-      published,
       link_url: linkUrl || null,
       action_label: actionLabel || null,
     };
+  }
+
+  async function ensureSaved(): Promise<string | null> {
+    const r = await saveAnnouncement(buildPayload());
+    if (!r.ok) {
+      toast(r.error, "error");
+      return null;
+    }
+    return r.id;
   }
 
   function onSave(e: React.FormEvent) {
@@ -87,11 +126,78 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
         return;
       }
       if (!initial?.id) {
-        router.push(`/admin/announcements?flash=announcement-saved`);
+        router.push(`/admin/announcements/${r.id}?flash=announcement-saved`);
       } else {
         toast("Announcement saved.", "success");
         router.refresh();
       }
+    });
+  }
+
+  function onSubmitForApproval() {
+    startTransition(async () => {
+      const id = await ensureSaved();
+      if (!id) return;
+      const r = await submitAnnouncementForApproval(id);
+      if (!r.ok) {
+        toast(r.error, "error");
+        return;
+      }
+      router.push("/admin/announcements?flash=announcement-submitted");
+    });
+  }
+
+  function onApprove() {
+    if (!initial?.id) return;
+    startTransition(async () => {
+      const r = await approveAnnouncement(initial.id as string);
+      if (!r.ok) {
+        toast(r.error, "error");
+        return;
+      }
+      router.push("/admin/announcements?flash=announcement-approved");
+    });
+  }
+
+  function onReject() {
+    if (!initial?.id) return;
+    if (!showRejectBox) {
+      setShowRejectBox(true);
+      return;
+    }
+    startTransition(async () => {
+      const r = await rejectAnnouncement(initial.id as string, rejectNotes);
+      if (!r.ok) {
+        toast(r.error, "error");
+        return;
+      }
+      router.push("/admin/announcements?flash=announcement-rejected");
+    });
+  }
+
+  function onUnpublish() {
+    if (!initial?.id) return;
+    startTransition(async () => {
+      const r = await unpublishAnnouncement(initial.id as string);
+      if (!r.ok) {
+        toast(r.error, "error");
+        return;
+      }
+      toast("Announcement unpublished.", "success");
+      router.refresh();
+    });
+  }
+
+  function onRepublish() {
+    if (!initial?.id) return;
+    startTransition(async () => {
+      const r = await republishAnnouncement(initial.id as string);
+      if (!r.ok) {
+        toast(r.error, "error");
+        return;
+      }
+      toast("Announcement republished.", "success");
+      router.refresh();
     });
   }
 
@@ -112,6 +218,74 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
 
   return (
     <form onSubmit={onSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      {/* Status banner */}
+      {isExisting && (
+        <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <span
+            style={{
+              background: statusStyle.bg,
+              color: statusStyle.color,
+              fontSize: "11.5px",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              padding: "6px 11px",
+              borderRadius: "7px",
+            }}
+          >
+            {statusStyle.label}
+          </span>
+          {initial?.submitted_by && (
+            <span style={{ color: "#9aa3b8", fontSize: "12.5px" }}>
+              Submitted by {initial.submitted_by}
+            </span>
+          )}
+          {initial?.published && status === "approved" && (
+            <span
+              style={{
+                background: "rgba(78,184,107,.15)",
+                color: "#7ed996",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "4px 9px",
+                borderRadius: "6px",
+              }}
+            >
+              Live on /announcements
+            </span>
+          )}
+        </div>
+      )}
+      {status === "rejected" && initial?.approval_notes && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            background: "rgba(181,50,65,.08)",
+            border: "1px solid rgba(181,50,65,.35)",
+            borderRadius: "12px",
+            padding: "14px 16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 800,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "#ff8a8a",
+              marginBottom: "6px",
+            }}
+          >
+            Notes from {initial.reviewed_by ?? "the approver"}
+          </div>
+          <div style={{ color: "#f4f1ea", fontSize: "14px", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+            {initial.approval_notes}
+          </div>
+        </div>
+      )}
+
       <div>
         <label style={labelStyle}>Category</label>
         <select
@@ -198,24 +372,8 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
         />
         Pin to the top
       </label>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          color: "#cdd3e0",
-          fontSize: "13.5px",
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={published}
-          onChange={(e) => setPublished(e.target.checked)}
-          style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
-        />
-        Published (visible on the public site)
-      </label>
 
+      {/* Action bar */}
       <div
         style={{
           gridColumn: "1 / -1",
@@ -229,22 +387,130 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
           type="submit"
           disabled={pending}
           style={{
-            background: "#e7b84e",
-            color: "#0b101c",
+            background: "#1a2438",
+            color: "#cdd3e0",
             fontWeight: 800,
             fontSize: "13px",
             letterSpacing: "0.05em",
             textTransform: "uppercase",
             padding: "12px 22px",
             borderRadius: "10px",
-            border: "none",
+            border: "1px solid rgba(244,241,234,.14)",
             cursor: pending ? "wait" : "pointer",
             opacity: pending ? 0.7 : 1,
           }}
         >
-          {pending ? "Saving…" : initial?.id ? "Save changes" : "Create announcement"}
+          {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
         </button>
-        {initial?.id && (
+        {canSubmit && (
+          <button
+            type="button"
+            onClick={onSubmitForApproval}
+            disabled={pending}
+            style={{
+              background: "#e7b84e",
+              color: "#0b101c",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "none",
+              cursor: pending ? "wait" : "pointer",
+              opacity: pending ? 0.7 : 1,
+            }}
+          >
+            {canApprove ? "Publish" : "Submit for approval"}
+          </button>
+        )}
+        {canApprove && status === "pending" && (
+          <>
+            <button
+              type="button"
+              onClick={onApprove}
+              disabled={pending}
+              style={{
+                background: "rgba(78,184,107,.22)",
+                color: "#7ed996",
+                fontWeight: 800,
+                fontSize: "13px",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "12px 22px",
+                borderRadius: "10px",
+                border: "1px solid rgba(78,184,107,.4)",
+                cursor: pending ? "wait" : "pointer",
+              }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={onReject}
+              disabled={pending}
+              style={{
+                background: "rgba(181,50,65,.18)",
+                color: "#ff8a8a",
+                fontWeight: 800,
+                fontSize: "13px",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                padding: "12px 22px",
+                borderRadius: "10px",
+                border: "1px solid rgba(181,50,65,.4)",
+                cursor: pending ? "wait" : "pointer",
+              }}
+            >
+              {showRejectBox ? "Send rejection" : "Reject…"}
+            </button>
+          </>
+        )}
+        {canApprove && status === "approved" && initial?.published && (
+          <button
+            type="button"
+            onClick={onUnpublish}
+            disabled={pending}
+            style={{
+              background: "transparent",
+              color: "#cdd3e0",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(244,241,234,.14)",
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            Unpublish
+          </button>
+        )}
+        {canApprove && status === "approved" && !initial?.published && (
+          <button
+            type="button"
+            onClick={onRepublish}
+            disabled={pending}
+            style={{
+              background: "#1a2438",
+              color: "#e7b84e",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(231,184,78,.4)",
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            Republish
+          </button>
+        )}
+        {canApprove && initial?.id && (
           <button
             type="button"
             onClick={onDelete}
@@ -260,13 +526,30 @@ export function AnnouncementForm({ initial }: { initial?: Initial }) {
               borderRadius: "10px",
               border: "1px solid rgba(255,138,138,.3)",
               cursor: pending ? "wait" : "pointer",
-              marginLeft: "auto",
             }}
           >
             Delete
           </button>
         )}
       </div>
+
+      {/* Reject notes box */}
+      {showRejectBox && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Rejection notes (sent to submitter)</label>
+          <textarea
+            value={rejectNotes}
+            onChange={(e) => setRejectNotes(e.target.value)}
+            rows={4}
+            placeholder="What needs to change before this can be approved?"
+            style={{ ...inputStyle, resize: "vertical" }}
+            autoFocus
+          />
+          <div style={{ marginTop: "8px", color: "#9aa3b8", fontSize: "12.5px" }}>
+            Click <strong>Reject…</strong> a second time to send.
+          </div>
+        </div>
+      )}
     </form>
   );
 }

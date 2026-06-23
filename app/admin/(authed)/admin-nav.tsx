@@ -76,7 +76,10 @@ export const ICONS: Record<string, ReactNode> = {
   ),
 };
 
-export function buildNav(pendingCount: number): NavItem[] {
+export function buildNav(
+  pendingEvents: number,
+  pendingAnnouncements: number = 0,
+): NavItem[] {
   return [
     { href: "/admin", label: "Overview", icon: ICONS.home },
     { href: "/admin/submissions", label: "Inbox", icon: ICONS.inbox },
@@ -85,9 +88,14 @@ export function buildNav(pendingCount: number): NavItem[] {
       href: "/admin/events/pending",
       label: "Pending approval",
       icon: ICONS.pending,
-      badge: pendingCount > 0 ? pendingCount : undefined,
+      badge: pendingEvents > 0 ? pendingEvents : undefined,
     },
-    { href: "/admin/announcements", label: "Announcements", icon: ICONS.megaphone },
+    {
+      href: "/admin/announcements",
+      label: "Announcements",
+      icon: ICONS.megaphone,
+      badge: pendingAnnouncements > 0 ? pendingAnnouncements : undefined,
+    },
     { href: "/admin/today", label: "Today & Week", icon: ICONS.sun },
     { href: "/admin/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/admin/agent", label: "Agent", icon: ICONS.bot },

@@ -84,6 +84,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
         "id, category, title, body, date_label, expires_at, pinned, published, link_url, action_label, created_at",
       )
       .eq("published", true)
+      .eq("approval_status", "approved")
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false }),
