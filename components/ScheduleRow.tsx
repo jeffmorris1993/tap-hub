@@ -1,21 +1,12 @@
+import Link from "next/link";
 import type { RowView } from "../lib/clock";
 
-export function ScheduleRow({ row }: { row: RowView }) {
+export function ScheduleRow({ row, href }: { row: RowView; href?: string }) {
   const live = row.status === "live";
   const done = row.status === "done";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "14px",
-        background: live ? "linear-gradient(135deg,#1c2740,#141d31)" : "#121a2e",
-        border: `1px solid ${live ? "rgba(231,184,78,.45)" : "rgba(244,241,234,.08)"}`,
-        borderRadius: "14px",
-        padding: "14px 16px",
-        opacity: done ? 0.5 : 1,
-      }}
-    >
+
+  const inner = (
+    <>
       <div
         style={{
           display: "flex",
@@ -67,6 +58,28 @@ export function ScheduleRow({ row }: { row: RowView }) {
       >
         {live ? "Live" : done ? "Done" : "Soon"}
       </span>
-    </div>
+    </>
   );
+
+  const wrapperStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    background: live ? "linear-gradient(135deg,#1c2740,#141d31)" : "#121a2e",
+    border: `1px solid ${live ? "rgba(231,184,78,.45)" : "rgba(244,241,234,.08)"}`,
+    borderRadius: "14px",
+    padding: "14px 16px",
+    opacity: done ? 0.5 : 1,
+    textDecoration: "none",
+    color: "inherit",
+  };
+
+  if (href) {
+    return (
+      <Link href={href} style={wrapperStyle}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div style={wrapperStyle}>{inner}</div>;
 }

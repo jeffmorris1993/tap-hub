@@ -10,6 +10,7 @@ import { LiveClock } from "../../components/LiveClock";
 import { getTodayStatus, type ScheduleRow as ClockRow } from "../../lib/clock";
 import { buildHero, type Hero } from "../../lib/hero";
 import type { DisplayEvent } from "../../lib/events-display";
+import { buildTodayTimeline, type TimelineRow } from "../../lib/today-timeline";
 
 export type WeekRow = { day_label: string; title: string; detail: string };
 export type EveningInfo = { label: string; where: string; time: string } | null;
@@ -56,23 +57,30 @@ export function TodayView({
 }) {
   const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
   const [hero, setHero] = useState<Hero>(() => buildHero(schedule, sundayFallback, new Date()));
+  const [timeline, setTimeline] = useState<TimelineRow[]>(() =>
+    buildTodayTimeline(schedule, todaysEvents, new Date()),
+  );
 
   useEffect(() => {
     const tick = () => {
       const now = new Date();
       setStatus(getTodayStatus(schedule, now));
       setHero(buildHero(schedule, sundayFallback, now));
+      setTimeline(buildTodayTimeline(schedule, todaysEvents, now));
     };
     tick();
     const id = setInterval(tick, 20000);
     return () => clearInterval(id);
-  }, [schedule, sundayFallback]);
+  }, [schedule, sundayFallback, todaysEvents]);
 
   // When today has nothing scheduled (e.g. Saturday), show Sunday's rows
-  // below the hero so the page isn't empty.
+  // below the hero so the page isn't empty. Otherwise show the unified
+  // schedule+events timeline.
   const fallbackRows = sundayRowsAsPreview(sundayFallback);
   const useFallback = status.rows.length === 0 && fallbackRows.length > 0;
-  const visibleRows = useFallback ? fallbackRows : status.rows;
+  const visibleRows: TimelineRow[] = useFallback
+    ? fallbackRows.map((r) => ({ ...r, sortMinutes: 0 }))
+    : timeline;
   const scheduleLabel = useFallback ? "This Sunday's Schedule" : status.scheduleLabel;
 
   return (
@@ -141,13 +149,13 @@ export function TodayView({
             </p>
           </div>
 
-          {/* schedule */}
+          {/* unified timeline: standard schedule + today's events, chronological */}
           {visibleRows.length > 0 && (
             <>
               <SectionLabel style={{ margin: "26px 0 14px" }}>{scheduleLabel}</SectionLabel>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {visibleRows.map((row, i) => (
-                  <ScheduleRow key={i} row={row} />
+                  <ScheduleRow key={i} row={row} href={row.href} />
                 ))}
               </div>
             </>
@@ -199,68 +207,6 @@ export function TodayView({
                 </div>
               </div>
             </div>
-          )}
-
-          {/* dynamic events happening today (one-offs and recurring instances) */}
-          {todaysEvents.length > 0 && (
-            <>
-              <SectionLabel style={{ margin: "28px 0 14px" }}>Also Today</SectionLabel>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {todaysEvents.map((e) => {
-                  const time = new Date(e.nextOccurrenceIso ?? e.starts_at).toLocaleTimeString("en-US", {
-                    timeZone: "America/Detroit",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  });
-                  return (
-                    <Link
-                      key={e.slug}
-                      href={`/events/${e.slug}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "14px",
-                        background: "#121a2e",
-                        border: "1px solid rgba(231,184,78,.28)",
-                        borderRadius: "13px",
-                        padding: "14px 16px",
-                        textDecoration: "none",
-                        color: "inherit",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "48px",
-                          height: "48px",
-                          borderRadius: "11px",
-                          background: "#1a2438",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          color: "#e7b84e",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                          textAlign: "center",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {time}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: "14.5px" }}>{e.title}</div>
-                        <div style={{ fontSize: "12px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
-                          {e.location}
-                          {e.recurrenceLabel ? ` · ${e.recurrenceLabel}` : ""}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
           )}
 
           {/* this week */}
