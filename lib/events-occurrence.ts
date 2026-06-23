@@ -132,13 +132,33 @@ export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Dat
   return null;
 }
 
-/** Returns true if an event has an occurrence on `dateIso` (YYYY-MM-DD). */
-export function hasOccurrenceOnDate(event: RecurringEventFields, dateIso: string): boolean {
+/**
+ * Returns true if an event has an occurrence on `dateIso` (YYYY-MM-DD).
+ * When `now` is provided, today's instance is also filtered out once its
+ * end time has passed — so "Also Today" doesn't keep showing a 9–5
+ * program after 5 PM.
+ */
+export function hasOccurrenceOnDate(
+  event: RecurringEventFields,
+  dateIso: string,
+  now?: Date,
+): boolean {
   const dayStart = new Date(`${dateIso}T00:00:00`);
   const dayEnd = new Date(`${dateIso}T23:59:59.999`);
   const next = nextOccurrence(event, dayStart);
   if (!next) return false;
-  return next.getTime() <= dayEnd.getTime();
+  if (next.getTime() > dayEnd.getTime()) return false;
+  // Filter out instances whose daily end time has already passed.
+  if (now && event.ends_at) {
+    const start = new Date(event.starts_at);
+    const end = new Date(event.ends_at);
+    const durationMs = end.getTime() - start.getTime();
+    if (durationMs > 0) {
+      const occurrenceEnd = new Date(next.getTime() + durationMs);
+      if (occurrenceEnd.getTime() < now.getTime()) return false;
+    }
+  }
+  return true;
 }
 
 const RECURRENCE_LABELS: Record<RecurrenceKind, string> = {

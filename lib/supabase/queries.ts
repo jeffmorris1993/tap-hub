@@ -141,10 +141,11 @@ export async function getEventBySlug(slug: string): Promise<EventRow | null> {
   return (data?.[0] ?? null) as unknown as EventRow | null;
 }
 
-/** Events whose next computed occurrence falls on a specific date. */
-export async function listEventsOnDate(dateIso: string): Promise<EventRow[]> {
+/** Events whose next computed occurrence falls on a specific date.
+ *  Pass `now` to also drop instances whose end time has already passed. */
+export async function listEventsOnDate(dateIso: string, now?: Date): Promise<EventRow[]> {
   const events = await listPublishedEvents();
-  return events.filter((e) => hasOccurrenceOnDate(e as RecurringEventFields, dateIso));
+  return events.filter((e) => hasOccurrenceOnDate(e as RecurringEventFields, dateIso, now));
 }
 
 export async function getTodaysKidsLesson(): Promise<KidsLessonRow | null> {

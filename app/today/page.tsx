@@ -22,7 +22,7 @@ export default async function Today() {
       getScheduleForDayOfWeek(0),
       getWeekLookahead(),
       getEveningTonight(),
-      listEventsOnDate(todayIso),
+      listEventsOnDate(todayIso, new Date()),
     ]);
   const todaysEvents = sortByNextOccurrence(
     todaysEventsRaw.map((e) => toDisplayEvent(e, now)),
