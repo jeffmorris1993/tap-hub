@@ -15,6 +15,7 @@ export type EventRow = {
   ends_at: string | null;
   location: string;
   cost: string | null;
+  accepts_rsvps: boolean;
   allow_volunteers: boolean;
   recurrence_kind: RecurrenceKind;
   recurrence_byday: number | null;
@@ -48,7 +49,7 @@ export type ParentResourceRow = {
 
 const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
-  "cost, allow_volunteers, recurrence_kind, recurrence_byday, recurrence_until";
+  "cost, accepts_rsvps, allow_volunteers, recurrence_kind, recurrence_byday, recurrence_until";
 
 /** Standard schedule for a specific day_of_week (Detroit-local active-date filter). */
 export async function getScheduleForDayOfWeek(dayOfWeek: number): Promise<ScheduleRow[]> {

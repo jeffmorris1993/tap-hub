@@ -153,10 +153,15 @@ export function buildAgentTools(ctx: AgentContext) {
             "Same format as startsAtLocal — local Detroit wall-clock datetime. The server converts to UTC.",
           ),
         location: z.string().min(1),
+        acceptsRsvps: z
+          .boolean()
+          .describe(
+            "True if the event should show a public signup / RSVP form. False for informational-only events that visitors just need to know about (e.g. announcements, observances, generic service times). Ask the user — do NOT assume true.",
+          ),
         allowVolunteers: z
           .boolean()
           .describe(
-            "True if the event is explicitly soliciting volunteer signups (e.g. greeters, kitchen help, ushers). False otherwise. Ask the user — do NOT assume true.",
+            "True if the event is explicitly soliciting volunteer signups (e.g. greeters, kitchen help, ushers). Only relevant when acceptsRsvps is true; pass false when there's no signup form. Ask the user — do NOT assume true.",
           ),
         cost: z
           .string()
@@ -210,7 +215,8 @@ export function buildAgentTools(ctx: AgentContext) {
           ends_at: endsAt && !isNaN(endsAt.getTime()) ? endsAt.toISOString() : null,
           location: input.location,
           cost: input.cost?.trim() ? input.cost.trim() : null,
-          allow_volunteers: input.allowVolunteers,
+          accepts_rsvps: input.acceptsRsvps,
+          allow_volunteers: input.acceptsRsvps && input.allowVolunteers,
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,
           recurrence_until: input.recurrenceUntil ?? null,

@@ -79,6 +79,7 @@ type Initial = {
   ends_at?: string | null;
   location?: string;
   cost?: string | null;
+  accepts_rsvps?: boolean;
   allow_volunteers?: boolean;
   published?: boolean;
   approval_status?: ApprovalStatus;
@@ -110,6 +111,7 @@ export function EventForm({
   const [startsAt, setStartsAt] = useState(toLocalInputValue(initial?.starts_at ?? null));
   const [endsAt, setEndsAt] = useState(toLocalInputValue(initial?.ends_at ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");
+  const [acceptsRsvps, setAcceptsRsvps] = useState(initial?.accepts_rsvps ?? true);
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
   const [cost, setCost] = useState(initial?.cost ?? "");
   const [recurrenceKind, setRecurrenceKind] = useState<"none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly">(
@@ -133,6 +135,7 @@ export function EventForm({
       starts_at_local: startsAt,
       ends_at_local: endsAt,
       location,
+      accepts_rsvps: acceptsRsvps,
       allow_volunteers: allowVolunteers,
       cost: cost.trim() || null,
       recurrence_kind: recurrenceKind,
@@ -414,13 +417,30 @@ export function EventForm({
       <label style={{ display: "flex", alignItems: "center", gap: "10px", color: "#cdd3e0", fontSize: "13.5px" }}>
         <input
           type="checkbox"
+          checked={acceptsRsvps}
+          onChange={(e) => setAcceptsRsvps(e.target.checked)}
+          style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
+        />
+        Accept RSVPs / signups (uncheck for info-only events)
+      </label>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          color: acceptsRsvps ? "#cdd3e0" : "#6a738b",
+          fontSize: "13.5px",
+        }}
+      >
+        <input
+          type="checkbox"
           checked={allowVolunteers}
           onChange={(e) => setAllowVolunteers(e.target.checked)}
+          disabled={!acceptsRsvps}
           style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
         />
         Allow volunteer signups
       </label>
-      <div />
 
       {error && (
         <div style={{ gridColumn: "1 / -1", color: "#ff8a8a", fontSize: "13px", fontWeight: 700 }}>{error}</div>

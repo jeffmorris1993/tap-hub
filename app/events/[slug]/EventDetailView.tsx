@@ -233,7 +233,24 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            {event.signupOpen ? (
+            {!event.accepts_rsvps ? (
+              <div
+                style={{
+                  marginTop: "24px",
+                  background: "rgba(78,141,231,.08)",
+                  border: "1px solid rgba(78,141,231,.25)",
+                  borderRadius: "12px",
+                  padding: "16px 18px",
+                  textAlign: "center",
+                  color: "#cdd3e0",
+                  fontSize: "13.5px",
+                  fontWeight: 600,
+                  lineHeight: 1.55,
+                }}
+              >
+                No RSVP needed — just come!
+              </div>
+            ) : event.signupOpen ? (
               <>
                 {event.allow_volunteers && (
                   <>

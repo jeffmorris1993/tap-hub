@@ -29,6 +29,7 @@ export type EventFormInput = {
   ends_at_local: string;
   location: string;
   cost: string | null;
+  accepts_rsvps: boolean;
   allow_volunteers: boolean;
   recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
   recurrence_byday: number | null;
@@ -98,6 +99,7 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
     starts_at,
     ends_at,
     location,
+    accepts_rsvps: input.accepts_rsvps,
     allow_volunteers: input.allow_volunteers,
     cost: input.cost?.trim() ? input.cost.trim() : null,
     recurrence_kind: input.recurrence_kind,
