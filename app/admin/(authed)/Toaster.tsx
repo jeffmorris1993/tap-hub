@@ -141,6 +141,8 @@ const FLASH_MESSAGES: Record<string, { kind: ToastKind; message: string }> = {
   "event-deleted": { kind: "success", message: "Event deleted." },
   "event-unpublished": { kind: "success", message: "Event unpublished." },
   "event-republished": { kind: "success", message: "Event republished." },
+  "announcement-saved": { kind: "success", message: "Announcement saved." },
+  "announcement-deleted": { kind: "success", message: "Announcement deleted." },
 };
 
 function popFlash(key: string | null): { kind: ToastKind; message: string } | null {

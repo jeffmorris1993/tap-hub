@@ -4,6 +4,7 @@ import { HubTopBar } from "../components/HubTopBar";
 import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
 import { Greeting } from "../components/Greeting";
+import { HubAnnouncements } from "../components/HubAnnouncements";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
 
 const CHURCH_PHONE = "+12485551234";
@@ -175,6 +176,8 @@ export default async function Hub() {
             }
           />
         </div>
+
+        <HubAnnouncements />
 
         {/* quick actions */}
         <div

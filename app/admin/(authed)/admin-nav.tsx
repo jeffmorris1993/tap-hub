@@ -69,6 +69,11 @@ export const ICONS: Record<string, ReactNode> = {
       <path d="M4 7h16M4 12h16M4 17h16" />
     </svg>
   ),
+  megaphone: (
+    <svg {...ic}>
+      <path d="M3 11v2a2 2 0 0 0 2 2h2v3l8 3V6L7 9H5a2 2 0 0 0-2 2zM18 8a4 4 0 0 1 0 8" />
+    </svg>
+  ),
 };
 
 export function buildNav(pendingCount: number): NavItem[] {
@@ -82,6 +87,7 @@ export function buildNav(pendingCount: number): NavItem[] {
       icon: ICONS.pending,
       badge: pendingCount > 0 ? pendingCount : undefined,
     },
+    { href: "/admin/announcements", label: "Announcements", icon: ICONS.megaphone },
     { href: "/admin/today", label: "Today & Week", icon: ICONS.sun },
     { href: "/admin/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/admin/agent", label: "Agent", icon: ICONS.bot },
