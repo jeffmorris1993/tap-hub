@@ -12,6 +12,7 @@ import {
   republishEvent,
   type EventFormInput,
 } from "./actions";
+import { useToast } from "../Toaster";
 
 const CATEGORIES = ["Worship", "Youth", "Community"] as const;
 const RECURRENCE_KINDS = [
@@ -99,10 +100,16 @@ export function EventForm({
   canApprove: boolean;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
+
+  function fail(msg: string) {
+    setError(msg);
+    toast(msg, "error");
+  }
 
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -150,11 +157,15 @@ export function EventForm({
     startTransition(async () => {
       const r = await saveEvent(buildPayload());
       if (!r.ok) {
-        setError(r.error);
+        fail(r.error);
         return;
       }
-      if (!initial?.id) router.push(`/admin/events/${r.id}`);
-      router.refresh();
+      if (!initial?.id) {
+        router.push(`/admin/events/${r.id}?flash=event-saved`);
+      } else {
+        toast("Event saved.", "success");
+        router.refresh();
+      }
     });
   }
 
@@ -163,16 +174,15 @@ export function EventForm({
     startTransition(async () => {
       const saveResult = await saveEvent(buildPayload());
       if (!saveResult.ok) {
-        setError(saveResult.error);
+        fail(saveResult.error);
         return;
       }
       const r = await submitForApproval(saveResult.id);
       if (!r.ok) {
-        setError(r.error);
+        fail(r.error);
         return;
       }
-      router.push("/admin/events");
-      router.refresh();
+      router.push("/admin/events?flash=event-submitted");
     });
   }
 
@@ -182,11 +192,10 @@ export function EventForm({
     startTransition(async () => {
       const r = await approveEvent(initial.id as string);
       if (!r.ok) {
-        setError(r.error);
+        fail(r.error);
         return;
       }
-      router.push("/admin/events");
-      router.refresh();
+      router.push("/admin/events?flash=event-approved");
     });
   }
 
@@ -200,11 +209,10 @@ export function EventForm({
     startTransition(async () => {
       const r = await rejectEvent(initial.id as string, rejectNotes);
       if (!r.ok) {
-        setError(r.error);
+        fail(r.error);
         return;
       }
-      router.push("/admin/events");
-      router.refresh();
+      router.push("/admin/events?flash=event-rejected");
     });
   }
 
@@ -212,6 +220,11 @@ export function EventForm({
     if (!initial?.id) return;
     if (!confirm("Delete this event? Signups will be removed too. This can't be undone.")) return;
     startTransition(async () => {
+      // deleteEvent server-redirects to /admin/events — append the flash
+      // via session storage so the destination page can show the toast.
+      try {
+        sessionStorage.setItem("admin-flash", "event-deleted");
+      } catch {}
       await deleteEvent(initial.id as string);
     });
   }
@@ -219,7 +232,12 @@ export function EventForm({
   function onUnpublish() {
     if (!initial?.id) return;
     startTransition(async () => {
-      await unpublishEvent(initial.id as string);
+      const r = await unpublishEvent(initial.id as string);
+      if (!r.ok) {
+        fail(r.error);
+        return;
+      }
+      toast("Event unpublished.", "success");
       router.refresh();
     });
   }
@@ -227,7 +245,12 @@ export function EventForm({
   function onRepublish() {
     if (!initial?.id) return;
     startTransition(async () => {
-      await republishEvent(initial.id as string);
+      const r = await republishEvent(initial.id as string);
+      if (!r.ok) {
+        fail(r.error);
+        return;
+      }
+      toast("Event republished.", "success");
       router.refresh();
     });
   }

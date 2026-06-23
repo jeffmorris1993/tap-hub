@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { LogoMark } from "../../../components/LogoMark";
 import { ICONS, type NavItem } from "./admin-nav";
+import { FlashConsumer, ToastProvider } from "./Toaster";
 
 type Persona = { name: string; email: string; role: string; initials: string };
 
@@ -50,7 +51,9 @@ export function AdminShell({
   }
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", background: "#0b101c", color: "#f4f1ea" }}>
+    <ToastProvider>
+      <FlashConsumer />
+      <div style={{ minHeight: "100dvh", display: "flex", background: "#0b101c", color: "#f4f1ea" }}>
       {/* mobile backdrop */}
       {drawerOpen && (
         <div
@@ -331,6 +334,7 @@ export function AdminShell({
           .admin-hamburger { display: none !important; }
         }
       `}</style>
-    </div>
+      </div>
+    </ToastProvider>
   );
 }

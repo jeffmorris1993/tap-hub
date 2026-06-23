@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAdminEventById } from "../../../../../lib/supabase/admin-queries";
+import { getAdminEventById, listSignupsForEvent } from "../../../../../lib/supabase/admin-queries";
 import { EventForm } from "../EventForm";
 import { currentUserCanApprove } from "../actions";
+import { SignupsList } from "./SignupsList";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditEvent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [event, canApprove] = await Promise.all([getAdminEventById(id), currentUserCanApprove()]);
+  const [event, canApprove, signups] = await Promise.all([
+    getAdminEventById(id),
+    currentUserCanApprove(),
+    listSignupsForEvent(id),
+  ]);
   if (!event) notFound();
 
   return (
@@ -32,6 +37,24 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
         Edit event
       </h1>
       <EventForm initial={event} canApprove={canApprove} />
+      {event.accepts_rsvps ? (
+        <SignupsList signups={signups} />
+      ) : (
+        <section
+          style={{
+            marginTop: "36px",
+            background: "#121a2e",
+            border: "1px solid rgba(244,241,234,.08)",
+            borderRadius: "18px",
+            padding: "22px 24px",
+            color: "#9aa3b8",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          This event is info-only — RSVPs aren&apos;t being collected.
+        </section>
+      )}
     </div>
   );
 }

@@ -2,20 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { updateProfile } from "./actions";
+import { useToast } from "../Toaster";
 
 export function ProfileForm({ initialName }: { initialName: string }) {
   const [name, setName] = useState(initialName);
   const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const { toast } = useToast();
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setStatus(null);
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await updateProfile(fd);
-      if (res.ok) setStatus({ ok: true, msg: "Saved." });
-      else setStatus({ ok: false, msg: res.error ?? "Couldn't save your name." });
+      if (res.ok) toast("Profile saved.", "success");
+      else toast(res.error ?? "Couldn't save your name.", "error");
     });
   }
 
@@ -86,17 +86,6 @@ export function ProfileForm({ initialName }: { initialName: string }) {
         >
           {pending ? "Saving…" : "Save"}
         </button>
-        {status ? (
-          <span
-            style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              color: status.ok ? "#7ed996" : "#ef6f6f",
-            }}
-          >
-            {status.msg}
-          </span>
-        ) : null}
       </div>
     </form>
   );
