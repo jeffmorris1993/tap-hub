@@ -178,3 +178,65 @@ export async function getAdminEventById(id: string): Promise<AdminEventRow | nul
   if (error) throw error;
   return (data?.[0] ?? null) as unknown as AdminEventRow | null;
 }
+
+export type ActivityKind = "visitor" | "prayer" | "feedback" | "signup";
+export type ActivityItem = {
+  kind: ActivityKind;
+  title: string;
+  meta: string;
+  created_at: string;
+};
+
+/** Merged recent activity across all submission tables, newest first. */
+export async function getRecentActivity(limit = 8): Promise<ActivityItem[]> {
+  const sb = supabaseAdmin();
+  const [v, p, f, s] = await Promise.all([
+    sb.from("visitors").select("name, first_time, created_at").order("created_at", { ascending: false }).limit(limit),
+    sb.from("prayer_requests").select("name, request, created_at").order("created_at", { ascending: false }).limit(limit),
+    sb.from("feedback").select("name, category, rating, created_at").order("created_at", { ascending: false }).limit(limit),
+    sb.from("event_signups").select("name, role, created_at, events(title)").order("created_at", { ascending: false }).limit(limit),
+  ]);
+
+  const items: ActivityItem[] = [];
+  (v.data ?? []).forEach((r) => {
+    const row = r as { name: string; first_time: boolean | null; created_at: string };
+    items.push({
+      kind: "visitor",
+      title: row.name,
+      meta: row.first_time ? "First-time visitor" : "Connect card",
+      created_at: row.created_at,
+    });
+  });
+  (p.data ?? []).forEach((r) => {
+    const row = r as { name: string | null; request: string; created_at: string };
+    items.push({
+      kind: "prayer",
+      title: row.name ?? "Anonymous",
+      meta: row.request.length > 80 ? row.request.slice(0, 80) + "…" : row.request,
+      created_at: row.created_at,
+    });
+  });
+  (f.data ?? []).forEach((r) => {
+    const row = r as { name: string | null; category: string; rating: number | null; created_at: string };
+    items.push({
+      kind: "feedback",
+      title: row.name ?? "Anonymous",
+      meta: row.rating ? `${row.rating}★ · ${row.category}` : row.category,
+      created_at: row.created_at,
+    });
+  });
+  (s.data ?? []).forEach((r) => {
+    const row = r as unknown as { name: string; role: string; created_at: string; events: { title: string } | { title: string }[] | null };
+    const event = Array.isArray(row.events) ? row.events[0] : row.events;
+    items.push({
+      kind: "signup",
+      title: row.name,
+      meta: `${row.role === "volunteer" ? "Volunteering for" : "Attending"} ${event?.title ?? "(event)"}`,
+      created_at: row.created_at,
+    });
+  });
+
+  return items
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limit);
+}

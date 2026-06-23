@@ -1,105 +1,52 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminUser } from "../../../lib/supabase/auth";
-import { LogoMark } from "../../../components/LogoMark";
-import { SignOutButton } from "./SignOutButton";
+import { supabaseAdmin } from "../../../lib/supabase/server";
+import { isApprover } from "../../../lib/approvers";
+import { AdminShell } from "./AdminShell";
+import { buildNav } from "./admin-nav";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/submissions", label: "Inbox" },
-  { href: "/admin/events", label: "Events" },
-  { href: "/admin/events/pending", label: "Approvals" },
-  { href: "/admin/today", label: "Today" },
-  { href: "/admin/kids-youth", label: "Kids + Youth" },
-  { href: "/admin/agent", label: "Agent" },
-  { href: "/admin/agent-log", label: "Agent Log" },
-];
+function initialsFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? email;
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return local.slice(0, 2).toUpperCase();
+}
+
+function displayName(email: string): string {
+  const local = email.split("@")[0] ?? email;
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  return parts.length > 0
+    ? parts.map((p) => p[0].toUpperCase() + p.slice(1)).join(" ")
+    : email;
+}
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getAdminUser();
   if (!user) redirect("/admin/login");
 
+  // Pull the pending-events count once for the sidebar badge — same query
+  // the queue page uses, lightweight HEAD count.
+  const { count } = await supabaseAdmin()
+    .from("events")
+    .select("*", { count: "exact", head: true })
+    .eq("approval_status", "pending");
+  const pendingCount = count ?? 0;
+
+  const email = user.email ?? "(unknown)";
+  const persona = {
+    name: displayName(email),
+    email,
+    role: isApprover(email) ? "Approver" : "Admin",
+    initials: initialsFromEmail(email),
+  };
+
+  const nav = buildNav(pendingCount);
+
   return (
-    <div style={{ minHeight: "100dvh", background: "#070b14" }}>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 30,
-          background: "rgba(11,16,28,.94)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(244,241,234,.08)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1180px",
-            margin: "0 auto",
-            padding: "14px 22px",
-            display: "flex",
-            alignItems: "center",
-            gap: "20px",
-            flexWrap: "wrap",
-          }}
-        >
-          <Link
-            href="/admin"
-            style={{ display: "flex", alignItems: "center", gap: "11px", textDecoration: "none", color: "#f4f1ea" }}
-          >
-            <LogoMark size="sm" />
-            <span style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-              <span
-                style={{
-                  fontFamily: "var(--font-anton)",
-                  fontSize: "15px",
-                  letterSpacing: "0.02em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Nehemiah&apos;s Temple
-              </span>
-              <span
-                style={{
-                  fontSize: "9px",
-                  fontWeight: 800,
-                  letterSpacing: "0.28em",
-                  textTransform: "uppercase",
-                  color: "#e7b84e",
-                  marginTop: "3px",
-                }}
-              >
-                TapHub Admin
-              </span>
-            </span>
-          </Link>
-          <nav style={{ display: "flex", gap: "4px", flex: 1, flexWrap: "wrap", minWidth: 0 }}>
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  color: "#cdd3e0",
-                  fontWeight: 700,
-                  fontSize: "13px",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  textDecoration: "none",
-                }}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ color: "#9aa3b8", fontSize: "12.5px", fontWeight: 600 }}>{user.email}</span>
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
-      <main style={{ maxWidth: "1180px", margin: "0 auto", padding: "28px 22px 80px" }}>{children}</main>
-    </div>
+    <AdminShell persona={persona} nav={nav}>
+      {children}
+    </AdminShell>
   );
 }
