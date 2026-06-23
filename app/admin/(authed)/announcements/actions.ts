@@ -4,8 +4,31 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAdminUser } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
-import { isApprover } from "../../../../lib/approvers";
+import { isApprover, getApproverEmails } from "../../../../lib/approvers";
 import type { AnnouncementCategory } from "../../../../lib/announcement-types";
+import {
+  notifyApproversOfAnnouncementSubmission,
+  notifySubmitterOfAnnouncementApproval,
+  notifySubmitterOfAnnouncementRejection,
+  type AnnouncementSnapshot,
+} from "../../../../lib/email/announcement-approval";
+import {
+  pushAnnouncementSubmissionToApprovers,
+  pushAnnouncementApprovalToSubmitter,
+  pushAnnouncementRejectionToSubmitter,
+} from "../../../../lib/chat-notifications";
+
+const SNAPSHOT_FIELDS = "id, category, title, body, date_label";
+
+async function snapshot(id: string): Promise<AnnouncementSnapshot | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("announcements")
+    .select(SNAPSHOT_FIELDS)
+    .eq("id", id)
+    .limit(1);
+  if (error || !data?.[0]) return null;
+  return data[0] as unknown as AnnouncementSnapshot;
+}
 
 export type ApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -131,6 +154,23 @@ export async function submitAnnouncementForApproval(id: string): Promise<Announc
   const { error } = await supabaseAdmin().from("announcements").update(payload).eq("id", id);
   if (error) return { ok: false, error: error.message };
   bustCaches();
+
+  // Notify approvers when a non-approver submits (matches the events flow).
+  if (!senderIsApprover) {
+    const snap = await snapshot(id);
+    if (snap) {
+      const approvers = getApproverEmails();
+      await Promise.all([
+        notifyApproversOfAnnouncementSubmission(snap, email, approvers),
+        pushAnnouncementSubmissionToApprovers(
+          { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+          email,
+          approvers,
+        ),
+      ]);
+    }
+  }
+
   return { ok: true, id };
 }
 
@@ -144,6 +184,15 @@ export async function approveAnnouncement(id: string): Promise<AnnouncementResul
   if (!isApprover(user.email)) {
     return { ok: false, error: "Only approvers can approve announcements." };
   }
+
+  // Pull the submitter before the update so we know whom to notify.
+  const { data: pre } = await supabaseAdmin()
+    .from("announcements")
+    .select("submitted_by")
+    .eq("id", id)
+    .limit(1);
+  const submittedBy = (pre?.[0] as { submitted_by: string | null } | undefined)?.submitted_by ?? null;
+
   const { error } = await supabaseAdmin()
     .from("announcements")
     .update({
@@ -156,6 +205,20 @@ export async function approveAnnouncement(id: string): Promise<AnnouncementResul
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   bustCaches();
+
+  if (submittedBy && submittedBy !== user.email) {
+    const snap = await snapshot(id);
+    if (snap) {
+      await Promise.all([
+        notifySubmitterOfAnnouncementApproval(snap, submittedBy, user.email ?? "admin"),
+        pushAnnouncementApprovalToSubmitter(
+          { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+          submittedBy,
+          user.email ?? "admin",
+        ),
+      ]);
+    }
+  }
   return { ok: true, id };
 }
 
@@ -171,6 +234,14 @@ export async function rejectAnnouncement(id: string, notes: string): Promise<Ann
   }
   const trimmed = notes.trim();
   if (!trimmed) return { ok: false, error: "Add a short note about what needs to change." };
+
+  const { data: pre } = await supabaseAdmin()
+    .from("announcements")
+    .select("submitted_by")
+    .eq("id", id)
+    .limit(1);
+  const submittedBy = (pre?.[0] as { submitted_by: string | null } | undefined)?.submitted_by ?? null;
+
   const { error } = await supabaseAdmin()
     .from("announcements")
     .update({
@@ -183,6 +254,21 @@ export async function rejectAnnouncement(id: string, notes: string): Promise<Ann
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   bustCaches();
+
+  if (submittedBy && submittedBy !== user.email) {
+    const snap = await snapshot(id);
+    if (snap) {
+      await Promise.all([
+        notifySubmitterOfAnnouncementRejection(snap, submittedBy, user.email ?? "admin", trimmed),
+        pushAnnouncementRejectionToSubmitter(
+          { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+          submittedBy,
+          user.email ?? "admin",
+          trimmed,
+        ),
+      ]);
+    }
+  }
   return { ok: true, id };
 }
 

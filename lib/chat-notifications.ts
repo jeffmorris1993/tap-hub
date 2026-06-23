@@ -109,3 +109,87 @@ export async function pushRejectionToSubmitter(
     ctaUrl: editUrl,
   });
 }
+
+// ----------------------------------------------------------------------
+// Announcement notifications (mirror the event-flow helpers above).
+// ----------------------------------------------------------------------
+
+export type AnnouncementChatSnapshot = {
+  id: string;
+  category: "Important" | "Ministry" | "Facilities" | "Event";
+  title: string;
+  date_label: string | null;
+};
+
+function announcementLines(a: AnnouncementChatSnapshot): string {
+  return [
+    `*${a.title}*`,
+    a.date_label ?? "",
+    `${a.category}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function pushAnnouncementSubmissionToApprovers(
+  a: AnnouncementChatSnapshot,
+  submitterEmail: string,
+  approverEmails: string[],
+): Promise<void> {
+  const editUrl = `${siteUrl()}/admin/announcements/${a.id}`;
+  const body = `Submitted by *${submitterEmail}*\n\n${announcementLines(a)}`;
+  await Promise.all(
+    approverEmails.map(async (email) => {
+      const space = await findThreadKeyByEmail("chat", email);
+      if (!space) return;
+      await sendChatNotification(space, {
+        headline: "📬 New announcement needs review",
+        body,
+        ctaLabel: "Review & approve",
+        ctaUrl: editUrl,
+      });
+    }),
+  );
+}
+
+export async function pushAnnouncementApprovalToSubmitter(
+  a: AnnouncementChatSnapshot,
+  submitterEmail: string,
+  approverEmail: string,
+): Promise<void> {
+  const space = await findThreadKeyByEmail("chat", submitterEmail);
+  if (!space) return;
+  const publicUrl = `${siteUrl()}/announcements`;
+  const body = `Approved by *${approverEmail}*\n\n${announcementLines(a)}`;
+  await sendChatNotification(space, {
+    headline: "✅ Your announcement was approved",
+    body,
+    ctaLabel: "View public page",
+    ctaUrl: publicUrl,
+  });
+}
+
+export async function pushAnnouncementRejectionToSubmitter(
+  a: AnnouncementChatSnapshot,
+  submitterEmail: string,
+  approverEmail: string,
+  notes: string,
+): Promise<void> {
+  const space = await findThreadKeyByEmail("chat", submitterEmail);
+  if (!space) return;
+  const editUrl = `${siteUrl()}/admin/announcements/${a.id}`;
+  const body = [
+    `Reviewed by *${approverEmail}*`,
+    "",
+    announcementLines(a),
+    "",
+    "*Notes:*",
+    notes,
+  ].join("\n");
+  await sendChatNotification(space, {
+    headline: "✏️ Announcement needs revisions",
+    body,
+    ctaLabel: "Edit & resubmit",
+    ctaUrl: editUrl,
+  });
+}

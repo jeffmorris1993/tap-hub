@@ -12,9 +12,18 @@ import {
   type EventSnapshot,
 } from "../email/event-approval";
 import {
+  notifyApproversOfAnnouncementSubmission,
+  notifySubmitterOfAnnouncementApproval,
+  notifySubmitterOfAnnouncementRejection,
+  type AnnouncementSnapshot,
+} from "../email/announcement-approval";
+import {
   pushSubmissionToApprovers,
   pushApprovalToSubmitter,
   pushRejectionToSubmitter,
+  pushAnnouncementSubmissionToApprovers,
+  pushAnnouncementApprovalToSubmitter,
+  pushAnnouncementRejectionToSubmitter,
 } from "../chat-notifications";
 
 function slugify(s: string): string {
@@ -516,13 +525,33 @@ export function buildAgentTools(ctx: AgentContext) {
         if (error) return { ok: false, error: error.message };
         const id = data?.[0]?.id as string;
 
+        // Notify approvers when a non-approver submitted for review.
+        if (wantsToPublishOrSubmit && !senderIsApprover) {
+          const snap: AnnouncementSnapshot = {
+            id,
+            category: input.category,
+            title: input.title,
+            body: input.body,
+            date_label: input.dateLabel ?? null,
+          };
+          const approvers = getApproverEmails();
+          await Promise.all([
+            notifyApproversOfAnnouncementSubmission(snap, ctx.sender, approvers),
+            pushAnnouncementSubmissionToApprovers(
+              { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+              ctx.sender,
+              approvers,
+            ),
+          ]);
+        }
+
         let summary: string;
         if (!wantsToPublishOrSubmit) {
           summary = `Saved announcement "${input.title}" as a draft. Not submitted yet.`;
         } else if (senderIsApprover) {
           summary = `Posted "${input.title}" to /announcements.`;
         } else {
-          summary = `Submitted "${input.title}" for approval. The Bishop and Assistant Pastor will be notified.`;
+          summary = `Submitted "${input.title}" for approval. The Bishop and Assistant Pastor have been notified.`;
         }
         return { ok: true, id, summary };
       },
@@ -556,10 +585,23 @@ export function buildAgentTools(ctx: AgentContext) {
         }
         if (!id && !title) return { ok: false, error: "Pass either id or title." };
         const sb = supabaseAdmin();
-        const query = sb.from("announcements").select("id, title, approval_status").limit(1);
+        const query = sb
+          .from("announcements")
+          .select("id, category, title, body, date_label, approval_status, submitted_by")
+          .limit(1);
         const { data, error } = id ? await query.eq("id", id) : await query.eq("title", title!);
         if (error) return { ok: false, error: error.message };
-        const row = data?.[0] as { id: string; title: string; approval_status: string } | undefined;
+        const row = data?.[0] as
+          | {
+              id: string;
+              category: AnnouncementSnapshot["category"];
+              title: string;
+              body: string;
+              date_label: string | null;
+              approval_status: string;
+              submitted_by: string | null;
+            }
+          | undefined;
         if (!row) return { ok: false, error: "No matching announcement found." };
         if (row.approval_status === "approved") {
           return { ok: false, error: `"${row.title}" is already approved.` };
@@ -575,6 +617,24 @@ export function buildAgentTools(ctx: AgentContext) {
           })
           .eq("id", row.id);
         if (upd.error) return { ok: false, error: upd.error.message };
+
+        if (row.submitted_by && row.submitted_by !== ctx.sender) {
+          const snap: AnnouncementSnapshot = {
+            id: row.id,
+            category: row.category,
+            title: row.title,
+            body: row.body,
+            date_label: row.date_label,
+          };
+          await Promise.all([
+            notifySubmitterOfAnnouncementApproval(snap, row.submitted_by, ctx.sender),
+            pushAnnouncementApprovalToSubmitter(
+              { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+              row.submitted_by,
+              ctx.sender,
+            ),
+          ]);
+        }
         return { ok: true, summary: `Approved "${row.title}". It's live on /announcements.` };
       },
     }),
@@ -593,10 +653,22 @@ export function buildAgentTools(ctx: AgentContext) {
         }
         if (!id && !title) return { ok: false, error: "Pass either id or title." };
         const sb = supabaseAdmin();
-        const query = sb.from("announcements").select("id, title").limit(1);
+        const query = sb
+          .from("announcements")
+          .select("id, category, title, body, date_label, submitted_by")
+          .limit(1);
         const { data, error } = id ? await query.eq("id", id) : await query.eq("title", title!);
         if (error) return { ok: false, error: error.message };
-        const row = data?.[0] as { id: string; title: string } | undefined;
+        const row = data?.[0] as
+          | {
+              id: string;
+              category: AnnouncementSnapshot["category"];
+              title: string;
+              body: string;
+              date_label: string | null;
+              submitted_by: string | null;
+            }
+          | undefined;
         if (!row) return { ok: false, error: "No matching announcement found." };
         const upd = await sb
           .from("announcements")
@@ -609,6 +681,25 @@ export function buildAgentTools(ctx: AgentContext) {
           })
           .eq("id", row.id);
         if (upd.error) return { ok: false, error: upd.error.message };
+
+        if (row.submitted_by && row.submitted_by !== ctx.sender) {
+          const snap: AnnouncementSnapshot = {
+            id: row.id,
+            category: row.category,
+            title: row.title,
+            body: row.body,
+            date_label: row.date_label,
+          };
+          await Promise.all([
+            notifySubmitterOfAnnouncementRejection(snap, row.submitted_by, ctx.sender, notes),
+            pushAnnouncementRejectionToSubmitter(
+              { id: snap.id, category: snap.category, title: snap.title, date_label: snap.date_label },
+              row.submitted_by,
+              ctx.sender,
+              notes,
+            ),
+          ]);
+        }
         return { ok: true, summary: `Rejected "${row.title}" and notified the submitter.` };
       },
     }),
