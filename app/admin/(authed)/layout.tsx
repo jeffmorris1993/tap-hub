@@ -35,11 +35,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const pendingCount = count ?? 0;
 
   const email = user.email ?? "(unknown)";
+  const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
+  const name = fullName && fullName.length > 0 ? fullName : displayName(email);
+  const initials = fullName
+    ? fullName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? "")
+        .join("") || initialsFromEmail(email)
+    : initialsFromEmail(email);
   const persona = {
-    name: displayName(email),
+    name,
     email,
     role: isApprover(email) ? "Approver" : "Admin",
-    initials: initialsFromEmail(email),
+    initials,
   };
 
   const nav = buildNav(pendingCount);

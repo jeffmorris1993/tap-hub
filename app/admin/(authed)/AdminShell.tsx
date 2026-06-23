@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { LogoMark } from "../../../components/LogoMark";
 import { ICONS, type NavItem } from "./admin-nav";
 
 type Persona = { name: string; email: string; role: string; initials: string };
@@ -31,7 +32,9 @@ export function AdminShell({
   }, [drawerOpen]);
 
   const currentNav = nav.find((n) => pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href)));
-  const pageTitle = currentNav?.label ?? "Admin";
+  const pageTitle = pathname.startsWith("/admin/profile")
+    ? "Profile"
+    : currentNav?.label ?? "Admin";
 
   function isActive(item: NavItem) {
     if (item.href === "/admin") return pathname === "/admin";
@@ -80,24 +83,8 @@ export function AdminShell({
         }}
         className="admin-sidebar"
       >
-        <div style={{ padding: "20px 18px 14px", display: "flex", alignItems: "center", gap: "11px" }}>
-          <span
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "9px",
-              background: "#e7b84e",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              fontFamily: "var(--font-anton)",
-              fontSize: "18px",
-              color: "#0b101c",
-            }}
-          >
-            NT
-          </span>
+        <div style={{ padding: "20px 18px 14px", display: "flex", alignItems: "center", gap: "12px" }}>
+          <LogoMark size="md" />
           <span style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
             <span
               style={{
@@ -107,7 +94,7 @@ export function AdminShell({
                 textTransform: "uppercase",
               }}
             >
-              Neh Temple
+              Nehemiah&apos;s Temple
             </span>
             <span
               style={{
@@ -124,7 +111,9 @@ export function AdminShell({
           </span>
         </div>
 
-        <div
+        <Link
+          href="/admin/profile"
+          title="Edit your profile"
           style={{
             margin: "6px 14px 14px",
             padding: "13px 14px",
@@ -134,6 +123,8 @@ export function AdminShell({
             display: "flex",
             alignItems: "center",
             gap: "11px",
+            textDecoration: "none",
+            color: "inherit",
           }}
         >
           <span
@@ -179,7 +170,7 @@ export function AdminShell({
               {persona.role}
             </div>
           </div>
-        </div>
+        </Link>
 
         <nav style={{ flex: 1, padding: "4px 12px", display: "flex", flexDirection: "column", gap: "3px" }}>
           {nav.map((item) => {
