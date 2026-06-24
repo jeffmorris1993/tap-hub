@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+import { BackButton } from "./BackButton";
 
 export function BackBar({
   href = "/",
@@ -7,6 +7,9 @@ export function BackBar({
   subtitle,
   right,
 }: {
+  /** Fallback destination when there's no in-app history (NFC tap,
+   *  direct link, fresh tab). When history exists, the back button
+   *  uses router.back() instead. */
   href?: string;
   title: string;
   subtitle?: ReactNode;
@@ -28,32 +31,7 @@ export function BackBar({
         gap: "13px",
       }}
     >
-      <Link
-        href={href}
-        aria-label="Back"
-        style={{
-          width: "40px",
-          height: "40px",
-          borderRadius: "11px",
-          background: "#1a2438",
-          border: "1px solid rgba(244,241,234,.1)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          textDecoration: "none",
-        }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M15 6l-6 6 6 6"
-            stroke="#f4f1ea"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </Link>
+      <BackButton fallback={href} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
