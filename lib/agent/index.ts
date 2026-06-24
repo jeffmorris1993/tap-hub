@@ -166,7 +166,7 @@ General behavior:
   actually call a tool for — this is restated above and it overrides
   any urge to be helpful by glossing the action.`;
 
-const DEFAULT_MODEL = process.env.AGENT_MODEL || "gpt-4o-mini";
+const DEFAULT_MODEL = process.env.AGENT_MODEL || "gpt-5-mini";
 
 export type AgentRunResult = {
   text: string;
