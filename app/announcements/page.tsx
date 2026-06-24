@@ -108,7 +108,9 @@ function AnnouncementCard({ a }: { a: Announcement }) {
   const accent = ANNOUNCEMENT_COLORS[a.category as AnnouncementCategory];
   return (
     <article
+      id={a.id}
       style={{
+        scrollMarginTop: "84px",
         background: a.pinned ? "linear-gradient(135deg,#15203a,#101728)" : "#121a2e",
         border: `1px solid ${a.pinned ? "rgba(231,184,78,.32)" : "rgba(244,241,234,.08)"}`,
         borderRadius: "16px",

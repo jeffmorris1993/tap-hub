@@ -302,55 +302,96 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                   </div>
                 )}
 
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  style={{ ...inputStyle, marginBottom: "12px" }}
-                />
-                <input
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="Email or phone"
-                  style={{ ...inputStyle, marginBottom: "12px" }}
-                />
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={
-                    role === "volunteer"
-                      ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
-                      : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
-                  }
-                  rows={3}
-                  style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
-                />
-                {result && !result.ok && (
-                  <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
-                    {result.error}
-                  </div>
+                {role === "attendee" && event.registration_url ? (
+                  // External registration takes over the Attend path. We
+                  // intentionally don't capture name/contact in-app since
+                  // the external site will.
+                  <>
+                    <p
+                      style={{
+                        color: "#cdd3e0",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        lineHeight: 1.55,
+                        marginBottom: "14px",
+                      }}
+                    >
+                      Registration happens on the official site. Tap below to register and reserve your spot.
+                    </p>
+                    <a
+                      href={event.registration_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        background: "#e7b84e",
+                        color: "#0b101c",
+                        fontWeight: 800,
+                        fontSize: "14px",
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        padding: "17px",
+                        borderRadius: "12px",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {event.registration_label?.trim() || "Register"} →
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                      style={{ ...inputStyle, marginBottom: "12px" }}
+                    />
+                    <input
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="Email or phone"
+                      style={{ ...inputStyle, marginBottom: "12px" }}
+                    />
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder={
+                        role === "volunteer"
+                          ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
+                          : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
+                      }
+                      rows={3}
+                      style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
+                    />
+                    {result && !result.ok && (
+                      <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
+                        {result.error}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onSubmit}
+                      disabled={pending}
+                      style={{
+                        width: "100%",
+                        background: "#e7b84e",
+                        color: "#0b101c",
+                        fontWeight: 800,
+                        fontSize: "14px",
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        padding: "17px",
+                        borderRadius: "12px",
+                        border: "none",
+                        cursor: pending ? "wait" : "pointer",
+                        opacity: pending ? 0.7 : 1,
+                      }}
+                    >
+                      {pending ? "Sending…" : role === "volunteer" ? "Sign Up to Volunteer" : "Sign Up to Attend"}
+                    </button>
+                  </>
                 )}
-                <button
-                  type="button"
-                  onClick={onSubmit}
-                  disabled={pending}
-                  style={{
-                    width: "100%",
-                    background: "#e7b84e",
-                    color: "#0b101c",
-                    fontWeight: 800,
-                    fontSize: "14px",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    padding: "17px",
-                    borderRadius: "12px",
-                    border: "none",
-                    cursor: pending ? "wait" : "pointer",
-                    opacity: pending ? 0.7 : 1,
-                  }}
-                >
-                  {pending ? "Sending…" : role === "volunteer" ? "Sign Up to Volunteer" : "Sign Up to Attend"}
-                </button>
               </>
             ) : (
               <div

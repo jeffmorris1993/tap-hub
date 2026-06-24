@@ -82,6 +82,8 @@ type Initial = {
   cost?: string | null;
   accepts_rsvps?: boolean;
   allow_volunteers?: boolean;
+  registration_url?: string | null;
+  registration_label?: string | null;
   published?: boolean;
   approval_status?: ApprovalStatus;
   approval_notes?: string | null;
@@ -121,6 +123,8 @@ export function EventForm({
   const [acceptsRsvps, setAcceptsRsvps] = useState(initial?.accepts_rsvps ?? true);
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
   const [cost, setCost] = useState(initial?.cost ?? "");
+  const [registrationUrl, setRegistrationUrl] = useState(initial?.registration_url ?? "");
+  const [registrationLabel, setRegistrationLabel] = useState(initial?.registration_label ?? "");
   const [recurrenceKind, setRecurrenceKind] = useState<"none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly">(
     initial?.recurrence_kind ?? "none",
   );
@@ -144,6 +148,8 @@ export function EventForm({
       location,
       accepts_rsvps: acceptsRsvps,
       allow_volunteers: allowVolunteers,
+      registration_url: registrationUrl.trim() || null,
+      registration_label: registrationLabel.trim() || null,
       cost: cost.trim() || null,
       recurrence_kind: recurrenceKind,
       recurrence_byday: recurrenceKind === "weekly" || recurrenceKind === "biweekly" ? recurrenceByday : null,
@@ -433,6 +439,28 @@ export function EventForm({
           value={cost}
           onChange={(e) => setCost(e.target.value)}
           placeholder='e.g. "$15 per person" or "Free will offering" — leave blank for free'
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label style={labelStyle}>External registration URL (optional)</label>
+        <input
+          value={registrationUrl}
+          onChange={(e) => setRegistrationUrl(e.target.value)}
+          placeholder="https://… (e.g. Eventbrite, conference site)"
+          style={inputStyle}
+        />
+        <p style={{ marginTop: "6px", color: "#9aa3b8", fontSize: "12px" }}>
+          When set, the event page shows a Register button to this URL instead of the in-app signup form. Volunteer signups still work.
+        </p>
+      </div>
+      <div>
+        <label style={labelStyle}>Register button label (optional)</label>
+        <input
+          value={registrationLabel}
+          onChange={(e) => setRegistrationLabel(e.target.value)}
+          placeholder='Defaults to "Register"'
           style={inputStyle}
         />
       </div>

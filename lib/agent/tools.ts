@@ -182,6 +182,16 @@ export function buildAgentTools(ctx: AgentContext) {
           .describe(
             "Cost description shown to visitors. Examples: '$15 per person', 'Free will offering', '$10 adults / $5 kids'. Pass null when the event is free. Ask the user if cost wasn't stated.",
           ),
+        registrationUrl: z
+          .string()
+          .optional()
+          .describe(
+            "Set when attendees must register on an external site (Eventbrite, a conference site, a Google Form, etc.). When set, the in-app attendee form is replaced with a Register button to this URL. Volunteer signups still work in-app. ASK if you suspect external registration (e.g. 'Growth Conference', 'sign up at the link') and the URL wasn't given.",
+          ),
+        registrationLabel: z
+          .string()
+          .optional()
+          .describe('Optional label for the external Register button. Defaults to "Register" if omitted.'),
         recurrenceKind: z
           .enum(["none", "daily", "weekdays", "weekly", "biweekly", "monthly"])
           .default("none")
@@ -230,6 +240,8 @@ export function buildAgentTools(ctx: AgentContext) {
           cost: input.cost?.trim() ? input.cost.trim() : null,
           accepts_rsvps: input.acceptsRsvps,
           allow_volunteers: input.allowVolunteers,
+          registration_url: input.registrationUrl?.trim() ? input.registrationUrl.trim() : null,
+          registration_label: input.registrationLabel?.trim() ? input.registrationLabel.trim() : null,
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,
           recurrence_until: input.recurrenceUntil ?? null,
