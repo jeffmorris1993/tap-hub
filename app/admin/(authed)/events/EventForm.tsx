@@ -451,7 +451,7 @@ export function EventForm({
           display: "flex",
           alignItems: "center",
           gap: "10px",
-          color: acceptsRsvps ? "#cdd3e0" : "#6a738b",
+          color: "#cdd3e0",
           fontSize: "13.5px",
         }}
       >
@@ -459,7 +459,6 @@ export function EventForm({
           type="checkbox"
           checked={allowVolunteers}
           onChange={(e) => setAllowVolunteers(e.target.checked)}
-          disabled={!acceptsRsvps}
           style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
         />
         Allow volunteer signups

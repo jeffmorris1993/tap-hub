@@ -14,6 +14,7 @@ import {
   type ApprovalStatus,
 } from "./actions";
 import { ANNOUNCEMENT_CATEGORIES, type AnnouncementCategory } from "../../../../lib/announcement-types";
+import type { EventPickerOption } from "../../../../lib/event-picker";
 import { useToast } from "../Toaster";
 
 type Initial = {
@@ -67,12 +68,20 @@ function toLocalDate(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
+function eventSlugFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/^\/events\/([a-z0-9-]+)$/);
+  return m ? m[1] : null;
+}
+
 export function AnnouncementForm({
   initial,
   canApprove,
+  events,
 }: {
   initial?: Initial;
   canApprove: boolean;
+  events: EventPickerOption[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -86,7 +95,20 @@ export function AnnouncementForm({
   const [dateLabel, setDateLabel] = useState(initial?.date_label ?? "");
   const [expiresAt, setExpiresAt] = useState(toLocalDate(initial?.expires_at ?? null));
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
-  const [linkUrl, setLinkUrl] = useState(initial?.link_url ?? "");
+  // Action link can be one of three modes: a specific event (auto-fills the
+  // URL), a custom URL, or none. If we're editing an existing announcement
+  // whose link_url already points at /events/<slug>, default into "event"
+  // mode with that event preselected.
+  const initialLinkUrl = initial?.link_url ?? "";
+  const initialEventSlug = eventSlugFromUrl(initialLinkUrl);
+  const initialMode: "none" | "event" | "custom" = initialLinkUrl
+    ? initialEventSlug
+      ? "event"
+      : "custom"
+    : "none";
+  const [linkMode, setLinkMode] = useState<"none" | "event" | "custom">(initialMode);
+  const [linkEventSlug, setLinkEventSlug] = useState<string>(initialEventSlug ?? "");
+  const [linkUrl, setLinkUrl] = useState(initialMode === "custom" ? initialLinkUrl : "");
   const [actionLabel, setActionLabel] = useState(initial?.action_label ?? "");
 
   const status: ApprovalStatus = initial?.approval_status ?? "draft";
@@ -95,6 +117,12 @@ export function AnnouncementForm({
   const canSubmit = !isExisting || status === "draft" || status === "rejected";
 
   function buildPayload(): AnnouncementInput {
+    let finalLinkUrl: string | null = null;
+    if (linkMode === "event" && linkEventSlug) {
+      finalLinkUrl = `/events/${linkEventSlug}`;
+    } else if (linkMode === "custom" && linkUrl.trim()) {
+      finalLinkUrl = linkUrl.trim();
+    }
     return {
       id: initial?.id,
       category,
@@ -103,8 +131,8 @@ export function AnnouncementForm({
       date_label: dateLabel || null,
       expires_at: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
       pinned,
-      link_url: linkUrl || null,
-      action_label: actionLabel || null,
+      link_url: finalLinkUrl,
+      action_label: finalLinkUrl ? actionLabel || null : null,
     };
   }
 
@@ -335,24 +363,85 @@ export function AnnouncementForm({
         />
       </div>
 
-      <div>
-        <label style={labelStyle}>Action link (optional)</label>
-        <input
-          value={linkUrl}
-          onChange={(e) => setLinkUrl(e.target.value)}
-          style={inputStyle}
-          placeholder="/events or https://…"
-        />
-      </div>
+      <div style={{ gridColumn: "1 / -1" }}>
+        <label style={labelStyle}>Action button (optional)</label>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
+          {(["none", "event", "custom"] as const).map((m) => {
+            const on = linkMode === m;
+            const label = m === "none" ? "No button" : m === "event" ? "Link to an event" : "Custom URL";
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setLinkMode(m)}
+                style={{
+                  background: on ? "#e7b84e" : "#1a2438",
+                  color: on ? "#0b101c" : "#cdd3e0",
+                  border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
+                  fontWeight: 800,
+                  fontSize: "12px",
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  padding: "9px 14px",
+                  borderRadius: "9px",
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
-      <div>
-        <label style={labelStyle}>Action button label</label>
-        <input
-          value={actionLabel}
-          onChange={(e) => setActionLabel(e.target.value)}
-          style={inputStyle}
-          placeholder="Learn more"
-        />
+        {linkMode === "event" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div>
+              <select
+                value={linkEventSlug}
+                onChange={(e) => {
+                  setLinkEventSlug(e.target.value);
+                  if (!actionLabel.trim()) setActionLabel("Sign up");
+                }}
+                style={{ ...inputStyle, WebkitAppearance: "none", appearance: "none" }}
+              >
+                <option value="">— Choose an event —</option>
+                {events.map((ev) => (
+                  <option key={ev.slug} value={ev.slug}>
+                    {ev.title} · {ev.startsAtLabel}
+                  </option>
+                ))}
+              </select>
+              {events.length === 0 && (
+                <p style={{ fontSize: "12px", color: "#9aa3b8", marginTop: "6px" }}>
+                  No published events yet — create one first or use Custom URL.
+                </p>
+              )}
+            </div>
+            <input
+              value={actionLabel}
+              onChange={(e) => setActionLabel(e.target.value)}
+              style={inputStyle}
+              placeholder='Button text — e.g. "Sign up"'
+            />
+          </div>
+        )}
+
+        {linkMode === "custom" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <input
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              style={inputStyle}
+              placeholder="https://…"
+            />
+            <input
+              value={actionLabel}
+              onChange={(e) => setActionLabel(e.target.value)}
+              style={inputStyle}
+              placeholder='Button text — e.g. "Learn more"'
+            />
+          </div>
+        )}
       </div>
 
       <label

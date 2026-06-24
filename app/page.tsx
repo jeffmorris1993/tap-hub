@@ -5,6 +5,7 @@ import { TodayBanner } from "../components/TodayBanner";
 import { HubTile } from "../components/HubTile";
 import { Greeting } from "../components/Greeting";
 import { HubAnnouncements } from "../components/HubAnnouncements";
+import { LivePoller } from "../components/LivePoller";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
 
 const CHURCH_PHONE = "+12485551234";
@@ -12,7 +13,10 @@ const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
 const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
 const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 
-export const revalidate = 60;
+// Force-dynamic so the LivePoller's router.refresh() actually re-runs
+// the data fetches every 30s; ISR would cache the announcements strip
+// for up to revalidate-seconds and visitors would still see stale cards.
+export const dynamic = "force-dynamic";
 
 export default async function Hub() {
   const [schedule, sundayFallback] = await Promise.all([
@@ -21,6 +25,7 @@ export default async function Hub() {
   ]);
   return (
     <PhoneShell>
+      <LivePoller />
       <div className="th-fade">
         <HubTopBar />
 

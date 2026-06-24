@@ -33,7 +33,11 @@ function segmentStyle(on: boolean): React.CSSProperties {
 }
 
 export function EventDetailView({ event }: { event: DisplayEvent }) {
-  const [role, setRole] = useState<"attendee" | "volunteer">("attendee");
+  // Default to attendee if RSVPs are open; otherwise (volunteers-only)
+  // start on volunteer so the form is immediately useful.
+  const [role, setRole] = useState<"attendee" | "volunteer">(
+    event.accepts_rsvps ? "attendee" : "volunteer",
+  );
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [notes, setNotes] = useState("");
@@ -234,7 +238,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            {!event.accepts_rsvps ? (
+            {!event.accepts_rsvps && !event.allow_volunteers ? (
               <div
                 style={{
                   marginTop: "24px",
@@ -253,7 +257,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               </div>
             ) : event.signupOpen ? (
               <>
-                {event.allow_volunteers && (
+                {event.accepts_rsvps && event.allow_volunteers && (
                   <>
                     <div
                       style={{
@@ -276,6 +280,20 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                       </button>
                     </div>
                   </>
+                )}
+                {!event.accepts_rsvps && event.allow_volunteers && (
+                  <div
+                    style={{
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "#e7b84e",
+                      margin: "24px 0 11px",
+                    }}
+                  >
+                    Volunteer signup
+                  </div>
                 )}
 
                 <input

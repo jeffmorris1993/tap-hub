@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../../../../../lib/supabase/server";
 import type { AnnouncementCategory } from "../../../../../lib/announcement-types";
 import { AnnouncementForm } from "../AnnouncementForm";
 import { currentUserCanApprove, type ApprovalStatus } from "../actions";
+import { listLinkableEvents } from "../../../../../lib/event-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,10 @@ const FIELDS =
 
 export default async function EditAnnouncement({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ data, error }, canApprove] = await Promise.all([
+  const [{ data, error }, canApprove, events] = await Promise.all([
     supabaseAdmin().from("announcements").select(FIELDS).eq("id", id).limit(1),
     currentUserCanApprove(),
+    listLinkableEvents(),
   ]);
   if (error) throw error;
   const row = (data?.[0] ?? null) as unknown as Row | null;
@@ -47,7 +49,7 @@ export default async function EditAnnouncement({ params }: { params: Promise<{ i
         ← All announcements
       </Link>
       <div style={{ marginTop: "16px" }}>
-        <AnnouncementForm initial={row} canApprove={canApprove} />
+        <AnnouncementForm initial={row} canApprove={canApprove} events={events} />
       </div>
     </div>
   );

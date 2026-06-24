@@ -170,7 +170,7 @@ export function buildAgentTools(ctx: AgentContext) {
         allowVolunteers: z
           .boolean()
           .describe(
-            "True if the event is explicitly soliciting volunteer signups (e.g. greeters, kitchen help, ushers). Only relevant when acceptsRsvps is true; pass false when there's no signup form. Ask the user — do NOT assume true.",
+            "True if the event is explicitly soliciting volunteer signups (e.g. greeters, kitchen help, ushers, chaperones). Independent of acceptsRsvps — an event can be info-only for attendees but still collect volunteers, or vice versa. Ask the user — do NOT assume true.",
           ),
         cost: z
           .string()
@@ -225,7 +225,7 @@ export function buildAgentTools(ctx: AgentContext) {
           location: input.location,
           cost: input.cost?.trim() ? input.cost.trim() : null,
           accepts_rsvps: input.acceptsRsvps,
-          allow_volunteers: input.acceptsRsvps && input.allowVolunteers,
+          allow_volunteers: input.allowVolunteers,
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,
           recurrence_until: input.recurrenceUntil ?? null,
@@ -447,12 +447,12 @@ export function buildAgentTools(ctx: AgentContext) {
         "BEFORE calling, make sure you have: category, a short title, the body, and ideally a display date/when. If any is missing, ASK one short follow-up first.",
       inputSchema: z.object({
         category: z
-          .enum(["Important", "Ministry", "Facilities", "Event"])
+          .enum(["Ministry", "Facilities", "Event"])
           .describe(
-            "Important = urgent / time-sensitive notices the whole church should see. " +
-              "Ministry = ministry-specific news (new members class, choir, etc.). " +
+            "Ministry = ministry-specific news (new members class, choir, volunteer asks, etc.). " +
               "Facilities = building / parking / closures. " +
-              "Event = a teaser for something on the calendar. Most one-off church news fits Ministry.",
+              "Event = a teaser for something on the calendar. " +
+              "If the sender hasn't made the category obvious from the message, ASK before posting — don't guess. Urgency is a separate axis: set pinned=true for time-sensitive items, no matter which category they belong to.",
           ),
         title: z.string().min(1).max(120),
         body: z.string().min(1).describe("2–5 sentences. Plain text; no markdown."),
@@ -471,25 +471,43 @@ export function buildAgentTools(ctx: AgentContext) {
           .describe(
             "Auto-hide the announcement after this date (YYYY-MM-DD). Use for time-bounded notices like a one-weekend parking closure. End of that day, local time.",
           ),
+        linkToEventSlug: z
+          .string()
+          .optional()
+          .describe(
+            "Preferred way to add a CTA when the announcement references one of our existing events (e.g. a volunteer ask for the Summer Discovery Program). Pass the event's slug — the tool fills in '/events/<slug>' for you. If you don't know the slug, call list_pending_events / list_recent_submissions or ask the user.",
+          ),
         linkUrl: z
           .string()
           .optional()
           .describe(
-            "Optional URL or app path the card's CTA button opens, e.g. '/events' or 'https://…'. Requires actionLabel.",
+            "Use ONLY when the CTA should point to something that isn't one of our events (an external URL, the give page, etc.). Prefer linkToEventSlug when the link is to an event. Requires actionLabel.",
           ),
         actionLabel: z
           .string()
           .optional()
-          .describe('Label for the CTA button, e.g. "Sign up", "Learn more". Required if linkUrl is set.'),
+          .describe(
+            'Label for the CTA button, e.g. "Sign up", "Volunteer", "Learn more". Required when linkUrl or linkToEventSlug is set. Default to "Sign up" when linking to an event with RSVPs/volunteers.',
+          ),
         submitForApproval: z
           .boolean()
           .default(true)
           .describe("Submit for review now? Defaults to true. Set false to keep as a draft."),
       }),
       execute: async (input) => {
-        if (input.linkUrl && !input.actionLabel) {
-          return { ok: false, error: "actionLabel is required when linkUrl is set." };
+        // Resolve which link wins. linkToEventSlug is preferred. Both
+        // require an action label.
+        let resolvedLink: string | null = null;
+        if (input.linkToEventSlug) {
+          resolvedLink = `/events/${input.linkToEventSlug}`;
+        } else if (input.linkUrl) {
+          resolvedLink = input.linkUrl;
         }
+        const resolvedLabel = input.actionLabel ?? (input.linkToEventSlug ? "Sign up" : null);
+        if (resolvedLink && !resolvedLabel) {
+          return { ok: false, error: "actionLabel is required when a link is set." };
+        }
+
         const wantsToPublishOrSubmit = input.submitForApproval;
         const nowIso = new Date().toISOString();
         const expiresAt = input.expiresOn
@@ -503,8 +521,8 @@ export function buildAgentTools(ctx: AgentContext) {
           date_label: input.dateLabel ?? null,
           expires_at: expiresAt,
           pinned: input.pinned ?? false,
-          link_url: input.linkUrl ?? null,
-          action_label: input.actionLabel ?? null,
+          link_url: resolvedLink,
+          action_label: resolvedLink ? resolvedLabel : null,
           approval_status: !wantsToPublishOrSubmit
             ? "draft"
             : senderIsApprover
