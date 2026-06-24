@@ -36,12 +36,13 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
   const [role, setRole] = useState<"attendee" | "volunteer">("attendee");
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
+  const [notes, setNotes] = useState("");
   const [result, setResult] = useState<EventSignupResult | null>(null);
   const [pending, startTransition] = useTransition();
 
   function onSubmit() {
     startTransition(async () => {
-      const r = await submitEventSignup({ slug: event.slug, name, contact, role });
+      const r = await submitEventSignup({ slug: event.slug, name, contact, role, notes });
       setResult(r);
     });
   }
@@ -287,7 +288,18 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
                   placeholder="Email or phone"
-                  style={{ ...inputStyle, marginBottom: "18px" }}
+                  style={{ ...inputStyle, marginBottom: "12px" }}
+                />
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={
+                    role === "volunteer"
+                      ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
+                      : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
+                  }
+                  rows={3}
+                  style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
                 />
                 {result && !result.ok && (
                   <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>

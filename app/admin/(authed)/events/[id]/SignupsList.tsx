@@ -79,7 +79,7 @@ function Section({
                   borderRadius: "11px",
                   padding: "12px 14px",
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: "12px",
                 }}
               >
@@ -94,8 +94,25 @@ function Section({
                       s.contact || <span style={{ color: "#6a738b" }}>(no contact)</span>
                     )}
                   </div>
+                  {s.notes && (
+                    <div
+                      style={{
+                        marginTop: "8px",
+                        padding: "8px 10px",
+                        background: "#121a2e",
+                        border: "1px solid rgba(244,241,234,.07)",
+                        borderRadius: "8px",
+                        fontSize: "12.5px",
+                        color: "#cdd3e0",
+                        lineHeight: 1.4,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {s.notes}
+                    </div>
+                  )}
                 </div>
-                <div style={{ color: "#6a738b", fontSize: "11.5px", whiteSpace: "nowrap" }}>
+                <div style={{ color: "#6a738b", fontSize: "11.5px", whiteSpace: "nowrap", alignSelf: "flex-start" }}>
                   {fmtDateTime(s.created_at)}
                 </div>
               </li>

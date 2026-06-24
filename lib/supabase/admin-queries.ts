@@ -112,13 +112,14 @@ export type EventSignupRow = {
   name: string;
   contact: string;
   role: "attendee" | "volunteer";
+  notes: string | null;
   created_at: string;
 };
 
 export async function listSignupsForEvent(eventId: string): Promise<EventSignupRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("event_signups")
-    .select("id, name, contact, role, created_at")
+    .select("id, name, contact, role, notes, created_at")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
   if (error) throw error;

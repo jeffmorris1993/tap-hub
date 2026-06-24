@@ -7,6 +7,7 @@ export type EventSignupInput = {
   name: string;
   contact: string;
   role: "attendee" | "volunteer";
+  notes?: string;
 };
 
 export type EventSignupResult =
@@ -33,11 +34,13 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     return { ok: false, error: "This event isn't accepting volunteers." };
   }
 
+  const notes = input.notes?.trim();
   const { error } = await sb.from("event_signups").insert({
     event_id: row.id,
     name: input.name.trim(),
     contact: input.contact.trim(),
     role: input.role,
+    notes: notes ? notes : null,
   });
   if (error) {
     console.error("[event-signup] insert failed", error);
