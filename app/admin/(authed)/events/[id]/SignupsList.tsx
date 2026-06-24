@@ -124,9 +124,23 @@ function Section({
   );
 }
 
-export function SignupsList({ signups }: { signups: EventSignupRow[] }) {
+export function SignupsList({
+  signups,
+  acceptsRsvps,
+  allowVolunteers,
+}: {
+  signups: EventSignupRow[];
+  acceptsRsvps: boolean;
+  allowVolunteers: boolean;
+}) {
   const attendees = signups.filter((s) => s.role === "attendee");
   const volunteers = signups.filter((s) => s.role === "volunteer");
+  // Show only sections that match what the event actually collects.
+  // (Old signups from before a flag flipped still show under whichever
+  // section is still enabled — if both are off the parent doesn't even
+  // render this list.)
+  const showAttendees = acceptsRsvps || attendees.length > 0;
+  const showVolunteers = allowVolunteers || volunteers.length > 0;
   return (
     <section
       style={{
@@ -161,8 +175,8 @@ export function SignupsList({ signups }: { signups: EventSignupRow[] }) {
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px" }}>
-        <Section title="Attendees" rows={attendees} emptyLabel="No attendees yet." />
-        <Section title="Volunteers" rows={volunteers} emptyLabel="No volunteers yet." />
+        {showAttendees && <Section title="Attendees" rows={attendees} emptyLabel="No attendees yet." />}
+        {showVolunteers && <Section title="Volunteers" rows={volunteers} emptyLabel="No volunteers yet." />}
       </div>
     </section>
   );

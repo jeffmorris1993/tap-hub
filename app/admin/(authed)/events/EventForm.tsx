@@ -13,6 +13,7 @@ import {
   type EventFormInput,
 } from "./actions";
 import { useToast } from "../Toaster";
+import { ConfirmDialog } from "../ConfirmDialog";
 
 const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
 const RECURRENCE_KINDS = [
@@ -44,6 +45,10 @@ const inputStyle: React.CSSProperties = {
   color: "#f4f1ea",
   background: "#0b101c",
   outline: "none",
+  // Tells the browser to draw native UI (date picker indicator,
+  // calendar overlay, default value placeholder) using dark-mode
+  // colors so they're legible against the navy background.
+  colorScheme: "dark",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -107,6 +112,7 @@ export function EventForm({
   const [error, setError] = useState<string | null>(null);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   function fail(msg: string) {
     setError(msg);
@@ -224,7 +230,11 @@ export function EventForm({
 
   function onDelete() {
     if (!initial?.id) return;
-    if (!confirm("Delete this event? Signups will be removed too. This can't be undone.")) return;
+    setConfirmingDelete(true);
+  }
+
+  function confirmDelete() {
+    if (!initial?.id) return;
     startTransition(async () => {
       // deleteEvent server-redirects to /admin/events — append the flash
       // via session storage so the destination page can show the toast.
@@ -665,6 +675,17 @@ export function EventForm({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this event?"
+        body="Signups will be removed too. This can't be undone."
+        confirmLabel="Delete event"
+        danger
+        pending={pending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={confirmDelete}
+      />
     </form>
   );
 }

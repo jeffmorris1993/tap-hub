@@ -16,6 +16,7 @@ import {
 import { ANNOUNCEMENT_CATEGORIES, type AnnouncementCategory } from "../../../../lib/announcement-types";
 import type { EventPickerOption } from "../../../../lib/event-picker";
 import { useToast } from "../Toaster";
+import { ConfirmDialog } from "../ConfirmDialog";
 
 type Initial = {
   id?: string;
@@ -44,6 +45,9 @@ const inputStyle: React.CSSProperties = {
   background: "#0b101c",
   outline: "none",
   fontFamily: "inherit",
+  // Tells the browser to use dark-mode picker UI so date / time
+  // controls are legible against the navy background.
+  colorScheme: "dark",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -88,6 +92,7 @@ export function AnnouncementForm({
   const [pending, startTransition] = useTransition();
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const [category, setCategory] = useState<AnnouncementCategory>(initial?.category ?? "General");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -231,7 +236,11 @@ export function AnnouncementForm({
 
   function onDelete() {
     if (!initial?.id) return;
-    if (!confirm("Delete this announcement? This can't be undone.")) return;
+    setConfirmingDelete(true);
+  }
+
+  function confirmDelete() {
+    if (!initial?.id) return;
     startTransition(async () => {
       try {
         sessionStorage.setItem("admin-flash", "announcement-deleted");
@@ -239,6 +248,7 @@ export function AnnouncementForm({
       try {
         await deleteAnnouncement(initial.id as string);
       } catch (err) {
+        setConfirmingDelete(false);
         toast(err instanceof Error ? err.message : "Couldn't delete.", "error");
       }
     });
@@ -639,6 +649,17 @@ export function AnnouncementForm({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this announcement?"
+        body="This can't be undone."
+        confirmLabel="Delete announcement"
+        danger
+        pending={pending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={confirmDelete}
+      />
     </form>
   );
 }

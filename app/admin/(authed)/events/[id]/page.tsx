@@ -37,8 +37,12 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
         Edit event
       </h1>
       <EventForm initial={event} canApprove={canApprove} />
-      {event.accepts_rsvps ? (
-        <SignupsList signups={signups} />
+      {event.accepts_rsvps || event.allow_volunteers ? (
+        <SignupsList
+          signups={signups}
+          acceptsRsvps={event.accepts_rsvps}
+          allowVolunteers={event.allow_volunteers}
+        />
       ) : (
         <section
           style={{
@@ -52,7 +56,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
             fontWeight: 600,
           }}
         >
-          This event is info-only — RSVPs aren&apos;t being collected.
+          This event is info-only — no signups are being collected.
         </section>
       )}
     </div>
