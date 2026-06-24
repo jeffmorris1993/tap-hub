@@ -14,7 +14,7 @@ import {
 } from "./actions";
 import { useToast } from "../Toaster";
 
-const CATEGORIES = ["Worship", "Youth", "Community"] as const;
+const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
 const RECURRENCE_KINDS = [
   { value: "none", label: "Doesn't repeat" },
   { value: "daily", label: "Every day (multi-day event)" },
@@ -75,7 +75,7 @@ type Initial = {
   slug?: string;
   title?: string;
   description_long?: string;
-  category?: "Worship" | "Youth" | "Community";
+  category?: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
   starts_at?: string | null;
   ends_at?: string | null;
   location?: string;
@@ -114,7 +114,7 @@ export function EventForm({
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description_long ?? "");
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>(initial?.category ?? "Community");
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>(initial?.category ?? "General");
   const [startsAt, setStartsAt] = useState(toLocalInputValue(initial?.starts_at ?? null));
   const [endsAt, setEndsAt] = useState(toLocalInputValue(initial?.ends_at ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");

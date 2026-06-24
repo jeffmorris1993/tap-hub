@@ -23,7 +23,7 @@ export type EventFormInput = {
   slug: string;
   title: string;
   description_long: string;
-  category: "Worship" | "Youth" | "Community";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
   /** ISO datetime-local string (e.g. "2026-04-05T12:00") in local time. */
   starts_at_local: string;
   ends_at_local: string;

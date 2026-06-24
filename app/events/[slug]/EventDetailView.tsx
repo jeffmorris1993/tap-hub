@@ -6,6 +6,7 @@ import { PhoneShell } from "../../../components/PhoneShell";
 import { BackBar } from "../../../components/BackBar";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
+import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -168,21 +169,26 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                   {event.day}
                 </span>
               </div>
-              <span
-                style={{
-                  display: "inline-block",
-                  background: "rgba(231,184,78,.14)",
-                  color: "#e7b84e",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  padding: "6px 11px",
-                  borderRadius: "6px",
-                }}
-              >
-                {event.category}
-              </span>
+              {(() => {
+                const accent = ANNOUNCEMENT_COLORS[event.category];
+                return (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      background: accent + "22",
+                      color: accent,
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      padding: "6px 11px",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    {event.category}
+                  </span>
+                );
+              })()}
             </div>
             <h2
               style={{

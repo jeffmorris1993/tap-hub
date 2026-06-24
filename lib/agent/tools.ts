@@ -149,7 +149,11 @@ export function buildAgentTools(ctx: AgentContext) {
       inputSchema: z.object({
         title: z.string().min(1),
         descriptionLong: z.string().min(1),
-        category: z.enum(["Worship", "Youth", "Community"]),
+        category: z
+          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"])
+          .describe(
+            "Audience the event is aimed at. Youth = kids/teens or the people serving them (chaperones, youth leaders). Sisterhood = women's ministry. Brotherhood = men's ministry. Marriage = married couples. General = whole church (Sunday worship, all-church events, holiday services). ASK if it's not obvious — don't guess.",
+          ),
         startsAtLocal: z
           .string()
           .describe(

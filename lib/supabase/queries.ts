@@ -4,7 +4,8 @@ import type { ScheduleRow } from "../clock";
 import { hasOccurrenceOnDate, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
 import { detroitNow, detroitDateIso } from "../tz";
 
-export type EventCategory = "Worship" | "Youth" | "Community";
+export { EVENT_CATEGORIES, type EventCategory } from "../event-categories";
+import type { EventCategory } from "../event-categories";
 
 export type EventRow = {
   slug: string;

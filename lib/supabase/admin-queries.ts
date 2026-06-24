@@ -144,7 +144,7 @@ export type AdminEventRow = {
   id: string;
   slug: string;
   title: string;
-  category: "Worship" | "Youth" | "Community";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
   starts_at: string;
   ends_at: string | null;
   location: string;

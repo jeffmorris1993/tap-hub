@@ -6,11 +6,12 @@ import { useEffect, useState } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
 import type { DisplayEvent } from "../../lib/events-display";
-import type { EventCategory } from "../../lib/supabase/queries";
+import { EVENT_CATEGORIES, type EventCategory } from "../../lib/event-categories";
+import { ANNOUNCEMENT_COLORS } from "../../lib/announcement-types";
 
 const POLL_INTERVAL_MS = 30_000;
 
-const TABS: ("All" | EventCategory)[] = ["All", "Worship", "Youth", "Community"];
+const TABS: ("All" | EventCategory)[] = ["All", ...EVENT_CATEGORIES];
 
 export function EventsList({ events }: { events: DisplayEvent[] }) {
   const router = useRouter();
@@ -126,21 +127,26 @@ export function EventsList({ events }: { events: DisplayEvent[] }) {
                 </span>
               </div>
               <div style={{ flex: 1, minWidth: 0, padding: "15px 16px" }}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    background: "rgba(231,184,78,.14)",
-                    color: "#e7b84e",
-                    fontSize: "9.5px",
-                    fontWeight: 800,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    padding: "5px 9px",
-                    borderRadius: "6px",
-                  }}
-                >
-                  {e.category}
-                </span>
+                {(() => {
+                  const accent = ANNOUNCEMENT_COLORS[e.category];
+                  return (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: accent + "22",
+                        color: accent,
+                        fontSize: "9.5px",
+                        fontWeight: 800,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        padding: "5px 9px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {e.category}
+                    </span>
+                  );
+                })()}
                 <h3
                   style={{
                     fontFamily: "var(--font-anton)",
