@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
+import { ScrollToHash } from "../../components/ScrollToHash";
 import {
   listAnnouncements,
   filterByCategory,
@@ -32,6 +33,7 @@ export default async function AnnouncementsPage({
 
   return (
     <PhoneShell>
+      <ScrollToHash />
       <div className="th-slide" style={{ minHeight: "100dvh" }}>
         <BackBar title="Announcements" subtitle="Stay in the loop" />
 

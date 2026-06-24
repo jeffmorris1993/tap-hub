@@ -34,10 +34,16 @@ function segmentStyle(on: boolean): React.CSSProperties {
 }
 
 export function EventDetailView({ event }: { event: DisplayEvent }) {
-  // Default to attendee if RSVPs are open; otherwise (volunteers-only)
-  // start on volunteer so the form is immediately useful.
+  // External registration AND in-app RSVPs both count as an "attend"
+  // path — the external URL just changes what the Attend tab shows.
+  const hasAttendPath = event.accepts_rsvps || !!event.registration_url;
+  const attendIsExternal = !!event.registration_url;
+  const hasVolunteerPath = event.allow_volunteers;
+
+  // Default to attendee when that path exists; otherwise (volunteers-
+  // only) start on volunteer so the form is immediately useful.
   const [role, setRole] = useState<"attendee" | "volunteer">(
-    event.accepts_rsvps ? "attendee" : "volunteer",
+    hasAttendPath ? "attendee" : "volunteer",
   );
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -244,7 +250,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            {!event.accepts_rsvps && !event.allow_volunteers ? (
+            {!hasAttendPath && !hasVolunteerPath ? (
               <div
                 style={{
                   marginTop: "24px",
@@ -263,7 +269,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               </div>
             ) : event.signupOpen ? (
               <>
-                {event.accepts_rsvps && event.allow_volunteers && (
+                {hasAttendPath && hasVolunteerPath && (
                   <>
                     <div
                       style={{
@@ -287,7 +293,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                     </div>
                   </>
                 )}
-                {!event.accepts_rsvps && event.allow_volunteers && (
+                {!hasAttendPath && hasVolunteerPath && (
                   <div
                     style={{
                       fontSize: "11.5px",
@@ -302,7 +308,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                   </div>
                 )}
 
-                {role === "attendee" && event.registration_url ? (
+                {role === "attendee" && attendIsExternal ? (
                   // External registration takes over the Attend path. We
                   // intentionally don't capture name/contact in-app since
                   // the external site will.
@@ -319,7 +325,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                       Registration happens on the official site. Tap below to register and reserve your spot.
                     </p>
                     <a
-                      href={event.registration_url}
+                      href={event.registration_url ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{

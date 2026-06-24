@@ -107,7 +107,10 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   }
 
   const manual: Announcement[] = manualRows.map((r) => ({
-    id: `manual:${r.id}`,
+    // IDs become URL fragments — keep them ASCII-safe and free of `:`
+    // (which Next.js encodes to %3A on Link nav, breaking getElementById
+    // scroll-to-anchor on the destination page).
+    id: `m-${r.id}`,
     kind: "manual",
     category: r.category,
     title: r.title,
@@ -144,7 +147,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     const endIso = e.ends_at && e.recurrence_kind === "none" ? e.ends_at : null;
     return [
       {
-        id: `event:${e.slug}`,
+        id: `e-${e.slug}`,
         kind: "event",
         // Events now carry the same audience-based category set as
         // announcements, so we can pass it through directly. A Youth
