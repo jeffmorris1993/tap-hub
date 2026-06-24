@@ -1,34 +1,43 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /**
  * Back-arrow chevron with phone-app-style behavior: prefers
  * router.back() when the previous page was on this site (so /events
  * landed-on-from-/announcements returns to /announcements instead of
- * the events list), and falls back to a sensible static URL when the
- * user landed here directly (NFC tap, deep link, fresh tab).
+ * the events list), and falls back to a sensible static URL when:
+ *   - the user landed here directly (NFC tap, deep link, fresh tab); or
+ *   - the previous page is a CHILD of the current one. Without this
+ *     check, hitting Back on /announcements after returning from
+ *     /announcements/[id] would loop back into the detail page.
  */
 export function BackButton({ fallback }: { fallback: string }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [canGoBack, setCanGoBack] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Same-origin referrer = we have a real "previous page" within the
-    // app. history.length > 1 alone isn't enough (some browsers report 2
-    // on a fresh tab) — checking the referrer host gives us a stronger
-    // signal that router.back() will actually do something useful.
     try {
       const ref = document.referrer;
       if (!ref) return;
       const url = new URL(ref);
-      if (url.origin === window.location.origin) setCanGoBack(true);
+      if (url.origin !== window.location.origin) return;
+      // If the referrer lives under our current path (e.g. we're on
+      // /announcements and referrer is /announcements/<id>), using
+      // history would just bounce the user back into the child page.
+      // Treat that as "no usable history" and fall through to the
+      // static fallback.
+      const refPath = url.pathname.replace(/\/+$/, "");
+      const here = (pathname ?? "").replace(/\/+$/, "");
+      if (here && (refPath === here || refPath.startsWith(here + "/"))) return;
+      setCanGoBack(true);
     } catch {
       // bad referrer, fall through
     }
-  }, []);
+  }, [pathname]);
 
   function onClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (canGoBack) {
