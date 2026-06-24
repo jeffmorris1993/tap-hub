@@ -34,19 +34,22 @@ function segmentStyle(on: boolean): React.CSSProperties {
 }
 
 export function EventDetailView({ event }: { event: DisplayEvent }) {
-  // accepts_rsvps is the master switch for the attend path. If staff
-  // disabled it, there's no attend button — even if a registration_url
-  // is set (the URL just describes where signups go *if* attendance is
-  // open). This matches the mental model "the two checkboxes in admin
-  // control which buttons appear on the public page."
-  const hasAttendPath = event.accepts_rsvps;
-  const attendIsExternal = hasAttendPath && !!event.registration_url;
-  const hasVolunteerPath = event.allow_volunteers;
+  // Three independent signup affordances:
+  //   1. External Register button   — whenever registration_url is set
+  //   2. In-app Attend form         — when accepts_rsvps && no external URL
+  //   3. In-app Volunteer form      — when allow_volunteers
+  //
+  // The Attend/Volunteer toggle is only needed when BOTH in-app forms
+  // would otherwise want the same screen real estate. An external
+  // Register button is a one-tap link, so it doesn't fight the
+  // volunteer form for space — they stack.
+  const hasExternalRegister = !!event.registration_url;
+  const hasInAppAttend = event.accepts_rsvps && !hasExternalRegister;
+  const hasInAppVolunteer = event.allow_volunteers;
+  const showToggle = hasInAppAttend && hasInAppVolunteer;
 
-  // Default to attendee when that path exists; otherwise (volunteers-
-  // only) start on volunteer so the form is immediately useful.
   const [role, setRole] = useState<"attendee" | "volunteer">(
-    hasAttendPath ? "attendee" : "volunteer",
+    hasInAppAttend ? "attendee" : "volunteer",
   );
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -253,7 +256,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {event.description_long}
             </p>
 
-            {!hasAttendPath && !hasVolunteerPath ? (
+            {!hasExternalRegister && !hasInAppAttend && !hasInAppVolunteer ? (
               <div
                 style={{
                   marginTop: "24px",
@@ -272,7 +275,61 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               </div>
             ) : event.signupOpen ? (
               <>
-                {hasAttendPath && hasVolunteerPath && (
+                {/* 1) External Register — independent block. Always
+                       shows when a URL is set, alongside any in-app
+                       forms below. */}
+                {hasExternalRegister && (
+                  <div style={{ marginTop: "24px" }}>
+                    <div
+                      style={{
+                        fontSize: "11.5px",
+                        fontWeight: 800,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#e7b84e",
+                        marginBottom: "11px",
+                      }}
+                    >
+                      Register to attend
+                    </div>
+                    <p
+                      style={{
+                        color: "#cdd3e0",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        lineHeight: 1.55,
+                        marginBottom: "14px",
+                      }}
+                    >
+                      Registration happens on the official site. Tap below to register.
+                    </p>
+                    <a
+                      href={event.registration_url ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        background: "#e7b84e",
+                        color: "#0b101c",
+                        fontWeight: 800,
+                        fontSize: "14px",
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        padding: "17px",
+                        borderRadius: "12px",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {event.registration_label?.trim() || "Register"} →
+                    </a>
+                  </div>
+                )}
+
+                {/* 2) In-app forms — Attend, Volunteer, or both via
+                       toggle. The toggle is only needed when both
+                       compete for the same form fields. */}
+                {showToggle && (
                   <>
                     <div
                       style={{
@@ -296,7 +353,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                     </div>
                   </>
                 )}
-                {!hasAttendPath && hasVolunteerPath && (
+                {!showToggle && hasInAppVolunteer && (
                   <div
                     style={{
                       fontSize: "11.5px",
@@ -310,45 +367,22 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                     Volunteer signup
                   </div>
                 )}
+                {!showToggle && hasInAppAttend && !hasExternalRegister && (
+                  <div
+                    style={{
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "#e7b84e",
+                      margin: "24px 0 11px",
+                    }}
+                  >
+                    RSVP
+                  </div>
+                )}
 
-                {role === "attendee" && attendIsExternal ? (
-                  // External registration takes over the Attend path. We
-                  // intentionally don't capture name/contact in-app since
-                  // the external site will.
-                  <>
-                    <p
-                      style={{
-                        color: "#cdd3e0",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        lineHeight: 1.55,
-                        marginBottom: "14px",
-                      }}
-                    >
-                      Registration happens on the official site. Tap below to register and reserve your spot.
-                    </p>
-                    <a
-                      href={event.registration_url ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        background: "#e7b84e",
-                        color: "#0b101c",
-                        fontWeight: 800,
-                        fontSize: "14px",
-                        letterSpacing: "0.05em",
-                        textTransform: "uppercase",
-                        padding: "17px",
-                        borderRadius: "12px",
-                        textDecoration: "none",
-                      }}
-                    >
-                      {event.registration_label?.trim() || "Register"} →
-                    </a>
-                  </>
-                ) : (
+                {(hasInAppAttend || hasInAppVolunteer) && (
                   <>
                     <input
                       value={name}

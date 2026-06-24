@@ -186,7 +186,7 @@ export function buildAgentTools(ctx: AgentContext) {
           .string()
           .optional()
           .describe(
-            "Set when attendees must register on an external site (Eventbrite, a conference site, a Google Form, etc.). REQUIRES acceptsRsvps=true — the URL is the attendee path, so attendance is on. When set, the in-app attendee form is replaced with a Register button to this URL. Volunteer signups still work in-app. ASK if you suspect external registration (e.g. 'Growth Conference', 'sign up at the link') and the URL wasn't given.",
+            "Set when attendees register on an external site (Eventbrite, a conference site, a Google Form, etc.). The public event page shows a Register button to this URL — independent of acceptsRsvps/allowVolunteers, so it stacks alongside in-app volunteer signups. acceptsRsvps in this case can stay false: the URL IS the attendee path and the in-app attendee form is hidden when the URL is set. ASK if you suspect external registration (e.g. 'Growth Conference', 'sign up at the link') and the URL wasn't given.",
           ),
         registrationLabel: z
           .string()

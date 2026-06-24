@@ -462,24 +462,8 @@ export function EventForm({
           style={inputStyle}
         />
         <p style={{ marginTop: "6px", color: "#9aa3b8", fontSize: "12px" }}>
-          When set, the event page shows a Register button to this URL instead of the in-app signup form. Volunteer signups still work.
+          When set, the event page shows a Register button to this URL. Works alongside volunteer signups. (When set, the in-app attendee form is hidden — the URL replaces it.)
         </p>
-        {registrationUrl.trim() && !acceptsRsvps && (
-          <p
-            style={{
-              marginTop: "8px",
-              padding: "8px 10px",
-              background: "rgba(231,184,78,.1)",
-              border: "1px solid rgba(231,184,78,.32)",
-              borderRadius: "8px",
-              color: "#e7b84e",
-              fontSize: "12px",
-              fontWeight: 700,
-            }}
-          >
-            Heads up: &ldquo;Accept RSVPs&rdquo; is off, so this Register button won&apos;t show on the public page.
-          </p>
-        )}
       </div>
       <div>
         <label style={labelStyle}>Register button label (optional)</label>
