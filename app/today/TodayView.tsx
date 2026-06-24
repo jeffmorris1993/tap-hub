@@ -86,7 +86,7 @@ export function TodayView({
   return (
     <PhoneShell>
       <div className="th-slide" style={{ minHeight: "100vh" }}>
-        <BackBar title="Today at Neh Temple" subtitle={<LiveClock />} />
+        <BackBar title="Today at Nehemiah&apos;s Temple" subtitle={<LiveClock />} />
 
         <div style={{ padding: "20px 18px 40px" }}>
           {/* hero */}

@@ -49,7 +49,7 @@ export default async function Hub() {
               marginTop: "10px",
             }}
           >
-            Tap below for everything happening at Neh Temple and how to get connected.
+            Tap below for everything happening at Nehemiah&apos;s Temple and how to get connected.
           </p>
         </div>
 

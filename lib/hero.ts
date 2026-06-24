@@ -195,18 +195,21 @@ export function buildHero(
     };
   }
 
-  // End of day — encourage rest, hint at tomorrow
+  // End of day — encourage rest, hint at tomorrow. Always make it
+  // explicit that the named event is *tomorrow*, not later tonight, so
+  // the hero doesn't read as "happening soon" to a visitor glancing at
+  // it.
   const tomorrow = nextDayWithSchedule(day);
   let tomorrowSub: string;
   if (tomorrow.dow === 0) {
     const worship = sundayFallback.find((r) => r.kind === "worship");
     tomorrowSub = worship
-      ? `Sunday Worship at ${minutesToTime(worship.startsAtMinutes)}`
-      : "See you Sunday";
+      ? `Join us tomorrow for Sunday Worship at ${minutesToTime(worship.startsAtMinutes)}`
+      : "Join us tomorrow for Sunday Worship";
   } else if (tomorrow.dow === 3) {
-    tomorrowSub = "Wednesday Bible Class · 7 PM";
+    tomorrowSub = "Join us tomorrow for Wednesday Bible Class · 7 PM";
   } else {
-    tomorrowSub = `${tomorrow.name} Morning Prayer · 7 AM via conference call`;
+    tomorrowSub = `Join us tomorrow for ${tomorrow.name} Morning Prayer at 7 AM via conference call`;
   }
   return {
     badge: greeting,
