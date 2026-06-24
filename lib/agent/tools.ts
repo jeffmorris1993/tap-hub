@@ -447,12 +447,15 @@ export function buildAgentTools(ctx: AgentContext) {
         "BEFORE calling, make sure you have: category, a short title, the body, and ideally a display date/when. If any is missing, ASK one short follow-up first.",
       inputSchema: z.object({
         category: z
-          .enum(["Ministry", "Facilities", "Event"])
+          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"])
           .describe(
-            "Ministry = ministry-specific news (new members class, choir, volunteer asks, etc.). " +
-              "Facilities = building / parking / closures. " +
-              "Event = a teaser for something on the calendar. " +
-              "If the sender hasn't made the category obvious from the message, ASK before posting — don't guess. Urgency is a separate axis: set pinned=true for time-sensitive items, no matter which category they belong to.",
+            "Pick by primary audience: " +
+              "Youth = aimed at our kids/teens or the people serving them (chaperones, youth leaders). " +
+              "Sisterhood = aimed at the women's ministry. " +
+              "Brotherhood = aimed at the men's ministry. " +
+              "Marriage = aimed at married couples (marriage ministry, couples' nights, etc.). " +
+              "General = aimed at the whole church (facility updates, all-church events, holiday closures). " +
+              "If the sender hasn't made the audience obvious, ASK before posting — don't guess. Urgency is separate: set pinned=true for time-sensitive items, regardless of category.",
           ),
         title: z.string().min(1).max(120),
         body: z.string().min(1).describe("2–5 sentences. Plain text; no markdown."),

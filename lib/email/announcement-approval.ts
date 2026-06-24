@@ -6,7 +6,7 @@ const DEFAULT_FROM = "TapHub Announcements <events@nehtemple.org>";
 
 export type AnnouncementSnapshot = {
   id: string;
-  category: "Ministry" | "Facilities" | "Event";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
   title: string;
   body: string;
   date_label: string | null;

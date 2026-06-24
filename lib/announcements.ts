@@ -146,7 +146,11 @@ export async function listAnnouncements(): Promise<Announcement[]> {
       {
         id: `event:${e.slug}`,
         kind: "event",
-        category: "Event",
+        // We don't yet carry a target audience on events, so default
+        // event-derived announcements to General. Admins can post their
+        // own audience-specific announcement linking to the event if
+        // they want it under a more specific category.
+        category: "General",
         title: e.title,
         body: e.description_long,
         dateLabel: fmtEventDateLabel(startIso, endIso),

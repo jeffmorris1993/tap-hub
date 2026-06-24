@@ -1,13 +1,22 @@
-export type AnnouncementCategory = "Ministry" | "Facilities" | "Event";
+export type AnnouncementCategory =
+  | "Youth"
+  | "Sisterhood"
+  | "Brotherhood"
+  | "Marriage"
+  | "General";
 
 export const ANNOUNCEMENT_CATEGORIES: AnnouncementCategory[] = [
-  "Ministry",
-  "Facilities",
-  "Event",
+  "Youth",
+  "Sisterhood",
+  "Brotherhood",
+  "Marriage",
+  "General",
 ];
 
 export const ANNOUNCEMENT_COLORS: Record<AnnouncementCategory, string> = {
-  Ministry: "#7bb0ff",
-  Facilities: "#aab2c6",
-  Event: "#e7b84e",
+  Youth: "#4eb86b",
+  Sisterhood: "#e9787f",
+  Brotherhood: "#4e8de7",
+  Marriage: "#b884e7",
+  General: "#aab2c6",
 };

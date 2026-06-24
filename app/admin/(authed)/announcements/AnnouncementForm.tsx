@@ -89,7 +89,7 @@ export function AnnouncementForm({
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
 
-  const [category, setCategory] = useState<AnnouncementCategory>(initial?.category ?? "Ministry");
+  const [category, setCategory] = useState<AnnouncementCategory>(initial?.category ?? "General");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [dateLabel, setDateLabel] = useState(initial?.date_label ?? "");
