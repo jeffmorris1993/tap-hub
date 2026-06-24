@@ -13,9 +13,12 @@ export { ANNOUNCEMENT_CATEGORIES, ANNOUNCEMENT_COLORS };
 export type { AnnouncementCategory };
 
 export type Announcement = {
-  /** Stable id for keys. `manual:<uuid>` or `event:<slug>`. */
+  /** Stable id for React keys. UUID for manual, "e-<slug>" for events. */
   id: string;
   kind: "manual" | "event";
+  /** Where to navigate when this card is tapped — the detail page for a
+   *  manual announcement, or the event detail for an event-derived one. */
+  href: string;
   category: AnnouncementCategory;
   title: string;
   body: string;
@@ -107,11 +110,9 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   }
 
   const manual: Announcement[] = manualRows.map((r) => ({
-    // IDs become URL fragments — keep them ASCII-safe and free of `:`
-    // (which Next.js encodes to %3A on Link nav, breaking getElementById
-    // scroll-to-anchor on the destination page).
-    id: `m-${r.id}`,
+    id: r.id,
     kind: "manual",
+    href: `/announcements/${r.id}`,
     category: r.category,
     title: r.title,
     body: r.body,
@@ -149,6 +150,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
       {
         id: `e-${e.slug}`,
         kind: "event",
+        href: `/events/${e.slug}`,
         // Events now carry the same audience-based category set as
         // announcements, so we can pass it through directly. A Youth
         // event surfaces as a Youth-colored announcement card.

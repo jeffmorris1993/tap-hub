@@ -86,12 +86,9 @@ export async function HubAnnouncements() {
 
 function PreviewCard({ a }: { a: Announcement }) {
   const accent = ANNOUNCEMENT_COLORS[a.category];
-  // Anchor jumps to the specific card on the announcements page. Event-
-  // derived cards (id="event:<slug>") just route to the event detail.
-  const href = a.kind === "event" && a.link ? a.link.href : `/announcements#${a.id}`;
   return (
     <Link
-      href={href}
+      href={a.href}
       style={{
         flexShrink: 0,
         width: "246px",
