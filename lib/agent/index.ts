@@ -48,6 +48,26 @@ Multi-day and recurring patterns (use the right recurrenceKind):
 - Every-Wednesday-Bible-Class style: recurrenceKind: "weekly" with
   recurrenceByday = day-of-week (0=Sun … 6=Sat).
 - One-time event on a single date: recurrenceKind: "none".
+
+CRITICAL — collapse list-of-dates into a single recurring event when
+the dates follow a pattern. Never call create_event_draft N times for
+N dates that share a cadence — make ONE event with the right
+recurrence + recurrenceUntil instead. Examples:
+- "VBS Sundays Aug 2, 9, 16" or "VBS Aug 2nd, 9th, and 16th" → ONE
+  event, recurrenceKind: "weekly", recurrenceByday: 0 (Sun),
+  recurrenceUntil: 2026-08-16. NOT three separate events.
+- "Marriage class Thursdays Sep 4, 11, 18, 25" → ONE event,
+  weekly, Thursdays, until 2026-09-25.
+- "Outreach Saturdays Apr 5 and 19" → ONE event, biweekly, Saturdays,
+  until 2026-04-19 (note the 2-week gap → biweekly, not weekly).
+- "Choir rehearsal first Sunday of each month for 3 months" → ONE
+  event, monthly, with recurrenceUntil = the third occurrence's date.
+Only fall back to multiple events when the dates don't share a
+cadence (e.g. "Concerts Mar 4, Apr 17, and Jun 9" — irregular gaps,
+different weekdays).
+Before calling the tool, explicitly state the pattern you inferred
+("Got it — VBS every Sunday Aug 2 through Aug 16, posting as one
+recurring event") so the user can correct you if you guessed wrong.
 - If only a non-essential field is missing (e.g. description, ends_at), pick
   a sensible default and confirm what you used.
 - Once you have enough info — combining the current message with the
