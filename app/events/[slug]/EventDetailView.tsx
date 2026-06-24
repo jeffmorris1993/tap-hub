@@ -34,10 +34,13 @@ function segmentStyle(on: boolean): React.CSSProperties {
 }
 
 export function EventDetailView({ event }: { event: DisplayEvent }) {
-  // External registration AND in-app RSVPs both count as an "attend"
-  // path — the external URL just changes what the Attend tab shows.
-  const hasAttendPath = event.accepts_rsvps || !!event.registration_url;
-  const attendIsExternal = !!event.registration_url;
+  // accepts_rsvps is the master switch for the attend path. If staff
+  // disabled it, there's no attend button — even if a registration_url
+  // is set (the URL just describes where signups go *if* attendance is
+  // open). This matches the mental model "the two checkboxes in admin
+  // control which buttons appear on the public page."
+  const hasAttendPath = event.accepts_rsvps;
+  const attendIsExternal = hasAttendPath && !!event.registration_url;
   const hasVolunteerPath = event.allow_volunteers;
 
   // Default to attendee when that path exists; otherwise (volunteers-
