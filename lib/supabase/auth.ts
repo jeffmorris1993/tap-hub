@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
@@ -45,11 +46,13 @@ export function isAllowedAdminEmail(email: string | null | undefined): boolean {
   return allowed.includes(domain);
 }
 
-/** Returns the current admin user, or null if not signed in / not allowed. */
-export async function getAdminUser(): Promise<User | null> {
+/** Returns the current admin user, or null if not signed in / not allowed.
+ *  cache() dedupes the auth.getUser() network round trip when the layout and
+ *  a page (e.g. via currentUserCanApprove) both call this in one request. */
+export const getAdminUser = cache(async (): Promise<User | null> => {
   const sb = await supabaseSession();
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) return null;
   if (!isAllowedAdminEmail(data.user.email)) return null;
   return data.user;
-}
+});

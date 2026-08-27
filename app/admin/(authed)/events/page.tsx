@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { listAllEvents, type AdminEventRow } from "../../../../lib/supabase/admin-queries";
+import { isEventOver, type RecurringEventFields } from "../../../../lib/events-occurrence";
+import { detroitDateIso } from "../../../../lib/tz";
 import { currentUserCanApprove } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +18,110 @@ const STATUS_PILL: Record<
 
 import { fmtDateTime as fmt } from "../../../../lib/format";
 
-export default async function AdminEvents() {
-  const [events, canApprove] = await Promise.all([listAllEvents(), currentUserCanApprove()]);
+const smallPill: React.CSSProperties = {
+  fontSize: "10px",
+  fontWeight: 800,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  padding: "3px 8px",
+  borderRadius: "5px",
+};
+
+function EventCard({ e, past }: { e: AdminEventRow; past?: boolean }) {
+  const pill = STATUS_PILL[e.approval_status];
+  return (
+    <Link
+      href={`/admin/events/${e.id}`}
+      style={{
+        background: "#121a2e",
+        border: "1px solid rgba(244,241,234,.08)",
+        borderRadius: "12px",
+        padding: "16px 18px",
+        textDecoration: "none",
+        color: "inherit",
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: "12px",
+        alignItems: "center",
+        opacity: past ? 0.6 : 1,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-anton)",
+              fontWeight: 400,
+              textTransform: "uppercase",
+              fontSize: "18px",
+              lineHeight: 1.04,
+            }}
+          >
+            {e.title}
+          </div>
+          <span style={{ ...smallPill, background: "rgba(231,184,78,.15)", color: "#e7b84e" }}>
+            {e.category}
+          </span>
+          <span style={{ ...smallPill, background: pill.bg, color: pill.color }}>
+            {pill.label}
+          </span>
+          {past && (
+            <span style={{ ...smallPill, background: "rgba(154,163,184,.15)", color: "#9aa3b8" }}>
+              Past
+            </span>
+          )}
+          {e.recurrence_kind !== "none" && (
+            <span style={{ ...smallPill, background: "rgba(78,141,231,.16)", color: "#9bbcf2" }}>
+              {e.recurrence_kind}
+            </span>
+          )}
+          {e.approval_status === "approved" && !e.published && (
+            <span style={{ ...smallPill, background: "rgba(154,163,184,.15)", color: "#9aa3b8" }}>
+              Unpublished
+            </span>
+          )}
+        </div>
+        <div style={{ color: "#9aa3b8", fontSize: "12.5px", marginTop: "4px", fontWeight: 600 }}>
+          {fmt(e.starts_at)} · {e.location}
+        </div>
+      </div>
+      <span style={{ color: "#e7b84e", fontSize: "12px", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+        Edit →
+      </span>
+    </Link>
+  );
+}
+
+const toggleLinkStyle: React.CSSProperties = {
+  display: "inline-block",
+  background: "#1a2438",
+  color: "#9aa3b8",
+  fontWeight: 800,
+  fontSize: "12.5px",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  padding: "12px 18px",
+  borderRadius: "10px",
+  textDecoration: "none",
+  border: "1px solid rgba(244,241,234,.12)",
+};
+
+export default async function AdminEvents({
+  searchParams,
+}: {
+  searchParams: Promise<{ archived?: string }>;
+}) {
+  const [events, canApprove, params] = await Promise.all([
+    listAllEvents(),
+    currentUserCanApprove(),
+    searchParams,
+  ]);
+  const showArchived = params.archived === "1";
   const pendingCount = events.filter((e) => e.approval_status === "pending").length;
+
+  const todayIso = detroitDateIso();
+  const archived = events.filter((e) => isEventOver(e as RecurringEventFields, todayIso));
+  const current = events.filter((e) => !isEventOver(e as RecurringEventFields, todayIso));
 
   return (
     <div>
@@ -73,7 +176,7 @@ export default async function AdminEvents() {
         </div>
       </div>
 
-      {events.length === 0 ? (
+      {current.length === 0 && archived.length === 0 ? (
         <div
           style={{
             background: "#121a2e",
@@ -89,111 +192,59 @@ export default async function AdminEvents() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {events.map((e) => {
-            const pill = STATUS_PILL[e.approval_status];
-            return (
-              <Link
-                key={e.id}
-                href={`/admin/events/${e.id}`}
-                style={{
-                  background: "#121a2e",
-                  border: "1px solid rgba(244,241,234,.08)",
-                  borderRadius: "12px",
-                  padding: "16px 18px",
-                  textDecoration: "none",
-                  color: "inherit",
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: "12px",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                    <div
-                      style={{
-                        fontFamily: "var(--font-anton)",
-                        fontWeight: 400,
-                        textTransform: "uppercase",
-                        fontSize: "18px",
-                        lineHeight: 1.04,
-                      }}
-                    >
-                      {e.title}
-                    </div>
-                    <span
-                      style={{
-                        background: "rgba(231,184,78,.15)",
-                        color: "#e7b84e",
-                        fontSize: "10px",
-                        fontWeight: 800,
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        padding: "3px 8px",
-                        borderRadius: "5px",
-                      }}
-                    >
-                      {e.category}
-                    </span>
-                    <span
-                      style={{
-                        background: pill.bg,
-                        color: pill.color,
-                        fontSize: "10px",
-                        fontWeight: 800,
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        padding: "3px 8px",
-                        borderRadius: "5px",
-                      }}
-                    >
-                      {pill.label}
-                    </span>
-                    {e.recurrence_kind !== "none" && (
-                      <span
-                        style={{
-                          background: "rgba(78,141,231,.16)",
-                          color: "#9bbcf2",
-                          fontSize: "10px",
-                          fontWeight: 800,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          padding: "3px 8px",
-                          borderRadius: "5px",
-                        }}
-                      >
-                        {e.recurrence_kind}
-                      </span>
-                    )}
-                    {e.approval_status === "approved" && !e.published && (
-                      <span
-                        style={{
-                          background: "rgba(154,163,184,.15)",
-                          color: "#9aa3b8",
-                          fontSize: "10px",
-                          fontWeight: 800,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          padding: "3px 8px",
-                          borderRadius: "5px",
-                        }}
-                      >
-                        Unpublished
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ color: "#9aa3b8", fontSize: "12.5px", marginTop: "4px", fontWeight: 600 }}>
-                    {fmt(e.starts_at)} · {e.location}
-                  </div>
-                </div>
-                <span style={{ color: "#e7b84e", fontSize: "12px", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Edit →
-                </span>
-              </Link>
-            );
-          })}
+          {current.map((e) => (
+            <EventCard key={e.id} e={e} />
+          ))}
+          {current.length === 0 && (
+            <div style={{ color: "#9aa3b8", fontSize: "13.5px", padding: "8px 2px" }}>
+              No current events. Create one above{archived.length > 0 ? " or browse the archive below" : ""}.
+            </div>
+          )}
         </div>
       )}
+
+      {archived.length > 0 && !showArchived && (
+        <div style={{ marginTop: "18px" }}>
+          <Link href="/admin/events?archived=1" style={toggleLinkStyle}>
+            Show archived ({archived.length})
+          </Link>
+        </div>
+      )}
+
+      {archived.length > 0 && showArchived && (
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              margin: "28px 0 12px",
+              gap: "12px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "11.5px",
+                fontWeight: 800,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "#6a738b",
+              }}
+            >
+              Archived
+            </span>
+            <Link href="/admin/events" style={{ ...toggleLinkStyle, padding: "8px 14px" }}>
+              Hide archived
+            </Link>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {archived.map((e) => (
+              <EventCard key={e.id} e={e} past />
+            ))}
+          </div>
+        </>
+      )}
+
       {!canApprove && (
         <p style={{ marginTop: "26px", color: "#6a738b", fontSize: "12.5px" }}>
           Submissions are reviewed by the Bishop and Assistant Pastor before they appear on /events.

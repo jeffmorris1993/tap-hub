@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
-import { hasOccurrenceOnDate, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
+import { hasOccurrenceOnDate, isEventOver, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
 import { detroitNow, detroitDateIso } from "../tz";
 
 export { EVENT_CATEGORIES, type EventCategory } from "../event-categories";
@@ -130,7 +130,12 @@ export async function listPublishedEvents(): Promise<EventRow[]> {
     .eq("approval_status", "approved")
     .order("starts_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as unknown as EventRow[];
+  // Archive finished events (one-offs in the past, ended recurrence windows).
+  // Must be computed via nextOccurrence, not a SQL starts_at bound — a weekly
+  // series that started months ago is still current.
+  const todayIso = detroitDateIso();
+  const rows = (data ?? []) as unknown as EventRow[];
+  return rows.filter((e) => !isEventOver(e as RecurringEventFields, todayIso));
 }
 
 export async function getEventBySlug(slug: string): Promise<EventRow | null> {

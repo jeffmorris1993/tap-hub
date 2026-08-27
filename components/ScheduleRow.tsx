@@ -1,9 +1,13 @@
 import Link from "next/link";
 import type { RowView } from "../lib/clock";
+import { getJoinLink } from "../lib/join-links";
 
 export function ScheduleRow({ row, href }: { row: RowView; href?: string }) {
   const live = row.status === "live";
   const done = row.status === "done";
+  // Join pills only on plain rows — event rows are already wrapped in a Link,
+  // and a nested <a> is invalid HTML.
+  const join = !href && !done ? getJoinLink(row.where) : null;
 
   const inner = (
     <>
@@ -42,6 +46,39 @@ export function ScheduleRow({ row, href }: { row: RowView; href?: string }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 800, fontSize: "15px", color: "#f4f1ea" }}>{row.label}</div>
         <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>{row.where}</div>
+        {join && (
+          <a
+            href={join.href}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              marginTop: "8px",
+              padding: "7px 12px",
+              borderRadius: "8px",
+              background: live ? "#e7b84e" : "rgba(231,184,78,.14)",
+              border: `1px solid ${live ? "#e7b84e" : "rgba(231,184,78,.3)"}`,
+              color: live ? "#0b101c" : "#e7b84e",
+              fontSize: "11px",
+              fontWeight: 800,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+            }}
+          >
+            {join.kind === "phone" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 4h3l1.5 4-2 1.5a11 11 0 005 5l1.5-2 4 1.5v3a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="6" width="13" height="12" rx="2.5" />
+                <path d="M15 10.5l7-3.5v10l-7-3.5z" />
+              </svg>
+            )}
+            {join.label}
+          </a>
+        )}
       </div>
       <span
         style={{

@@ -11,6 +11,7 @@ import { getTodayStatus, type ScheduleRow as ClockRow } from "../../lib/clock";
 import { buildHero, type Hero } from "../../lib/hero";
 import type { DisplayEvent } from "../../lib/events-display";
 import { buildTodayTimeline, type TimelineRow } from "../../lib/today-timeline";
+import { getJoinLink } from "../../lib/join-links";
 
 export type WeekRow = { day_label: string; title: string; detail: string };
 export type EveningInfo = { label: string; where: string; time: string } | null;
@@ -147,6 +148,42 @@ export function TodayView({
             >
               {hero.sub}
             </p>
+            {hero.emphasis === "live" && (() => {
+              const join = getJoinLink(hero.sub);
+              if (!join) return null;
+              return (
+                <a
+                  href={join.href}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    marginTop: "14px",
+                    padding: "10px 16px",
+                    borderRadius: "10px",
+                    background: "#e7b84e",
+                    color: "#0b101c",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    textDecoration: "none",
+                  }}
+                >
+                  {join.kind === "phone" ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 4h3l1.5 4-2 1.5a11 11 0 005 5l1.5-2 4 1.5v3a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" />
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="6" width="13" height="12" rx="2.5" />
+                      <path d="M15 10.5l7-3.5v10l-7-3.5z" />
+                    </svg>
+                  )}
+                  {join.label}
+                </a>
+              );
+            })()}
           </div>
 
           {/* unified timeline: standard schedule + today's events, chronological */}

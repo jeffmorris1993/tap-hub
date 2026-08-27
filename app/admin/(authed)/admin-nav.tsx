@@ -4,8 +4,8 @@ export type NavItem = {
   href: string;
   label: string;
   icon: ReactNode;
-  /** Optional badge count (e.g. pending approvals). Hidden when undefined or 0. */
-  badge?: number;
+  /** Optional badge node (e.g. a Suspense-wrapped pending count). */
+  badge?: ReactNode;
 };
 
 const sw = 1.7;
@@ -77,8 +77,8 @@ export const ICONS: Record<string, ReactNode> = {
 };
 
 export function buildNav(
-  pendingEvents: number,
-  pendingAnnouncements: number = 0,
+  pendingEventsBadge?: ReactNode,
+  pendingAnnouncementsBadge?: ReactNode,
 ): NavItem[] {
   return [
     { href: "/admin", label: "Overview", icon: ICONS.home },
@@ -88,13 +88,13 @@ export function buildNav(
       href: "/admin/events/pending",
       label: "Pending approval",
       icon: ICONS.pending,
-      badge: pendingEvents > 0 ? pendingEvents : undefined,
+      badge: pendingEventsBadge,
     },
     {
       href: "/admin/announcements",
       label: "Announcements",
       icon: ICONS.megaphone,
-      badge: pendingAnnouncements > 0 ? pendingAnnouncements : undefined,
+      badge: pendingAnnouncementsBadge,
     },
     { href: "/admin/today", label: "Today & Week", icon: ICONS.sun },
     { href: "/admin/kids-youth", label: "Kids + Youth", icon: ICONS.kids },

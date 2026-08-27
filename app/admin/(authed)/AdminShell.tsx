@@ -200,25 +200,7 @@ export function AdminShell({
                   {item.icon}
                 </span>
                 <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && item.badge > 0 ? (
-                  <span
-                    style={{
-                      background: on ? "#0b101c" : "#e7b84e",
-                      color: on ? "#e7b84e" : "#0b101c",
-                      fontSize: "10.5px",
-                      fontWeight: 800,
-                      minWidth: "19px",
-                      height: "19px",
-                      borderRadius: "10px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0 5px",
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                ) : null}
+                {item.badge ?? null}
               </Link>
             );
           })}

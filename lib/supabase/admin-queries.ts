@@ -1,5 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
+import { isEventOver, type RecurringEventFields } from "../events-occurrence";
+import { detroitDateIso } from "../tz";
 
 export type DashboardCounts = {
   visitors: number;
@@ -21,18 +23,23 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
     sb.from("event_signups").select("*", { count: "exact", head: true }),
     sb
       .from("events")
-      .select("*", { count: "exact", head: true })
+      .select("starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
       .eq("published", true)
       .eq("approval_status", "approved"),
     sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
     sb.from("visitors").select("*", { count: "exact", head: true }).gte("created_at", since24h),
   ]);
+  // Count only live/upcoming events so the KPI doesn't inflate forever.
+  const todayIso = detroitDateIso();
+  const currentEvents = ((e.data ?? []) as RecurringEventFields[]).filter(
+    (ev) => !isEventOver(ev, todayIso),
+  ).length;
   return {
     visitors: v.count ?? 0,
     feedback: f.count ?? 0,
     prayers: p.count ?? 0,
     signups: s.count ?? 0,
-    publishedEvents: e.count ?? 0,
+    publishedEvents: currentEvents,
     pendingEvents: ep.count ?? 0,
     recentVisitors24h: vRecent.count ?? 0,
   };

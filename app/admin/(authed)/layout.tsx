@@ -1,9 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getAdminUser } from "../../../lib/supabase/auth";
-import { supabaseAdmin } from "../../../lib/supabase/server";
 import { isApprover } from "../../../lib/approvers";
 import { AdminShell } from "./AdminShell";
 import { buildNav } from "./admin-nav";
+import { PendingBadge } from "./NavBadge";
 
 function initialsFromEmail(email: string): string {
   const local = email.split("@")[0] ?? email;
@@ -26,16 +27,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getAdminUser();
   if (!user) redirect("/admin/login");
 
-  // Pull the pending counts once for the sidebar badges — lightweight
-  // HEAD counts on both events and announcements.
-  const sb = supabaseAdmin();
-  const [{ count: eventsPending }, { count: annPending }] = await Promise.all([
-    sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
-    sb.from("announcements").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
-  ]);
-  const pendingCount = eventsPending ?? 0;
-  const pendingAnnouncementsCount = annPending ?? 0;
-
   const email = user.email ?? "(unknown)";
   const fullName = (user.user_metadata?.full_name as string | undefined)?.trim();
   const name = fullName && fullName.length > 0 ? fullName : displayName(email);
@@ -54,7 +45,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     initials,
   };
 
-  const nav = buildNav(pendingCount, pendingAnnouncementsCount);
+  // Badge counts stream in behind Suspense so the shell paints without
+  // waiting on the two HEAD count queries.
+  const nav = buildNav(
+    <Suspense fallback={null}>
+      <PendingBadge table="events" />
+    </Suspense>,
+    <Suspense fallback={null}>
+      <PendingBadge table="announcements" />
+    </Suspense>,
+  );
 
   return (
     <AdminShell persona={persona} nav={nav}>

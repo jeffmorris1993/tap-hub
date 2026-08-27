@@ -161,6 +161,15 @@ export function hasOccurrenceOnDate(
   return true;
 }
 
+/**
+ * True when the event has no occurrence today or later. Anchoring at the
+ * start of `todayIso` (Detroit) keeps an event that finished earlier today
+ * visible until midnight, matching hasOccurrenceOnDate's day semantics.
+ */
+export function isEventOver(event: RecurringEventFields, todayIso: string): boolean {
+  return nextOccurrence(event, new Date(`${todayIso}T00:00:00`)) === null;
+}
+
 const RECURRENCE_LABELS: Record<RecurrenceKind, string> = {
   none: "",
   daily: "Daily",

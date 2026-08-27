@@ -12,6 +12,11 @@ import {
 export { ANNOUNCEMENT_CATEGORIES, ANNOUNCEMENT_COLORS };
 export type { AnnouncementCategory };
 
+/** Manual announcements without an explicit expires_at auto-archive this many
+ *  days after creation; also the "fresh" window for ranking. */
+export const ANNOUNCEMENT_FRESH_DAYS = 14;
+export const ANNOUNCEMENT_FRESH_MS = ANNOUNCEMENT_FRESH_DAYS * 24 * 60 * 60 * 1000;
+
 export type Announcement = {
   /** Stable id for React keys. UUID for manual, "e-<slug>" for events. */
   id: string;
@@ -109,6 +114,13 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     manualRows = (manualRes.data ?? []) as ManualRow[];
   }
 
+  // Auto-archive: rows with no explicit expiry disappear ANNOUNCEMENT_FRESH_DAYS
+  // after creation. Kept in JS rather than nested in the PostgREST .or above.
+  const freshCutoffMs = Date.now() - ANNOUNCEMENT_FRESH_MS;
+  manualRows = manualRows.filter(
+    (r) => r.expires_at !== null || Date.parse(r.created_at) > freshCutoffMs,
+  );
+
   const manual: Announcement[] = manualRows.map((r) => ({
     id: r.id,
     kind: "manual",
@@ -187,7 +199,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   // top even if its sortDate (created_at) is in the past. Bring manual
   // items posted in the last 14 days to the front of the non-pinned
   // tail.
-  const recentMs = 14 * 24 * 60 * 60 * 1000;
+  const recentMs = ANNOUNCEMENT_FRESH_MS;
   const fresh = rest.filter(
     (a) => a.kind === "manual" && Date.now() - Date.parse(a.sortDate) < recentMs,
   );

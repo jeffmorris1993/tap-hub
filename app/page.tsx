@@ -160,11 +160,22 @@ export default async function Hub() {
           />
           <HubTile
             href="/feedback"
-            title="Feedback / Prayer"
-            sub="Share or request"
+            title="Feedback"
+            sub="How are we doing?"
             icon={
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a8 8 0 01-11.6 7.1L4 20.5l1.4-5.3A8 8 0 1121 12z" />
+              </svg>
+            }
+          />
+          <HubTile
+            href="/feedback?tab=prayer"
+            title="Prayer Request"
+            sub="We'll pray with you"
+            icon={
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
+                <path d="M9.5 12l1.8 1.8 3.2-3.6" />
               </svg>
             }
           />

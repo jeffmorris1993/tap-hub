@@ -4,6 +4,7 @@ import { PhoneShell } from "../../../components/PhoneShell";
 import { BackBar } from "../../../components/BackBar";
 import { supabaseAdmin } from "../../../lib/supabase/server";
 import { ANNOUNCEMENT_COLORS, type AnnouncementCategory } from "../../../lib/announcement-types";
+import { ANNOUNCEMENT_FRESH_MS } from "../../../lib/announcements";
 
 export const revalidate = 60;
 
@@ -17,6 +18,7 @@ type Row = {
   pinned: boolean;
   link_url: string | null;
   action_label: string | null;
+  created_at: string;
 };
 
 export default async function AnnouncementDetail({
@@ -33,7 +35,7 @@ export default async function AnnouncementDetail({
   const nowIso = new Date().toISOString();
   const { data, error } = await supabaseAdmin()
     .from("announcements")
-    .select("id, category, title, body, date_label, expires_at, pinned, link_url, action_label")
+    .select("id, category, title, body, date_label, expires_at, pinned, link_url, action_label, created_at")
     .eq("id", id)
     .eq("published", true)
     .eq("approval_status", "approved")
@@ -42,6 +44,10 @@ export default async function AnnouncementDetail({
   if (error) throw error;
   const a = (data?.[0] ?? null) as Row | null;
   if (!a) notFound();
+  // No explicit expiry → auto-archived ANNOUNCEMENT_FRESH_DAYS after creation.
+  if (!a.expires_at && Date.parse(a.created_at) <= Date.now() - ANNOUNCEMENT_FRESH_MS) {
+    notFound();
+  }
 
   const accent = ANNOUNCEMENT_COLORS[a.category];
 

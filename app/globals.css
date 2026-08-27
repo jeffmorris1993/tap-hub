@@ -64,7 +64,21 @@ body {
   to { transform: rotateY(180deg); }
 }
 
+@keyframes thSkel {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 .th-fade { animation: thFade 0.4s both; }
 .th-up { animation: thUp 0.4s both; }
 .th-slide { animation: thSlide 0.34s both; }
 .th-pulse { animation: thPulse 1.9s infinite; }
+.th-skel {
+  background: #1a2438;
+  border-radius: 8px;
+  animation: thSkel 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .th-skel { animation: none; }
+}
