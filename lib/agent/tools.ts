@@ -47,16 +47,6 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .describe("ISO date, e.g. 2026-04-05");
 
-const time24 = z
-  .string()
-  .regex(/^([0-1]?\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour)")
-  .describe("24-hour time, e.g. 18:00 for 6 PM");
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
 async function snapshotById(id: string): Promise<EventSnapshot | null> {
   const { data, error } = await supabaseAdmin()
     .from("events")
@@ -89,54 +79,6 @@ export function buildAgentTools(ctx: AgentContext) {
   const senderIsApprover = isApprover(ctx.sender);
 
   return {
-    add_evening_service: tool({
-      description:
-        "Schedule a one-off evening or special service for a specific date. Use when staff says things like 'evening service tonight at 6 pm in the chapel' or 'add a watch night service Dec 31 at 10 pm'.",
-      inputSchema: z.object({
-        date: isoDate,
-        time: time24,
-        label: z.string().min(1).default("Evening Worship").describe("Service name shown to visitors"),
-        location: z.string().min(1).default("Main Sanctuary"),
-        durationMinutes: z.number().int().positive().max(360).default(90),
-      }),
-      execute: async ({ date, time, label, location, durationMinutes }) => {
-        const dow = new Date(`${date}T12:00:00`).getDay();
-        const { error } = await supabaseAdmin().from("schedule_today").insert({
-          day_of_week: dow,
-          kind: "evening",
-          label,
-          starts_at_minutes: timeToMinutes(time),
-          duration_minutes: durationMinutes,
-          location,
-          active_from: date,
-          active_until: date,
-        });
-        if (error) return { ok: false, error: error.message };
-        return { ok: true, summary: `Added "${label}" on ${date} at ${time} (${location}).` };
-      },
-    }),
-
-    add_week_lookahead: tool({
-      description:
-        "Add an item to 'Coming Up This Week' on the Today page. Use for things like 'add Friday potluck 6 PM Fellowship Hall'.",
-      inputSchema: z.object({
-        dayLabel: z.string().min(1).describe("Short day label, e.g. 'Wed', 'Fri'"),
-        title: z.string().min(1),
-        detail: z.string().default(""),
-        sortOrder: z.number().int().default(0),
-      }),
-      execute: async ({ dayLabel, title, detail, sortOrder }) => {
-        const { error } = await supabaseAdmin().from("week_lookahead").insert({
-          day_label: dayLabel,
-          title,
-          detail,
-          sort_order: sortOrder,
-        });
-        if (error) return { ok: false, error: error.message };
-        return { ok: true, summary: `Added "${title}" (${dayLabel}) to this week.` };
-      },
-    }),
-
     create_event_draft: tool({
       description:
         "Create a NEW event. By default it's submitted for review immediately. " +

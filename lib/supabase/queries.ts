@@ -2,7 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
 import { hasOccurrenceOnDate, isEventOver, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
-import { detroitNow, detroitDateIso } from "../tz";
+import { detroitNow, detroitDateIso, fmtDetroitTime } from "../tz";
 
 export { EVENT_CATEGORIES, type EventCategory } from "../event-categories";
 import type { EventCategory } from "../event-categories";
@@ -83,41 +83,89 @@ export async function getTodaySchedule(now: Date = detroitNow()): Promise<Schedu
   return getScheduleForDayOfWeek(now.getDay());
 }
 
-/** Returns evening worship for today's date, or null if none scheduled. */
-export async function getEveningTonight(): Promise<{ label: string; where: string; time: string } | null> {
-  const sb = supabaseAdmin();
-  const today = detroitNow();
-  const dow = today.getDay();
-  const isoDate = detroitDateIso();
-  const { data, error } = await sb
-    .from("schedule_today")
-    .select("label, location, starts_at_minutes, active_from, active_until")
-    .eq("kind", "evening")
-    .eq("day_of_week", dow)
-    .or(`active_from.is.null,active_from.lte.${isoDate}`)
-    .or(`active_until.is.null,active_until.gte.${isoDate}`)
-    .limit(1);
-  if (error) throw error;
-  const row = data?.[0];
-  if (!row) return null;
-  const h = Math.floor(row.starts_at_minutes / 60);
-  const m = row.starts_at_minutes % 60;
+function minutesToTimeLabel(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
   const ampm = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return { label: row.label, where: row.location, time: `${h12}:${m < 10 ? "0" + m : m} ${ampm}` };
+  return `${h12}:${m < 10 ? "0" + m : m} ${ampm}`;
 }
 
-export async function getWeekLookahead(): Promise<WeekLookaheadRow[]> {
+// Highlight order for derived week rows — a day's headline is worship or
+// Bible class, not the prayer call that also happens that morning.
+const WEEK_KIND_PRIORITY: Record<string, number> = {
+  worship: 0,
+  midweek: 1,
+  special: 2,
+  evening: 3,
+  sunday_school: 4,
+  fellowship: 5,
+  prayer: 6,
+};
+
+/**
+ * "Coming Up This Week", derived instead of hand-curated: for each of the
+ * next 6 days (tomorrow onward), event occurrences plus standing-schedule
+ * highlights. Rows that repeat on 5+ days of the week (the weekday prayer
+ * call) are routine, not highlights, and are skipped; each day is capped
+ * at 2 items with events listed first.
+ */
+export async function getDerivedWeekLookahead(now: Date = detroitNow()): Promise<WeekLookaheadRow[]> {
   const sb = supabaseAdmin();
-  const today = detroitDateIso();
-  const { data, error } = await sb
-    .from("week_lookahead")
-    .select("day_label, title, detail")
-    .or(`active_from.is.null,active_from.lte.${today}`)
-    .or(`active_until.is.null,active_until.gte.${today}`)
-    .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  const [scheduleRes, events] = await Promise.all([
+    sb
+      .from("schedule_today")
+      .select("day_of_week, kind, label, starts_at_minutes, location, active_from, active_until"),
+    listPublishedEvents(),
+  ]);
+  if (scheduleRes.error) throw scheduleRes.error;
+  const scheduleRows = scheduleRes.data ?? [];
+
+  const perWeekCounts = new Map<string, number>();
+  for (const r of scheduleRows) {
+    const key = `${r.label}@${r.starts_at_minutes}`;
+    perWeekCounts.set(key, (perWeekCounts.get(key) ?? 0) + 1);
+  }
+
+  const out: WeekLookaheadRow[] = [];
+  for (let offset = 1; offset <= 6; offset++) {
+    const day = new Date(now);
+    day.setDate(day.getDate() + offset);
+    const dateIso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    const dayLabel = day.toLocaleDateString("en-US", { weekday: "short" });
+
+    const items: WeekLookaheadRow[] = [];
+    for (const e of events) {
+      if (hasOccurrenceOnDate(e as RecurringEventFields, dateIso)) {
+        items.push({
+          day_label: dayLabel,
+          title: e.title,
+          detail: `${fmtDetroitTime(e.starts_at)} · ${e.location}`,
+        });
+      }
+    }
+
+    const standing = scheduleRows
+      .filter((r) => r.day_of_week === day.getDay())
+      .filter((r) => !r.active_from || r.active_from <= dateIso)
+      .filter((r) => !r.active_until || r.active_until >= dateIso)
+      .filter((r) => (perWeekCounts.get(`${r.label}@${r.starts_at_minutes}`) ?? 0) < 5)
+      .sort(
+        (a, b) =>
+          (WEEK_KIND_PRIORITY[a.kind] ?? 9) - (WEEK_KIND_PRIORITY[b.kind] ?? 9) ||
+          a.starts_at_minutes - b.starts_at_minutes,
+      );
+    for (const r of standing) {
+      items.push({
+        day_label: dayLabel,
+        title: r.label,
+        detail: `${minutesToTimeLabel(r.starts_at_minutes)} · ${r.location}`,
+      });
+    }
+
+    out.push(...items.slice(0, 2));
+  }
+  return out;
 }
 
 export async function listPublishedEvents(): Promise<EventRow[]> {

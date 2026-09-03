@@ -14,7 +14,6 @@ import { buildTodayTimeline, type TimelineRow } from "../../lib/today-timeline";
 import { getJoinLink } from "../../lib/join-links";
 
 export type WeekRow = { day_label: string; title: string; detail: string };
-export type EveningInfo = { label: string; where: string; time: string } | null;
 
 function minutesToTime(mins: number): { time: string; ampm: string; combined: string } {
   let h = Math.floor(mins / 60);
@@ -47,13 +46,11 @@ export function TodayView({
   schedule,
   sundayFallback,
   weekLookahead,
-  evening,
   todaysEvents,
 }: {
   schedule: ClockRow[];
   sundayFallback: ClockRow[];
   weekLookahead: WeekRow[];
-  evening: EveningInfo;
   todaysEvents: DisplayEvent[];
 }) {
   const [status, setStatus] = useState(() => getTodayStatus(schedule, new Date()));
@@ -198,55 +195,7 @@ export function TodayView({
             </>
           )}
 
-          {/* evening / special */}
-          {evening && (
-            <div
-              style={{
-                marginTop: "16px",
-                background: "#1a2438",
-                border: "1px solid rgba(231,184,78,.28)",
-                borderRadius: "14px",
-                padding: "16px",
-                display: "flex",
-                alignItems: "center",
-                gap: "14px",
-              }}
-            >
-              <span
-                style={{
-                  width: "44px",
-                  height: "44px",
-                  borderRadius: "11px",
-                  background: "#0b101c",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#e7b84e"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
-                </svg>
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: "15px" }}>{evening.label}</div>
-                <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
-                  {evening.time} · {evening.where}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* this week */}
+          {/* this week (derived from events + standing schedule) */}
           {weekLookahead.length > 0 && (
             <>
               <SectionLabel style={{ margin: "28px 0 14px" }}>Coming Up This Week</SectionLabel>

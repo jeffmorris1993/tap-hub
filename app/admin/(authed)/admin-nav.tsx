@@ -96,7 +96,6 @@ export function buildNav(
       icon: ICONS.megaphone,
       badge: pendingAnnouncementsBadge,
     },
-    { href: "/admin/today", label: "Today & Week", icon: ICONS.sun },
     { href: "/admin/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/admin/agent", label: "Agent", icon: ICONS.bot },
     { href: "/admin/agent-log", label: "Agent log", icon: ICONS.list },

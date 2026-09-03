@@ -1,8 +1,7 @@
 import {
   getTodaySchedule,
   getScheduleForDayOfWeek,
-  getWeekLookahead,
-  getEveningTonight,
+  getDerivedWeekLookahead,
   listEventsOnDate,
 } from "../../lib/supabase/queries";
 import { toDisplayEvent, sortByNextOccurrence } from "../../lib/events-display";
@@ -16,12 +15,11 @@ export default async function Today() {
   const todayIso = detroitDateIso();
   // Always fetch Sunday too, so we can fall back gracefully on days that
   // have nothing scheduled (the empty Saturday case in particular).
-  const [schedule, sundaySchedule, weekLookahead, evening, todaysEventsRaw] =
+  const [schedule, sundaySchedule, weekLookahead, todaysEventsRaw] =
     await Promise.all([
       getTodaySchedule(now),
       getScheduleForDayOfWeek(0),
-      getWeekLookahead(),
-      getEveningTonight(),
+      getDerivedWeekLookahead(now),
       // Don't pass `now` — we want events to stay visible all day with a
       // "Done" badge once they end, matching the standard schedule rows.
       listEventsOnDate(todayIso),
@@ -34,7 +32,6 @@ export default async function Today() {
       schedule={schedule}
       sundayFallback={sundaySchedule}
       weekLookahead={weekLookahead}
-      evening={evening}
       todaysEvents={todaysEvents}
     />
   );
