@@ -7,6 +7,7 @@ import { BackBar } from "../../../components/BackBar";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
 import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
+import { googleCalendarUrl, outlookCalendarUrl } from "../../../lib/event-calendar";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -18,6 +19,73 @@ const inputStyle: React.CSSProperties = {
   background: "#0b101c",
   outline: "none",
 };
+
+const calendarBtnStyle: React.CSSProperties = {
+  flex: 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  background: "#1a2438",
+  color: "#cdd3e0",
+  border: "1px solid rgba(244,241,234,.14)",
+  borderRadius: "10px",
+  padding: "12px 6px",
+  fontSize: "11.5px",
+  fontWeight: 800,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
+function AddToCalendarRow({ event }: { event: DisplayEvent }) {
+  // suppressHydrationWarning: the URLs embed the next occurrence, which can
+  // advance between the cached server render and hydration (revalidate = 60).
+  return (
+    <div style={{ marginTop: "14px", textAlign: "left" }}>
+      <div
+        style={{
+          fontSize: "11px",
+          fontWeight: 800,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "#9aa3b8",
+          marginBottom: "8px",
+        }}
+      >
+        Add to calendar
+      </div>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <a
+          href={googleCalendarUrl(event)}
+          target="_blank"
+          rel="noopener noreferrer"
+          suppressHydrationWarning
+          style={calendarBtnStyle}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="5" width="16" height="16" rx="2.5" />
+            <path d="M4 9.5h16M8 3v4M16 3v4M12 12.5v5M9.5 15h5" />
+          </svg>
+          Google
+        </a>
+        <a
+          href={outlookCalendarUrl(event)}
+          target="_blank"
+          rel="noopener noreferrer"
+          suppressHydrationWarning
+          style={calendarBtnStyle}
+        >
+          Outlook
+        </a>
+        <a href={`/api/events/${event.slug}/ics`} style={calendarBtnStyle}>
+          Apple / .ics
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function segmentStyle(on: boolean): React.CSSProperties {
   return {
@@ -105,6 +173,9 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
             <p style={{ color: "#9aa3b8", fontSize: "15px", fontWeight: 500, lineHeight: 1.6, marginTop: "12px" }}>
               {doneMsg}
             </p>
+            <div style={{ marginTop: "26px" }}>
+              <AddToCalendarRow event={event} />
+            </div>
             <Link
               href="/events"
               style={{
@@ -252,6 +323,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                 </div>
               )}
             </div>
+            <AddToCalendarRow event={event} />
             <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px" }}>
               {event.description_long}
             </p>
