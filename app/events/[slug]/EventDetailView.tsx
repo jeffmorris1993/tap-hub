@@ -7,7 +7,8 @@ import { BackBar } from "../../../components/BackBar";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
 import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
-import { googleCalendarUrl, outlookCalendarUrl } from "../../../lib/event-calendar";
+import { googleCalendarUrl, outlookCalendarUrl, upcomingOccurrences } from "../../../lib/event-calendar";
+import { CHURCH_TZ } from "../../../lib/tz";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -313,6 +314,27 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                 </svg>
                 <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.location}</span>
               </div>
+              {event.recurrence_kind !== "none" && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "2px" }}>
+                    <path d="M17 2l4 4-4 4" />
+                    <path d="M3 11v-1a4 4 0 014-4h14" />
+                    <path d="M7 22l-4-4 4-4" />
+                    <path d="M21 13v1a4 4 0 01-4 4H3" />
+                  </svg>
+                  <span
+                    suppressHydrationWarning
+                    style={{ fontSize: "13px", fontWeight: 600, color: "#9aa3b8", lineHeight: 1.55 }}
+                  >
+                    {event.recurrenceLabel} ·{" "}
+                    {upcomingOccurrences(event, 4)
+                      .map((d) =>
+                        d.toLocaleDateString("en-US", { timeZone: CHURCH_TZ, month: "short", day: "numeric" }),
+                      )
+                      .join(", ")}
+                  </span>
+                </div>
+              )}
               {event.cost && event.cost.trim() && (
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

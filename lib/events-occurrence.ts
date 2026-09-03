@@ -1,4 +1,13 @@
-export type RecurrenceKind = "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+import { CHURCH_TZ } from "./tz";
+
+export type RecurrenceKind =
+  | "none"
+  | "daily"
+  | "weekdays"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "monthly_weekday";
 
 export type RecurringEventFields = {
   starts_at: string;
@@ -41,6 +50,9 @@ function isWeekday(dow: number): boolean {
  *               every 7 days
  *   biweekly  — same as weekly with 14-day stride aligned to starts_at
  *   monthly   — same day-of-month as starts_at (skips invalid Feb 30 etc.)
+ *   monthly_weekday — same weekday-position as starts_at (a start on the
+ *               2nd Friday repeats every 2nd Friday; a 5th weekday is
+ *               skipped in months that don't have one)
  */
 export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Date | null {
   const start = new Date(event.starts_at);
@@ -129,6 +141,30 @@ export function nextOccurrence(event: RecurringEventFields, fromDate: Date): Dat
     return null;
   }
 
+  if (event.recurrence_kind === "monthly_weekday") {
+    const dow = start.getDay();
+    const nth = Math.floor((start.getDate() - 1) / 7); // 0-based week-of-month
+    const from = startOfDay(fromDate);
+    let year = Math.max(start.getFullYear(), from.getFullYear());
+    let month = year === from.getFullYear() ? Math.max(start.getMonth(), from.getMonth()) : start.getMonth();
+    for (let i = 0; i < 24; i++) {
+      const firstDow = new Date(year, month, 1).getDay();
+      const dom = 1 + ((dow - firstDow + 7) % 7) + nth * 7;
+      const candidate = new Date(year, month, dom, startHour, startMinute, 0, 0);
+      const valid = candidate.getMonth() === month; // a 5th weekday can overflow the month
+      if (valid && candidate.getTime() >= fromDate.getTime()) {
+        if (isAfterUntil(candidate, event.recurrence_until)) return null;
+        return candidate;
+      }
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+    }
+    return null;
+  }
+
   return null;
 }
 
@@ -177,8 +213,23 @@ const RECURRENCE_LABELS: Record<RecurrenceKind, string> = {
   weekly: "Every week",
   biweekly: "Every 2 weeks",
   monthly: "Every month",
+  monthly_weekday: "Monthly",
 };
 
-export function recurrenceLabel(kind: RecurrenceKind): string {
+const NTH_LABELS = ["1st", "2nd", "3rd", "4th", "5th"];
+
+/**
+ * Pass startsAt to get a specific label for monthly_weekday events
+ * ("Every 2nd Fri" instead of "Monthly").
+ */
+export function recurrenceLabel(kind: RecurrenceKind, startsAt?: string): string {
+  if (kind === "monthly_weekday" && startsAt) {
+    const d = new Date(startsAt);
+    if (!isNaN(d.getTime())) {
+      const dom = Number(d.toLocaleDateString("en-US", { timeZone: CHURCH_TZ, day: "numeric" }));
+      const dowName = d.toLocaleDateString("en-US", { timeZone: CHURCH_TZ, weekday: "short" });
+      return `Every ${NTH_LABELS[Math.floor((dom - 1) / 7)]} ${dowName}`;
+    }
+  }
   return RECURRENCE_LABELS[kind] ?? "";
 }

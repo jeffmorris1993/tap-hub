@@ -1,7 +1,7 @@
 import "server-only";
 import { findThreadKeyByEmail } from "./agent/thread";
 import { sendChatNotification } from "./google-chat";
-import { recurrenceLabel } from "./events-occurrence";
+import { recurrenceLabel, type RecurrenceKind } from "./events-occurrence";
 
 const SITE_URL_FALLBACK = "https://tap-hub.nehtemple.org";
 
@@ -16,7 +16,7 @@ export type EventChatSnapshot = {
   category: string;
   starts_at: string;
   location: string;
-  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: RecurrenceKind;
 };
 
 function fmtWhen(iso: string): string {
@@ -32,7 +32,7 @@ function fmtWhen(iso: string): string {
 }
 
 function eventLines(ev: EventChatSnapshot): string {
-  const rec = recurrenceLabel(ev.recurrence_kind);
+  const rec = recurrenceLabel(ev.recurrence_kind, ev.starts_at);
   return [
     `*${ev.title}*`,
     `${fmtWhen(ev.starts_at)} · ${ev.location}`,

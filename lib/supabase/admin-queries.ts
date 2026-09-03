@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
-import { isEventOver, type RecurringEventFields } from "../events-occurrence";
+import { isEventOver, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
 import { detroitDateIso } from "../tz";
 
 export type DashboardCounts = {
@@ -168,7 +168,7 @@ export type AdminEventRow = {
   reviewed_by: string | null;
   submitted_at: string | null;
   reviewed_at: string | null;
-  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: RecurrenceKind;
   recurrence_byday: number | null;
   recurrence_until: string | null;
 };

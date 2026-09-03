@@ -119,7 +119,29 @@ export function occurrenceStart(event: CalendarEventInput, now: Date = new Date(
         break;
       }
       month += 1;
-      if (month > 11) {
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+    }
+  } else if (event.recurrence_kind === "monthly_weekday") {
+    const wantDow = dayOfWeek(startDay);
+    const nth = Math.floor((w.d - 1) / 7); // 0-based week-of-month
+    const baseW = dayToWall(base);
+    let year = baseW.y;
+    let month = baseW.mo;
+    for (let i = 0; i < 24; i++) {
+      const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+      const dom = 1 + ((wantDow - firstDow + 7) % 7) + nth * 7;
+      const ms = Date.UTC(year, month - 1, dom);
+      const valid = new Date(ms).getUTCMonth() === month - 1; // a 5th weekday can overflow
+      const day = Math.round(ms / DAY_MS);
+      if (valid && day >= base) {
+        candidate = day;
+        break;
+      }
+      month += 1;
+      if (month > 12) {
         month = 1;
         year += 1;
       }
@@ -130,6 +152,25 @@ export function occurrenceStart(event: CalendarEventInput, now: Date = new Date(
   const candW = dayToWall(candidate);
   if (event.recurrence_until && wallDateIso(candW) > event.recurrence_until) return start;
   return wallToInstant(candW, w.hh, w.mm) ?? start;
+}
+
+/**
+ * The next `count` occurrence starts (a single item for one-off events, or
+ * fewer than `count` when the series ends first).
+ */
+export function upcomingOccurrences(event: CalendarEventInput, count: number, now: Date = new Date()): Date[] {
+  const out: Date[] = [];
+  let cursor = now;
+  for (let i = 0; i < count; i++) {
+    const start = occurrenceStart(event, cursor);
+    // occurrenceStart falls back to the original start once the series is
+    // over — a non-advancing result means there are no more occurrences.
+    if (out.length && start.getTime() <= out[out.length - 1].getTime()) break;
+    out.push(start);
+    if (event.recurrence_kind === "none") break;
+    cursor = new Date(start.getTime() + 60000);
+  }
+  return out;
 }
 
 /** Start/end instants for the calendar entry. Defaults to 1 hour when ends_at is unset. */
@@ -162,6 +203,9 @@ export function buildRrule(event: CalendarEventInput, dtstart: Date): string | n
       break;
     case "monthly":
       rule = `FREQ=MONTHLY;BYMONTHDAY=${w.d}`;
+      break;
+    case "monthly_weekday":
+      rule = `FREQ=MONTHLY;BYDAY=${Math.floor((w.d - 1) / 7) + 1}${byday}`;
       break;
     default:
       return null;

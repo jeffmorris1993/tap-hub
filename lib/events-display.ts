@@ -114,7 +114,7 @@ export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): Disp
     month: chip.month,
     day: chip.day,
     whenText: formatWhenText(row, fromDate),
-    recurrenceLabel: recurrenceLabel(row.recurrence_kind),
+    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at),
     hue: hueFromSlug(row.slug),
     nextOccurrenceIso: next ? next.toISOString() : null,
     signupOpen: next !== null,

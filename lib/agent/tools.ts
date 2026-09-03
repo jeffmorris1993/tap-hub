@@ -64,10 +64,8 @@ async function snapshotById(id: string): Promise<EventSnapshot | null> {
     .eq("id", id)
     .limit(1);
   if (error || !data?.[0]) return null;
-  const row = data[0] as unknown as EventSnapshot & {
-    recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
-  };
-  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
+  const row = data[0] as unknown as EventSnapshot;
+  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind, row.starts_at) };
 }
 
 async function snapshotBySlug(slug: string): Promise<EventSnapshot | null> {
@@ -77,10 +75,8 @@ async function snapshotBySlug(slug: string): Promise<EventSnapshot | null> {
     .eq("slug", slug)
     .limit(1);
   if (error || !data?.[0]) return null;
-  const row = data[0] as unknown as EventSnapshot & {
-    recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
-  };
-  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
+  const row = data[0] as unknown as EventSnapshot;
+  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind, row.starts_at) };
 }
 
 export type AgentContext = {
@@ -193,10 +189,10 @@ export function buildAgentTools(ctx: AgentContext) {
           .optional()
           .describe('Optional label for the external Register button. Defaults to "Register" if omitted.'),
         recurrenceKind: z
-          .enum(["none", "daily", "weekdays", "weekly", "biweekly", "monthly"])
+          .enum(["none", "daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_weekday"])
           .default("none")
           .describe(
-            "Use 'daily' for multi-day events that run every day in a range (e.g. a 5-day conference). Use 'weekdays' for Mon–Fri runs (e.g. a 5-week summer program). Use 'weekly'/'biweekly'/'monthly' for a single day-of-week or day-of-month cadence. For 'daily' and 'weekdays' you MUST also set recurrenceUntil to the last day of the series.",
+            "Use 'daily' for multi-day events that run every day in a range (e.g. a 5-day conference). Use 'weekdays' for Mon–Fri runs (e.g. a 5-week summer program). Use 'weekly'/'biweekly'/'monthly' for a single day-of-week or day-of-month cadence. Use 'monthly_weekday' for patterns like 'every 2nd Friday of the month' — the weekday and week-of-month are derived from startsAtLocal, so startsAtLocal MUST fall on the described day (e.g. an actual 2nd Friday). For 'daily' and 'weekdays' you MUST also set recurrenceUntil to the last day of the series.",
           ),
         /** 0=Sun … 6=Sat; only needed for weekly/biweekly. */
         recurrenceByday: z.number().int().min(0).max(6).optional(),

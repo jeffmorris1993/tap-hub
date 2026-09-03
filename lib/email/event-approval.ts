@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
+import type { RecurrenceKind } from "../events-occurrence";
 
 const DEFAULT_SUBMIT_FROM = "TapHub Events <events@nehtemple.org>";
 const DEFAULT_RESPONSE_FROM = "TapHub Events <events@nehtemple.org>";
@@ -15,7 +16,7 @@ export type EventSnapshot = {
   description_long: string;
   cost: string | null;
   recurrence_label: string;
-  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: RecurrenceKind;
 };
 
 function fmtDate(iso: string): string {

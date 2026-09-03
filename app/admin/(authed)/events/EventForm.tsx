@@ -13,6 +13,7 @@ import {
   type EventFormInput,
 } from "./actions";
 import { useToast } from "../Toaster";
+import type { RecurrenceKind } from "../../../../lib/events-occurrence";
 import { ConfirmDialog } from "../ConfirmDialog";
 
 const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
@@ -22,7 +23,8 @@ const RECURRENCE_KINDS = [
   { value: "weekdays", label: "Every weekday (Mon–Fri)" },
   { value: "weekly", label: "Every week" },
   { value: "biweekly", label: "Every 2 weeks" },
-  { value: "monthly", label: "Every month" },
+  { value: "monthly", label: "Every month (same date)" },
+  { value: "monthly_weekday", label: "Every month (same weekday, e.g. 2nd Friday — from start date)" },
 ] as const;
 const DOW_OPTIONS = [
   { value: 0, label: "Sunday" },
@@ -94,7 +96,7 @@ type Initial = {
   approval_notes?: string | null;
   submitted_by?: string | null;
   reviewed_by?: string | null;
-  recurrence_kind?: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind?: RecurrenceKind;
   recurrence_byday?: number | null;
   recurrence_until?: string | null;
 };
@@ -131,7 +133,7 @@ export function EventForm({
   const [cost, setCost] = useState(initial?.cost ?? "");
   const [registrationUrl, setRegistrationUrl] = useState(initial?.registration_url ?? "");
   const [registrationLabel, setRegistrationLabel] = useState(initial?.registration_label ?? "");
-  const [recurrenceKind, setRecurrenceKind] = useState<"none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly">(
+  const [recurrenceKind, setRecurrenceKind] = useState<RecurrenceKind>(
     initial?.recurrence_kind ?? "none",
   );
   const [recurrenceByday, setRecurrenceByday] = useState<number | null>(initial?.recurrence_byday ?? null);

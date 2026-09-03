@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listAllEvents, type AdminEventRow } from "../../../../lib/supabase/admin-queries";
-import { isEventOver, type RecurringEventFields } from "../../../../lib/events-occurrence";
+import { isEventOver, recurrenceLabel, type RecurringEventFields } from "../../../../lib/events-occurrence";
 import { detroitDateIso } from "../../../../lib/tz";
 import { currentUserCanApprove } from "./actions";
 
@@ -72,7 +72,7 @@ function EventCard({ e, past }: { e: AdminEventRow; past?: boolean }) {
           )}
           {e.recurrence_kind !== "none" && (
             <span style={{ ...smallPill, background: "rgba(78,141,231,.16)", color: "#9bbcf2" }}>
-              {e.recurrence_kind}
+              {recurrenceLabel(e.recurrence_kind, e.starts_at) || e.recurrence_kind}
             </span>
           )}
           {e.approval_status === "approved" && !e.published && (

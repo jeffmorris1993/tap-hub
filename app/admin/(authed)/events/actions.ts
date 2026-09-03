@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getAdminUser } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
 import { isApprover, getApproverEmails } from "../../../../lib/approvers";
-import { recurrenceLabel } from "../../../../lib/events-occurrence";
+import { recurrenceLabel, type RecurrenceKind } from "../../../../lib/events-occurrence";
 import {
   notifyApproversOfSubmission,
   notifySubmitterOfApproval,
@@ -33,7 +33,7 @@ export type EventFormInput = {
   allow_volunteers: boolean;
   registration_url: string | null;
   registration_label: string | null;
-  recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+  recurrence_kind: RecurrenceKind;
   recurrence_byday: number | null;
   recurrence_until: string | null;
 };
@@ -143,8 +143,8 @@ async function loadSnapshot(id: string): Promise<EventSnapshot | null> {
     .eq("id", id)
     .limit(1);
   if (error || !data?.[0]) return null;
-  const row = data[0] as unknown as EventSnapshot & { recurrence_kind: "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly" };
-  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind) };
+  const row = data[0] as unknown as EventSnapshot;
+  return { ...row, recurrence_label: recurrenceLabel(row.recurrence_kind, row.starts_at) };
 }
 
 export async function submitForApproval(id: string): Promise<EventActionResult> {
