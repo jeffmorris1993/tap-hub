@@ -147,6 +147,77 @@ export async function listSignups(limit = 200): Promise<SignupRow[]> {
   });
 }
 
+export type IgniteChildRow = {
+  id: string;
+  sort_order: number;
+  full_name: string;
+  date_of_birth: string;
+  grade: string;
+  school: string | null;
+  tshirt_size: string | null;
+  interests: string;
+  spiritual_needs: string;
+  support_notes: string | null;
+  health_notes: string | null;
+};
+
+export type IgniteFamilyRow = {
+  id: string;
+  guardian_name: string;
+  guardian_relationship: string;
+  guardian_phone: string;
+  guardian_email: string;
+  contact_preference: "text" | "email" | "flocknote" | "phone";
+  second_guardian_name: string | null;
+  second_guardian_relationship: string | null;
+  second_guardian_phone: string | null;
+  second_guardian_email: string | null;
+  support_parents: string | null;
+  more_of_2027: string | null;
+  wish_offered: string | null;
+  could_improve: string | null;
+  volunteer_interest: "yes" | "maybe" | "not_now" | null;
+  volunteer_areas: string[];
+  volunteer_areas_other: string | null;
+  participation_helps: string[];
+  participation_helps_other: string | null;
+  anything_else: string | null;
+  created_at: string;
+  ignite_children: IgniteChildRow[];
+};
+
+const IGNITE_FAMILY_FIELDS =
+  "id, guardian_name, guardian_relationship, guardian_phone, guardian_email, " +
+  "contact_preference, second_guardian_name, second_guardian_relationship, " +
+  "second_guardian_phone, second_guardian_email, support_parents, more_of_2027, " +
+  "wish_offered, could_improve, volunteer_interest, volunteer_areas, " +
+  "volunteer_areas_other, participation_helps, participation_helps_other, " +
+  "anything_else, created_at, " +
+  "ignite_children(id, sort_order, full_name, date_of_birth, grade, school, " +
+  "tshirt_size, interests, spiritual_needs, support_notes, health_notes)";
+
+/**
+ * Ignite parent/family submissions with their children embedded. This reads
+ * through the service-role client because the tables have RLS enabled with no
+ * policies — see the 20260917 migration. Admin-only callers.
+ */
+export async function listIgniteFamilies(limit = 200): Promise<IgniteFamilyRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("ignite_families")
+    .select(IGNITE_FAMILY_FIELDS)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as unknown as IgniteFamilyRow[]).map((family) => ({
+    ...family,
+    // PostgREST doesn't guarantee embed ordering; keep the order the parent
+    // entered the children in.
+    ignite_children: [...(family.ignite_children ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order,
+    ),
+  }));
+}
+
 export type AdminEventRow = {
   id: string;
   slug: string;

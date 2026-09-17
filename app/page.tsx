@@ -6,7 +6,9 @@ import { HubTile } from "../components/HubTile";
 import { Greeting } from "../components/Greeting";
 import { HubAnnouncements } from "../components/HubAnnouncements";
 import { LivePoller } from "../components/LivePoller";
+import { IgniteParentCard } from "../components/IgniteParentCard";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
+import { igniteParentFormOpen } from "../lib/ignite-form";
 
 const CHURCH_PHONE = "+12485551234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
@@ -126,6 +128,11 @@ export default async function Hub() {
             </div>
           </div>
         </Link>
+
+        {/* Temporary Ignite parent form promo — retires itself on the close
+            date in lib/ignite-form.ts. This page is force-dynamic, so no
+            redeploy is needed for it to disappear. */}
+        {igniteParentFormOpen() && <IgniteParentCard />}
 
         {/* 2x2 grid */}
         <div
