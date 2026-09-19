@@ -48,7 +48,7 @@ export async function notifyWelcomeTeam(payload: WelcomeEmailPayload): Promise<v
   ];
 
   const ctaLabel = "Open admin inbox";
-  const ctaHref = `${siteUrl()}/admin/submissions?tab=visitors`;
+  const ctaHref = `${siteUrl()}/portal/submissions?tab=visitors`;
 
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · TapHub Welcome",

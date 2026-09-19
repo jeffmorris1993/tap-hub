@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
-import { isEventOver, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
+import type { RecurrenceKind, RecurringEventFields } from "../events-occurrence";
+import { isSeriesOver } from "../event-calendar";
 import { detroitDateIso } from "../tz";
 
 export type DashboardCounts = {
@@ -13,26 +14,34 @@ export type DashboardCounts = {
   recentVisitors24h: number;
 };
 
-export async function getDashboardCounts(): Promise<DashboardCounts> {
+/** `scope` = ministry filter for lead roles (null/omitted = church-wide). */
+export async function getDashboardCounts(scope: string[] | null = null): Promise<DashboardCounts> {
   const sb = supabaseAdmin();
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const feedbackQ = sb.from("feedback").select("*", { count: "exact", head: true });
+  const prayersQ = sb.from("prayer_requests").select("*", { count: "exact", head: true });
+  const signupsQ = scope
+    ? sb.from("event_signups").select("id, events!inner(category)", { count: "exact", head: true }).in("events.category", scope)
+    : sb.from("event_signups").select("*", { count: "exact", head: true });
+  const eventsQ = sb
+    .from("events")
+    .select("starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
+    .eq("published", true)
+    .eq("approval_status", "approved");
+  const pendingQ = sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending");
   const [v, f, p, s, e, ep, vRecent] = await Promise.all([
     sb.from("visitors").select("*", { count: "exact", head: true }),
-    sb.from("feedback").select("*", { count: "exact", head: true }),
-    sb.from("prayer_requests").select("*", { count: "exact", head: true }),
-    sb.from("event_signups").select("*", { count: "exact", head: true }),
-    sb
-      .from("events")
-      .select("starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
-      .eq("published", true)
-      .eq("approval_status", "approved"),
-    sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending"),
+    scope ? feedbackQ.in("ministry", scope) : feedbackQ,
+    scope ? prayersQ.in("ministry", scope) : prayersQ,
+    signupsQ,
+    scope ? eventsQ.in("category", scope) : eventsQ,
+    scope ? pendingQ.in("category", scope) : pendingQ,
     sb.from("visitors").select("*", { count: "exact", head: true }).gte("created_at", since24h),
   ]);
   // Count only live/upcoming events so the KPI doesn't inflate forever.
   const todayIso = detroitDateIso();
   const currentEvents = ((e.data ?? []) as RecurringEventFields[]).filter(
-    (ev) => !isEventOver(ev, todayIso),
+    (ev) => !isSeriesOver(ev, todayIso),
   ).length;
   return {
     visitors: v.count ?? 0,
@@ -69,17 +78,18 @@ export type FeedbackRow = {
   id: string;
   rating: number | null;
   category: string;
+  ministry: string;
   name: string | null;
   message: string;
   created_at: string;
 };
 
-export async function listFeedback(limit = 100): Promise<FeedbackRow[]> {
-  const { data, error } = await supabaseAdmin()
+export async function listFeedback(limit = 100, scope: string[] | null = null): Promise<FeedbackRow[]> {
+  let q = supabaseAdmin()
     .from("feedback")
-    .select("id, rating, category, name, message, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .select("id, rating, category, ministry, name, message, created_at");
+  if (scope) q = q.in("ministry", scope);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return data ?? [];
 }
@@ -91,15 +101,16 @@ export type PrayerRow = {
   request: string;
   confidential: boolean;
   prayer_wall: boolean;
+  ministry: string;
   created_at: string;
 };
 
-export async function listPrayers(limit = 100): Promise<PrayerRow[]> {
-  const { data, error } = await supabaseAdmin()
+export async function listPrayers(limit = 100, scope: string[] | null = null): Promise<PrayerRow[]> {
+  let q = supabaseAdmin()
     .from("prayer_requests")
-    .select("id, name, contact, request, confidential, prayer_wall, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .select("id, name, contact, request, confidential, prayer_wall, ministry, created_at");
+  if (scope) q = q.in("ministry", scope);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return data ?? [];
 }
@@ -110,6 +121,7 @@ export type SignupRow = {
   name: string;
   contact: string;
   role: "attendee" | "volunteer";
+  occurrence_date: string | null;
   created_at: string;
   events: { slug: string; title: string } | null;
 };
@@ -120,23 +132,32 @@ export type EventSignupRow = {
   contact: string;
   role: "attendee" | "volunteer";
   notes: string | null;
+  occurrence_date: string | null;
   created_at: string;
 };
 
 export async function listSignupsForEvent(eventId: string): Promise<EventSignupRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("event_signups")
-    .select("id, name, contact, role, notes, created_at")
+    .select("id, name, contact, role, notes, occurrence_date, created_at")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as EventSignupRow[];
 }
 
-export async function listSignups(limit = 200): Promise<SignupRow[]> {
-  const { data, error } = await supabaseAdmin()
+export async function listSignups(limit = 200, scope: string[] | null = null): Promise<SignupRow[]> {
+  // Scoped reads join the parent event so a lead only sees signups for
+  // their ministry's events.
+  let q = supabaseAdmin()
     .from("event_signups")
-    .select("id, event_id, name, contact, role, created_at, events(slug, title)")
+    .select(
+      scope
+        ? "id, event_id, name, contact, role, occurrence_date, created_at, events!inner(slug, title, category)"
+        : "id, event_id, name, contact, role, occurrence_date, created_at, events(slug, title)",
+    );
+  if (scope) q = q.in("events.category", scope);
+  const { data, error } = await q
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -250,21 +271,18 @@ const ADMIN_EVENT_FIELDS =
   "published, approval_status, approval_notes, " +
   "submitted_by, reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until";
 
-export async function listAllEvents(): Promise<AdminEventRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("events")
-    .select(ADMIN_EVENT_FIELDS)
-    .order("starts_at", { ascending: false });
+export async function listAllEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
+  let q = supabaseAdmin().from("events").select(ADMIN_EVENT_FIELDS);
+  if (scope) q = q.in("category", scope);
+  const { data, error } = await q.order("starts_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as AdminEventRow[];
 }
 
-export async function listPendingEvents(): Promise<AdminEventRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("events")
-    .select(ADMIN_EVENT_FIELDS)
-    .eq("approval_status", "pending")
-    .order("submitted_at", { ascending: true });
+export async function listPendingEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
+  let q = supabaseAdmin().from("events").select(ADMIN_EVENT_FIELDS).eq("approval_status", "pending");
+  if (scope) q = q.in("category", scope);
+  const { data, error } = await q.order("submitted_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as unknown as AdminEventRow[];
 }
@@ -287,14 +305,23 @@ export type ActivityItem = {
   created_at: string;
 };
 
-/** Merged recent activity across all submission tables, newest first. */
-export async function getRecentActivity(limit = 8): Promise<ActivityItem[]> {
+/** Merged recent activity across all submission tables, newest first.
+ *  Scoped (lead) view filters by ministry and skips visitors — visitor
+ *  follow-up is a pastoral surface. */
+export async function getRecentActivity(limit = 8, scope: string[] | null = null): Promise<ActivityItem[]> {
   const sb = supabaseAdmin();
+  const prayersQ = sb.from("prayer_requests").select("name, request, created_at");
+  const feedbackQ = sb.from("feedback").select("name, category, rating, created_at");
+  const signupsQ = scope
+    ? sb.from("event_signups").select("name, role, created_at, events!inner(title, category)").in("events.category", scope)
+    : sb.from("event_signups").select("name, role, created_at, events(title)");
   const [v, p, f, s] = await Promise.all([
-    sb.from("visitors").select("name, first_time, created_at").order("created_at", { ascending: false }).limit(limit),
-    sb.from("prayer_requests").select("name, request, created_at").order("created_at", { ascending: false }).limit(limit),
-    sb.from("feedback").select("name, category, rating, created_at").order("created_at", { ascending: false }).limit(limit),
-    sb.from("event_signups").select("name, role, created_at, events(title)").order("created_at", { ascending: false }).limit(limit),
+    scope
+      ? Promise.resolve({ data: [] as never[] })
+      : sb.from("visitors").select("name, first_time, created_at").order("created_at", { ascending: false }).limit(limit),
+    (scope ? prayersQ.in("ministry", scope) : prayersQ).order("created_at", { ascending: false }).limit(limit),
+    (scope ? feedbackQ.in("ministry", scope) : feedbackQ).order("created_at", { ascending: false }).limit(limit),
+    signupsQ.order("created_at", { ascending: false }).limit(limit),
   ]);
 
   const items: ActivityItem[] = [];
@@ -339,4 +366,118 @@ export async function getRecentActivity(limit = 8): Promise<ActivityItem[]> {
   return items
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
+// Member self-service queries ("My Events" / "My Forms")
+//
+// Linkage is best-effort: rows are matched by user_id (stamped when a
+// signed-in member submits) OR by the account's email appearing in the
+// row's contact/email field (covers submissions made before the account
+// existed). The email match can surface a submission someone else typed
+// with this member's address — acceptable for a church app.
+// ---------------------------------------------------------------------------
+
+export type MySignupRow = {
+  id: string;
+  role: "attendee" | "volunteer";
+  occurrence_date: string | null;
+  created_at: string;
+  /** True when this row is user_id-linked (cancellable by the member). */
+  owned: boolean;
+  events: {
+    slug: string;
+    title: string;
+    location: string;
+    starts_at: string;
+  } | null;
+};
+
+export async function listMySignups(userId: string, email: string): Promise<MySignupRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("event_signups")
+    .select("id, role, occurrence_date, created_at, user_id, events(slug, title, location, starts_at)")
+    .or(`user_id.eq.${userId},contact.ilike.${email}`)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: unknown) => {
+    const r = row as MySignupRow & { user_id: string | null; events: MySignupRow["events"] | MySignupRow["events"][] };
+    const events = Array.isArray(r.events) ? r.events[0] ?? null : r.events;
+    return { id: r.id, role: r.role, occurrence_date: r.occurrence_date, created_at: r.created_at, owned: r.user_id === userId, events };
+  });
+}
+
+/** Delete one of the member's own signups. Only user_id-linked rows qualify —
+ *  email-matched rows can't be cancelled (the match is too loose to act on). */
+export async function cancelMySignup(signupId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from("event_signups")
+    .delete()
+    .eq("id", signupId)
+    .eq("user_id", userId)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+export type MyFormItem = {
+  kind: "prayer" | "feedback" | "visitor";
+  title: string;
+  meta: string;
+  created_at: string;
+};
+
+export async function listMyForms(userId: string, email: string): Promise<MyFormItem[]> {
+  const sb = supabaseAdmin();
+  const [p, f, v] = await Promise.all([
+    sb
+      .from("prayer_requests")
+      .select("request, ministry, created_at")
+      .or(`user_id.eq.${userId},contact.ilike.${email}`)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    // feedback has no contact column — user_id linkage only.
+    sb
+      .from("feedback")
+      .select("category, rating, message, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    sb
+      .from("visitors")
+      .select("name, first_time, created_at")
+      .or(`user_id.eq.${userId},email.ilike.${email}`)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  const items: MyFormItem[] = [];
+  (p.data ?? []).forEach((r) => {
+    const row = r as { request: string; ministry: string; created_at: string };
+    items.push({
+      kind: "prayer",
+      title: "Prayer request",
+      meta: row.request.length > 90 ? row.request.slice(0, 90) + "…" : row.request,
+      created_at: row.created_at,
+    });
+  });
+  (f.data ?? []).forEach((r) => {
+    const row = r as { category: string; rating: number | null; message: string; created_at: string };
+    items.push({
+      kind: "feedback",
+      title: `Feedback · ${row.category}`,
+      meta: row.message.length > 90 ? row.message.slice(0, 90) + "…" : row.message,
+      created_at: row.created_at,
+    });
+  });
+  (v.data ?? []).forEach((r) => {
+    const row = r as { name: string; first_time: boolean | null; created_at: string };
+    items.push({
+      kind: "visitor",
+      title: row.first_time ? "I'm New Here" : "Connect card",
+      meta: row.name,
+      created_at: row.created_at,
+    });
+  });
+  return items.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }

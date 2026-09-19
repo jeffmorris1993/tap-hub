@@ -2,14 +2,15 @@ import { CHURCH_TZ, localToUtcIso } from "./tz";
 import type { RecurringEventFields } from "./events-occurrence";
 
 /**
- * "Add to calendar" link + ICS generation.
+ * The recurrence engine + "add to calendar" link/ICS generation.
  *
- * All occurrence math here runs in Detroit wall-clock space (via Intl),
- * deliberately NOT reusing nextOccurrence() from events-occurrence.ts —
- * that helper interprets timestamps in the runtime's local timezone,
- * which is UTC on Vercel and the visitor's own zone in the browser.
- * Calendar entries need the exact instant, so we resolve the wall clock
- * against CHURCH_TZ explicitly and convert back with localToUtcIso().
+ * All occurrence math runs in Detroit wall-clock space (via Intl): a naive
+ * `new Date()` walk interprets timestamps in the runtime's local timezone,
+ * which is UTC on Vercel and the visitor's own zone in the browser, so the
+ * same series can land on different days depending on where the code runs.
+ * Everything that needs an occurrence — the events list, per-date signups,
+ * calendar entries — resolves the wall clock against CHURCH_TZ explicitly
+ * and converts back with localToUtcIso().
  */
 
 export type CalendarEventInput = RecurringEventFields & {
@@ -72,14 +73,22 @@ function wallToInstant(date: WallDate, hh: number, mm: number): Date | null {
   return iso ? new Date(iso) : null;
 }
 
+/** Detroit-local YYYY-MM-DD for an instant. */
+export function detroitDayIso(instant: Date): string {
+  return wallDateIso(detroitWall(instant));
+}
+
 /**
- * The instant the event next occurs (Detroit semantics), used as the
- * calendar entry's start. For recurring events whose window has ended —
- * or any failure — falls back to the original starts_at.
+ * The next occurrence starting at or after `now` (Detroit semantics), or
+ * null when the event has none left — a one-off in the past, or a recurrence
+ * window that has ended.
  */
-export function occurrenceStart(event: CalendarEventInput, now: Date = new Date()): Date {
+export function nextOccurrence(event: RecurringEventFields, now: Date = new Date()): Date | null {
   const start = new Date(event.starts_at);
-  if (event.recurrence_kind === "none" || isNaN(start.getTime())) return start;
+  if (isNaN(start.getTime())) return null;
+  if (event.recurrence_kind === "none") {
+    return start.getTime() >= now.getTime() ? start : null;
+  }
 
   const w = detroitWall(start);
   const nowW = detroitWall(now);
@@ -148,24 +157,59 @@ export function occurrenceStart(event: CalendarEventInput, now: Date = new Date(
     }
   }
 
-  if (candidate === null) return start;
+  if (candidate === null) return null;
   const candW = dayToWall(candidate);
-  if (event.recurrence_until && wallDateIso(candW) > event.recurrence_until) return start;
-  return wallToInstant(candW, w.hh, w.mm) ?? start;
+  if (event.recurrence_until && wallDateIso(candW) > event.recurrence_until) return null;
+  return wallToInstant(candW, w.hh, w.mm);
+}
+
+/**
+ * The instant the event next occurs (Detroit semantics), used as the
+ * calendar entry's start. For recurring events whose window has ended —
+ * or any failure — falls back to the original starts_at.
+ */
+export function occurrenceStart(event: RecurringEventFields, now: Date = new Date()): Date {
+  return nextOccurrence(event, now) ?? new Date(event.starts_at);
+}
+
+/**
+ * The exact start instant of the occurrence on a specific Detroit calendar
+ * date (YYYY-MM-DD), or null when the series has no occurrence that day.
+ * This is the validator behind ?date= links and per-date signups.
+ */
+export function occurrenceOnDate(event: RecurringEventFields, dateIso: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return null;
+  const midnight = localToUtcIso(`${dateIso}T00:00`);
+  if (!midnight) return null;
+  // Probe from just before the day starts so an occurrence at any time of
+  // day — including midnight — counts as "on" the date.
+  const probe = new Date(new Date(midnight).getTime() - 60000);
+  const occ = nextOccurrence(event, probe);
+  if (!occ || detroitDayIso(occ) !== dateIso) return null;
+  return occ;
+}
+
+/**
+ * True when the event has no occurrence today (Detroit) or later. Anchoring
+ * at the start of `todayIso` keeps an event that finished earlier today
+ * visible until midnight.
+ */
+export function isSeriesOver(event: RecurringEventFields, todayIso: string): boolean {
+  const midnight = localToUtcIso(`${todayIso}T00:00`);
+  if (!midnight) return false;
+  return nextOccurrence(event, new Date(new Date(midnight).getTime() - 60000)) === null;
 }
 
 /**
  * The next `count` occurrence starts (a single item for one-off events, or
  * fewer than `count` when the series ends first).
  */
-export function upcomingOccurrences(event: CalendarEventInput, count: number, now: Date = new Date()): Date[] {
+export function upcomingOccurrences(event: RecurringEventFields, count: number, now: Date = new Date()): Date[] {
   const out: Date[] = [];
   let cursor = now;
   for (let i = 0; i < count; i++) {
-    const start = occurrenceStart(event, cursor);
-    // occurrenceStart falls back to the original start once the series is
-    // over — a non-advancing result means there are no more occurrences.
-    if (out.length && start.getTime() <= out[out.length - 1].getTime()) break;
+    const start = nextOccurrence(event, cursor);
+    if (!start) break;
     out.push(start);
     if (event.recurrence_kind === "none") break;
     cursor = new Date(start.getTime() + 60000);
@@ -173,9 +217,23 @@ export function upcomingOccurrences(event: CalendarEventInput, count: number, no
   return out;
 }
 
+/**
+ * How a calendar entry is built:
+ *   mode "series" (default) — anchored at the next occurrence, with the
+ *     recurrence rule attached so the whole series lands in the calendar.
+ *   mode "occurrence" — a single entry for `occurrence` only; no recurrence
+ *     rule, and a per-date UID so it never overwrites the series entry.
+ */
+export type CalendarLinkOptions = {
+  now?: Date;
+  mode?: "series" | "occurrence";
+  /** The specific occurrence start; required for mode "occurrence". */
+  occurrence?: Date | null;
+};
+
 /** Start/end instants for the calendar entry. Defaults to 1 hour when ends_at is unset. */
-export function calendarTimes(event: CalendarEventInput, now?: Date): { start: Date; end: Date } {
-  const start = occurrenceStart(event, now);
+export function calendarTimes(event: RecurringEventFields, opts: CalendarLinkOptions = {}): { start: Date; end: Date } {
+  const start = opts.occurrence ?? occurrenceStart(event, opts.now);
   const s = new Date(event.starts_at).getTime();
   const e = event.ends_at ? new Date(event.ends_at).getTime() : NaN;
   const durationMs = e > s ? e - s : 3600000;
@@ -183,7 +241,7 @@ export function calendarTimes(event: CalendarEventInput, now?: Date): { start: D
 }
 
 /** RRULE body (no "RRULE:" prefix) for recurring events, else null. */
-export function buildRrule(event: CalendarEventInput, dtstart: Date): string | null {
+export function buildRrule(event: RecurringEventFields, dtstart: Date): string | null {
   if (event.recurrence_kind === "none") return null;
   const w = detroitWall(dtstart);
   const byday = ICAL_DAYS[dayOfWeek(dayNumber(w))];
@@ -230,8 +288,8 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
-export function googleCalendarUrl(event: CalendarEventInput, now?: Date): string {
-  const { start, end } = calendarTimes(event, now);
+export function googleCalendarUrl(event: CalendarEventInput, opts: CalendarLinkOptions = {}): string {
+  const { start, end } = calendarTimes(event, opts);
   // Wall-clock dates + ctz (not UTC "Z" times) so recurring entries stay
   // pinned to Detroit wall time across DST changes.
   const params = new URLSearchParams({
@@ -242,14 +300,14 @@ export function googleCalendarUrl(event: CalendarEventInput, now?: Date): string
     details: truncate(event.description_long, 800),
     location: event.location,
   });
-  const rrule = buildRrule(event, start);
+  const rrule = opts.mode === "occurrence" ? null : buildRrule(event, start);
   if (rrule) params.set("recur", `RRULE:${rrule}`);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 /** Outlook's compose deeplink has no recurrence support — recurring events land as their next instance. */
-export function outlookCalendarUrl(event: CalendarEventInput, now?: Date): string {
-  const { start, end } = calendarTimes(event, now);
+export function outlookCalendarUrl(event: CalendarEventInput, opts: CalendarLinkOptions = {}): string {
+  const { start, end } = calendarTimes(event, opts);
   const params = new URLSearchParams({
     path: "/calendar/action/compose",
     rru: "addevent",
@@ -302,9 +360,16 @@ const VTIMEZONE = [
 ];
 
 /** Full .ics file body for the event (Apple Calendar, Outlook desktop, etc.). */
-export function buildEventIcs(event: CalendarEventInput, pageUrl?: string, now: Date = new Date()): string {
-  const { start, end } = calendarTimes(event, now);
-  const rrule = buildRrule(event, start);
+export function buildEventIcs(event: CalendarEventInput, pageUrl?: string, opts: CalendarLinkOptions = {}): string {
+  const now = opts.now ?? new Date();
+  const { start, end } = calendarTimes(event, opts);
+  const single = opts.mode === "occurrence";
+  const rrule = single ? null : buildRrule(event, start);
+  // A single-date entry gets its own UID so importing it never overwrites
+  // a previously imported series entry (calendars dedupe on UID).
+  const uid = single
+    ? `event-${event.slug}-${detroitDayIso(start)}@nehtemple.org`
+    : `event-${event.slug}@nehtemple.org`;
   const description = pageUrl
     ? `${event.description_long}\n\n${pageUrl}`
     : event.description_long;
@@ -316,7 +381,7 @@ export function buildEventIcs(event: CalendarEventInput, pageUrl?: string, now: 
     "METHOD:PUBLISH",
     ...VTIMEZONE,
     "BEGIN:VEVENT",
-    `UID:event-${event.slug}@nehtemple.org`,
+    `UID:${uid}`,
     `DTSTAMP:${icsUtcStamp(now)}`,
     `DTSTART;TZID=${CHURCH_TZ}:${wallStamp(detroitWall(start))}`,
     `DTEND;TZID=${CHURCH_TZ}:${wallStamp(detroitWall(end))}`,

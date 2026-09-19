@@ -7,8 +7,12 @@ import { BackBar } from "../../../components/BackBar";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
 import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
-import { googleCalendarUrl, outlookCalendarUrl, upcomingOccurrences } from "../../../lib/event-calendar";
-import { CHURCH_TZ } from "../../../lib/tz";
+import { googleCalendarUrl, outlookCalendarUrl } from "../../../lib/event-calendar";
+
+/** One upcoming date of a recurring series, for the date switcher. */
+export type OccurrenceChoice = { date: string; label: string };
+/** The server-resolved occurrence this page is anchored on. */
+export type SelectedOccurrence = { date: string; iso: string; label: string };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -40,26 +44,90 @@ const calendarBtnStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-function AddToCalendarRow({ event }: { event: DisplayEvent }) {
-  // suppressHydrationWarning: the URLs embed the next occurrence, which can
-  // advance between the cached server render and hydration (revalidate = 60).
+function calendarModeStyle(on: boolean): React.CSSProperties {
+  return {
+    flex: 1,
+    fontWeight: 800,
+    fontSize: "11px",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    padding: "9px 8px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    background: on ? "#e7b84e" : "transparent",
+    color: on ? "#0b101c" : "#9aa3b8",
+    border: "none",
+  };
+}
+
+function AddToCalendarRow({
+  event,
+  occurrence,
+}: {
+  event: DisplayEvent;
+  occurrence: SelectedOccurrence | null;
+}) {
+  const recurring = event.recurrence_kind !== "none";
+  const [mode, setMode] = useState<"occurrence" | "series">(recurring ? "occurrence" : "series");
+
+  // With a server-resolved occurrence the URLs are deterministic between
+  // server render and hydration. Without one (series over, page kept as a
+  // fallback) the builders resolve "next occurrence" client-side, which can
+  // drift from the cached render — hence suppressHydrationWarning.
+  const occDate = occurrence ? new Date(occurrence.iso) : null;
+  const single = recurring && mode === "occurrence" && occurrence !== null;
+  const linkOpts = occDate
+    ? { occurrence: occDate, mode: single ? ("occurrence" as const) : ("series" as const) }
+    : {};
+  const icsParams = occurrence
+    ? `?date=${occurrence.date}&mode=${single ? "occurrence" : "series"}`
+    : "";
+
   return (
     <div style={{ marginTop: "14px", textAlign: "left" }}>
       <div
         style={{
-          fontSize: "11px",
-          fontWeight: 800,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "#9aa3b8",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "10px",
           marginBottom: "8px",
         }}
       >
-        Add to calendar
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 800,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "#9aa3b8",
+          }}
+        >
+          Add to calendar
+        </div>
+        {recurring && occurrence && (
+          <div
+            style={{
+              display: "flex",
+              gap: "2px",
+              background: "#121a2e",
+              border: "1px solid rgba(244,241,234,.12)",
+              borderRadius: "9px",
+              padding: "2px",
+            }}
+          >
+            <button type="button" onClick={() => setMode("occurrence")} style={calendarModeStyle(mode === "occurrence")}>
+              This date
+            </button>
+            <button type="button" onClick={() => setMode("series")} style={calendarModeStyle(mode === "series")}>
+              Full series
+            </button>
+          </div>
+        )}
       </div>
       <div style={{ display: "flex", gap: "8px" }}>
         <a
-          href={googleCalendarUrl(event)}
+          href={googleCalendarUrl(event, linkOpts)}
           target="_blank"
           rel="noopener noreferrer"
           suppressHydrationWarning
@@ -72,7 +140,7 @@ function AddToCalendarRow({ event }: { event: DisplayEvent }) {
           Google
         </a>
         <a
-          href={outlookCalendarUrl(event)}
+          href={outlookCalendarUrl(event, linkOpts)}
           target="_blank"
           rel="noopener noreferrer"
           suppressHydrationWarning
@@ -80,7 +148,7 @@ function AddToCalendarRow({ event }: { event: DisplayEvent }) {
         >
           Outlook
         </a>
-        <a href={`/api/events/${event.slug}/ics`} style={calendarBtnStyle}>
+        <a href={`/api/events/${event.slug}/ics${icsParams}`} style={calendarBtnStyle}>
           Apple / .ics
         </a>
       </div>
@@ -102,7 +170,15 @@ function segmentStyle(on: boolean): React.CSSProperties {
   };
 }
 
-export function EventDetailView({ event }: { event: DisplayEvent }) {
+export function EventDetailView({
+  event,
+  occurrence,
+  choices,
+}: {
+  event: DisplayEvent;
+  occurrence: SelectedOccurrence | null;
+  choices: OccurrenceChoice[];
+}) {
   // Three independent signup affordances:
   //   1. External Register button   — whenever registration_url is set
   //   2. In-app Attend form         — when accepts_rsvps && no external URL
@@ -128,16 +204,25 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
 
   function onSubmit() {
     startTransition(async () => {
-      const r = await submitEventSignup({ slug: event.slug, name, contact, role, notes });
+      const r = await submitEventSignup({
+        slug: event.slug,
+        name,
+        contact,
+        role,
+        notes,
+        occurrenceDate: occurrence?.date,
+      });
       setResult(r);
     });
   }
 
   if (result?.ok) {
+    const forDate =
+      event.recurrence_kind !== "none" && occurrence ? ` on ${occurrence.label}` : "";
     const doneMsg =
       result.role === "volunteer"
-        ? `Thank you for volunteering for ${event.title}! Our team will follow up with details and your role.`
-        : `We've saved your spot for ${event.title}. Watch for a reminder and any updates.`;
+        ? `Thank you for volunteering for ${event.title}${forDate}! Our team will follow up with details and your role.`
+        : `We've saved your spot for ${event.title}${forDate}. Watch for a reminder and any updates.`;
     return (
       <PhoneShell>
         <div className="th-slide" style={{ minHeight: "100vh" }}>
@@ -175,7 +260,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
               {doneMsg}
             </p>
             <div style={{ marginTop: "26px" }}>
-              <AddToCalendarRow event={event} />
+              <AddToCalendarRow event={event} occurrence={occurrence} />
             </div>
             <Link
               href="/events"
@@ -314,24 +399,40 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                 </svg>
                 <span style={{ fontSize: "14px", fontWeight: 700 }}>{event.location}</span>
               </div>
-              {event.recurrence_kind !== "none" && (
+              {event.recurrence_kind !== "none" && choices.length > 0 && (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "2px" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "5px" }}>
                     <path d="M17 2l4 4-4 4" />
                     <path d="M3 11v-1a4 4 0 014-4h14" />
                     <path d="M7 22l-4-4 4-4" />
                     <path d="M21 13v1a4 4 0 01-4 4H3" />
                   </svg>
-                  <span
-                    suppressHydrationWarning
-                    style={{ fontSize: "13px", fontWeight: 600, color: "#9aa3b8", lineHeight: 1.55 }}
-                  >
-                    {event.recurrenceLabel} ·{" "}
-                    {upcomingOccurrences(event, 4)
-                      .map((d) =>
-                        d.toLocaleDateString("en-US", { timeZone: CHURCH_TZ, month: "short", day: "numeric" }),
-                      )
-                      .join(", ")}
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#9aa3b8", lineHeight: 1.55 }}>
+                    <span style={{ marginRight: "8px" }}>{event.recurrenceLabel} ·</span>
+                    <span style={{ display: "inline-flex", gap: "6px", flexWrap: "wrap", verticalAlign: "middle" }}>
+                      {choices.map((c) => {
+                        const on = occurrence?.date === c.date;
+                        return (
+                          <Link
+                            key={c.date}
+                            href={`/events/${event.slug}?date=${c.date}`}
+                            style={{
+                              display: "inline-block",
+                              padding: "4px 9px",
+                              borderRadius: "7px",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              textDecoration: "none",
+                              background: on ? "#e7b84e" : "#1a2438",
+                              color: on ? "#0b101c" : "#cdd3e0",
+                              border: `1px solid ${on ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
+                            }}
+                          >
+                            {c.label}
+                          </Link>
+                        );
+                      })}
+                    </span>
                   </span>
                 </div>
               )}
@@ -345,7 +446,7 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
                 </div>
               )}
             </div>
-            <AddToCalendarRow event={event} />
+            <AddToCalendarRow event={event} occurrence={occurrence} />
             <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px" }}>
               {event.description_long}
             </p>
@@ -478,6 +579,24 @@ export function EventDetailView({ event }: { event: DisplayEvent }) {
 
                 {(hasInAppAttend || hasInAppVolunteer) && (
                   <>
+                    {event.recurrence_kind !== "none" && occurrence && (
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#cdd3e0",
+                          background: "rgba(231,184,78,.08)",
+                          border: "1px solid rgba(231,184,78,.25)",
+                          borderRadius: "10px",
+                          padding: "11px 14px",
+                          marginBottom: "14px",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        Signing up for <span style={{ color: "#e7b84e" }}>{occurrence.label}</span>.
+                        Want a different date? Pick one above.
+                      </div>
+                    )}
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}

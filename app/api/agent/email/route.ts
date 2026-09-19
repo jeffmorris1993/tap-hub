@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   const senderEmail = extractEmail(fromHeader);
   const senderDisplay = fromHeader ?? senderEmail ?? "(unknown)";
 
-  if (!senderEmail || !isAllowedAgentSender(senderEmail)) {
+  if (!senderEmail || !(await isAllowedAgentSender(senderEmail))) {
     await logBlocked(senderDisplay, text);
     // Don't reply — bounce silently so we don't fuel spam loops.
     return NextResponse.json({ ok: true, blocked: true });

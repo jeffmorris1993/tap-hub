@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
-import type { DisplayEvent } from "../../lib/events-display";
+import type { DisplayOccurrence } from "../../lib/events-display";
 import { EVENT_CATEGORIES, type EventCategory } from "../../lib/event-categories";
 import { ANNOUNCEMENT_COLORS } from "../../lib/announcement-types";
 
@@ -13,7 +13,7 @@ const POLL_INTERVAL_MS = 30_000;
 
 const TABS: ("All" | EventCategory)[] = ["All", ...EVENT_CATEGORIES];
 
-export function EventsList({ events }: { events: DisplayEvent[] }) {
+export function EventsList({ events }: { events: DisplayOccurrence[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState<(typeof TABS)[number]>("All");
   const list = filter === "All" ? events : events.filter((e) => e.category === filter);
@@ -79,8 +79,8 @@ export function EventsList({ events }: { events: DisplayEvent[] }) {
           )}
           {list.map((e) => (
             <Link
-              key={e.slug}
-              href={`/events/${e.slug}`}
+              key={e.occurrenceKey}
+              href={`/events/${e.slug}?date=${e.occurrenceDate}`}
               style={{
                 display: "flex",
                 background: "#121a2e",
@@ -130,20 +130,39 @@ export function EventsList({ events }: { events: DisplayEvent[] }) {
                 {(() => {
                   const accent = ANNOUNCEMENT_COLORS[e.category];
                   return (
-                    <span
-                      style={{
-                        display: "inline-block",
-                        background: accent + "22",
-                        color: accent,
-                        fontSize: "9.5px",
-                        fontWeight: 800,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        padding: "5px 9px",
-                        borderRadius: "6px",
-                      }}
-                    >
-                      {e.category}
+                    <span style={{ display: "inline-flex", gap: "6px", flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          background: accent + "22",
+                          color: accent,
+                          fontSize: "9.5px",
+                          fontWeight: 800,
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          padding: "5px 9px",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        {e.category}
+                      </span>
+                      {e.recurrenceLabel && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            background: "rgba(231,184,78,.14)",
+                            color: "#e7b84e",
+                            fontSize: "9.5px",
+                            fontWeight: 800,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            padding: "5px 9px",
+                            borderRadius: "6px",
+                          }}
+                        >
+                          {e.recurrenceLabel}
+                        </span>
+                      )}
                     </span>
                   );
                 })()}

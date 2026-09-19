@@ -1,30 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_ADMIN_PATHS = ["/admin/login", "/auth/callback", "/auth/sign-out"];
-
-function isAllowedAdminEmail(email: string | null | undefined) {
-  if (!email) return false;
-  const at = email.lastIndexOf("@");
-  if (at < 0) return false;
-  const domain = email.slice(at + 1).toLowerCase();
-  const allowed = (process.env.ADMIN_ALLOWED_DOMAINS ?? "nehtemple.org")
-    .split(",")
-    .map((d) => d.trim().toLowerCase())
-    .filter(Boolean);
-  return allowed.includes(domain);
-}
+// Coarse gate only: /portal/* requires a session. WHO may see WHAT (member
+// vs lead vs pastoral) is decided in the app via lib/portal-auth.ts —
+// middleware can't cheaply consult the profiles table, so it never tries.
+// Members sign up with any email; there is no domain check here anymore.
+const PUBLIC_PORTAL_PATHS = [
+  "/portal/login",
+  "/portal/signup",
+  "/portal/reset",
+  "/auth/callback",
+  "/auth/sign-out",
+];
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  if (!pathname.startsWith("/admin")) return NextResponse.next();
-  if (PUBLIC_ADMIN_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
+  if (!pathname.startsWith("/portal")) return NextResponse.next();
+  if (PUBLIC_PORTAL_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const response = NextResponse.next();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
-    const redirect = new URL("/admin/login?error=config", request.url);
+    const redirect = new URL("/portal/login?error=config", request.url);
     return NextResponse.redirect(redirect);
   }
 
@@ -42,8 +40,8 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getUser();
-  if (!data.user || !isAllowedAdminEmail(data.user.email)) {
-    const redirect = new URL("/admin/login", request.url);
+  if (!data.user) {
+    const redirect = new URL("/portal/login", request.url);
     redirect.searchParams.set("next", pathname);
     return NextResponse.redirect(redirect);
   }
@@ -52,5 +50,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/portal/:path*"],
 };

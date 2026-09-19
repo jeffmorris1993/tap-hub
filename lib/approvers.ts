@@ -18,3 +18,15 @@ export function isApprover(email: string | null | undefined): boolean {
   if (!email) return false;
   return getApproverEmails().includes(email.toLowerCase());
 }
+
+/**
+ * Everyone who should be NOTIFIED about pending approvals: pastoral-role
+ * profiles plus the env bootstrap list. (Authorization checks use the
+ * portal role, not this list.)
+ */
+export async function listApproverEmails(): Promise<string[]> {
+  const { supabaseAdmin } = await import("./supabase/server");
+  const { data } = await supabaseAdmin().from("profiles").select("email").eq("role", "pastoral");
+  const fromProfiles = (data ?? []).map((r) => String(r.email).toLowerCase());
+  return [...new Set([...fromProfiles, ...getApproverEmails()])];
+}

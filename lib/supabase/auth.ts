@@ -1,8 +1,7 @@
 import "server-only";
-import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function env() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,7 +32,12 @@ export async function supabaseSession(): Promise<SupabaseClient> {
   });
 }
 
-/** Allowlist check: returns true if the email's domain is in ADMIN_ALLOWED_DOMAINS. */
+/**
+ * Staff-domain check: true when the email's domain is in
+ * ADMIN_ALLOWED_DOMAINS. This no longer gates portal ACCESS (members sign in
+ * with any email) — it gates ELIGIBILITY for the lead/pastoral roles. See
+ * lib/portal-auth.ts for the role model.
+ */
 export function isAllowedAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const at = email.lastIndexOf("@");
@@ -45,14 +49,3 @@ export function isAllowedAdminEmail(email: string | null | undefined): boolean {
     .filter(Boolean);
   return allowed.includes(domain);
 }
-
-/** Returns the current admin user, or null if not signed in / not allowed.
- *  cache() dedupes the auth.getUser() network round trip when the layout and
- *  a page (e.g. via currentUserCanApprove) both call this in one request. */
-export const getAdminUser = cache(async (): Promise<User | null> => {
-  const sb = await supabaseSession();
-  const { data, error } = await sb.auth.getUser();
-  if (error || !data.user) return null;
-  if (!isAllowedAdminEmail(data.user.email)) return null;
-  return data.user;
-});

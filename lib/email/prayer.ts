@@ -33,7 +33,7 @@ export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<voi
     { label: "Contact", value: payload.contact?.trim() || "Not shared" },
   ];
 
-  const ctaHref = `${siteUrl()}/admin/submissions?tab=prayers`;
+  const ctaHref = `${siteUrl()}/portal/submissions?tab=prayers`;
 
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Pastoral Care",

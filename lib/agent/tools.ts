@@ -2,7 +2,7 @@ import "server-only";
 import { tool } from "ai";
 import { z } from "zod";
 import { supabaseAdmin } from "../supabase/server";
-import { isApprover, getApproverEmails } from "../approvers";
+import { listApproverEmails } from "../approvers";
 import { localToUtcIso } from "../tz";
 import { recurrenceLabel } from "../events-occurrence";
 import {
@@ -72,11 +72,13 @@ async function snapshotBySlug(slug: string): Promise<EventSnapshot | null> {
 export type AgentContext = {
   /** Current user's email — used to gate approval tools and audit who did what. */
   sender: string;
+  /** True when the sender holds the pastoral role (resolved by runAgent). */
+  senderIsApprover: boolean;
 };
 
 /** Builds the tool set scoped to the calling user. */
 export function buildAgentTools(ctx: AgentContext) {
-  const senderIsApprover = isApprover(ctx.sender);
+  const senderIsApprover = ctx.senderIsApprover;
 
   return {
     create_event_draft: tool({
@@ -207,7 +209,7 @@ export function buildAgentTools(ctx: AgentContext) {
         if (wantsToPublishOrSubmit && !isSenderApprover) {
           const snap = await snapshotById(id);
           if (snap) {
-            const approvers = getApproverEmails();
+            const approvers = await listApproverEmails();
             await Promise.all([
               notifyApproversOfSubmission(snap, ctx.sender, approvers),
               pushSubmissionToApprovers(
@@ -509,7 +511,7 @@ export function buildAgentTools(ctx: AgentContext) {
             body: input.body,
             date_label: input.dateLabel ?? null,
           };
-          const approvers = getApproverEmails();
+          const approvers = await listApproverEmails();
           await Promise.all([
             notifyApproversOfAnnouncementSubmission(snap, ctx.sender, approvers),
             pushAnnouncementSubmissionToApprovers(

@@ -65,8 +65,8 @@ export async function notifyApproversOfSubmission(
 ): Promise<void> {
   if (approverEmails.length === 0) return;
   const from = process.env.EVENT_APPROVAL_FROM || DEFAULT_SUBMIT_FROM;
-  const editHref = `${siteUrl()}/admin/events/${event.id}`;
-  const queueHref = `${siteUrl()}/admin/events/pending`;
+  const editHref = `${siteUrl()}/portal/events/${event.id}`;
+  const queueHref = `${siteUrl()}/portal/events/pending`;
 
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Awaiting Your Approval",
@@ -148,7 +148,7 @@ export async function notifySubmitterOfRejection(
   notes: string,
 ): Promise<void> {
   const from = process.env.EVENT_APPROVAL_FROM || DEFAULT_RESPONSE_FROM;
-  const editHref = `${siteUrl()}/admin/events/${event.id}`;
+  const editHref = `${siteUrl()}/portal/events/${event.id}`;
 
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Revisions Requested",

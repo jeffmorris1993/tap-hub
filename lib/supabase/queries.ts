@@ -1,7 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
-import { hasOccurrenceOnDate, isEventOver, type RecurrenceKind, type RecurringEventFields } from "../events-occurrence";
+import type { RecurrenceKind, RecurringEventFields } from "../events-occurrence";
+import { isSeriesOver, occurrenceOnDate } from "../event-calendar";
 import { detroitNow, detroitDateIso, fmtDetroitTime } from "../tz";
 
 export { EVENT_CATEGORIES, type EventCategory } from "../event-categories";
@@ -136,11 +137,12 @@ export async function getDerivedWeekLookahead(now: Date = detroitNow()): Promise
 
     const items: WeekLookaheadRow[] = [];
     for (const e of events) {
-      if (hasOccurrenceOnDate(e as RecurringEventFields, dateIso)) {
+      const occ = occurrenceOnDate(e as RecurringEventFields, dateIso);
+      if (occ) {
         items.push({
           day_label: dayLabel,
           title: e.title,
-          detail: `${fmtDetroitTime(e.starts_at)} · ${e.location}`,
+          detail: `${fmtDetroitTime(occ.toISOString())} · ${e.location}`,
         });
       }
     }
@@ -179,11 +181,11 @@ export async function listPublishedEvents(): Promise<EventRow[]> {
     .order("starts_at", { ascending: true });
   if (error) throw error;
   // Archive finished events (one-offs in the past, ended recurrence windows).
-  // Must be computed via nextOccurrence, not a SQL starts_at bound — a weekly
-  // series that started months ago is still current.
+  // Must be computed via the occurrence engine, not a SQL starts_at bound —
+  // a weekly series that started months ago is still current.
   const todayIso = detroitDateIso();
   const rows = (data ?? []) as unknown as EventRow[];
-  return rows.filter((e) => !isEventOver(e as RecurringEventFields, todayIso));
+  return rows.filter((e) => !isSeriesOver(e as RecurringEventFields, todayIso));
 }
 
 export async function getEventBySlug(slug: string): Promise<EventRow | null> {
@@ -203,7 +205,17 @@ export async function getEventBySlug(slug: string): Promise<EventRow | null> {
  *  Pass `now` to also drop instances whose end time has already passed. */
 export async function listEventsOnDate(dateIso: string, now?: Date): Promise<EventRow[]> {
   const events = await listPublishedEvents();
-  return events.filter((e) => hasOccurrenceOnDate(e as RecurringEventFields, dateIso, now));
+  return events.filter((e) => {
+    const occ = occurrenceOnDate(e as RecurringEventFields, dateIso);
+    if (!occ) return false;
+    // Drop instances whose daily end time has already passed — "Also Today"
+    // shouldn't keep showing a 9–5 program after 5 PM.
+    if (now && e.ends_at) {
+      const durationMs = new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime();
+      if (durationMs > 0 && occ.getTime() + durationMs < now.getTime()) return false;
+    }
+    return true;
+  });
 }
 
 export async function getTodaysKidsLesson(): Promise<KidsLessonRow | null> {

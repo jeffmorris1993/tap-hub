@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "../../lib/supabase/server";
+import { supabaseSession } from "../../lib/supabase/auth";
 import { notifyWelcomeTeam } from "../../lib/email/welcome";
 
 export type NewHereSubmission = {
@@ -25,6 +26,16 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
   const email = input.email?.trim() || null;
   const phone = input.phone?.trim() || null;
 
+  // Link to the signed-in account when there is one (for "My Forms").
+  let userId: string | null = null;
+  try {
+    const session = await supabaseSession();
+    const { data } = await session.auth.getUser();
+    userId = data.user?.id ?? null;
+  } catch {
+    // Anonymous submission.
+  }
+
   const { error } = await supabaseAdmin().from("visitors").insert({
     name,
     email,
@@ -32,6 +43,7 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
     first_time: input.firstTime,
     interests: input.interests,
     source: "tap-hub",
+    user_id: userId,
   });
   if (error) {
     console.error("[new-here] insert failed", error);

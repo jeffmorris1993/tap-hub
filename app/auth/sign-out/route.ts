@@ -4,5 +4,5 @@ import { supabaseSession } from "../../../lib/supabase/auth";
 export async function POST(request: NextRequest) {
   const sb = await supabaseSession();
   await sb.auth.signOut();
-  return NextResponse.redirect(new URL("/admin/login", request.url));
+  return NextResponse.redirect(new URL("/portal/login", request.url));
 }

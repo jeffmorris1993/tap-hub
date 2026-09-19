@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(buildResponse("", wantsAddonsResponse));
   }
 
-  if (!parsed.senderEmail || !isAllowedAgentSender(parsed.senderEmail)) {
+  if (!parsed.senderEmail || !(await isAllowedAgentSender(parsed.senderEmail))) {
     await logRow({
       sender: parsed.senderName,
       input: parsed.text,

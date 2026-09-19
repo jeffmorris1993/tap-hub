@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset your password</title>
+</head>
+<body style="margin:0;padding:0;background-color:#eceae2;">
+<!-- preheader (hidden preview text) -->
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Set a new password for your Neh Temple Portal account.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eceae2;">
+  <tr>
+    <td align="center" style="padding:36px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#0b101c;border-radius:18px;">
+        <tr>
+          <td style="padding:34px 34px 30px;">
+            <!-- brand -->
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width:42px;height:42px;background-color:#e7b84e;border-radius:9px;text-align:center;vertical-align:middle;font-family:Arial Black,Arial,sans-serif;font-size:17px;font-weight:900;color:#0b101c;">NT</td>
+                <td style="padding-left:12px;font-family:Arial,Helvetica,sans-serif;">
+                  <div style="font-size:14px;font-weight:bold;color:#f4f1ea;letter-spacing:.04em;text-transform:uppercase;">Nehemiah's Temple</div>
+                  <div style="font-size:9px;font-weight:bold;color:#e7b84e;letter-spacing:.26em;text-transform:uppercase;padding-top:3px;">Member Portal</div>
+                </td>
+              </tr>
+            </table>
+
+            <h1 style="margin:28px 0 0;font-family:Arial Black,Arial,sans-serif;font-size:26px;line-height:1.1;color:#f4f1ea;text-transform:uppercase;letter-spacing:.01em;">Reset your<br><span style="color:#e7b84e;">password</span></h1>
+
+            <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#9aa3b8;">
+              A password reset was requested for <span style="color:#cdd3e0;font-weight:bold;">{{ .Email }}</span>.
+              Tap the button below to choose a new password.
+            </p>
+
+            <!-- button -->
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 0;">
+              <tr>
+                <td style="background-color:#e7b84e;border-radius:11px;">
+                  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery&next=/portal/reset/confirm"
+                     style="display:inline-block;padding:15px 30px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#0b101c;text-decoration:none;">
+                    Choose a new password
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.6;color:#6a738b;">
+              This link expires after a short while and can only be used once.
+              Didn't request this? You can safely ignore this email — your password won't change.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 34px 28px;">
+            <div style="border-top:1px solid #232d44;padding-top:16px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.6;color:#6a738b;">
+              Nehemiah's Temple &middot; Madison Heights, Michigan<br>
+              Sent by the Tap Hub Member Portal
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

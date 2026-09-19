@@ -36,7 +36,7 @@ export async function notifyIgniteTeam(payload: IgniteParentEmailPayload): Promi
 
   const childLabel = payload.childCount === 1 ? "1 child" : `${payload.childCount} children`;
   const volunteerLabel = VOLUNTEER_LABEL[payload.volunteerInterest] ?? "Not answered";
-  const ctaHref = `${siteUrl()}/admin/submissions?tab=ignite`;
+  const ctaHref = `${siteUrl()}/portal/submissions?tab=ignite`;
 
   const fields: Field[] = [
     { label: "Family", value: payload.guardianName },

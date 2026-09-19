@@ -1,0 +1,47 @@
+# Remote config managed as code — pushed with `supabase config push`.
+#
+# WARNING: config push treats ANY field missing from this file as "use the
+# CLI default" and overwrites the remote value. Every remote setting that
+# differs from the defaults MUST be declared here, or a push will clobber it.
+project_id = "qcfakwzqkltifelperep"
+
+[auth]
+site_url = "https://tap-hub.nehtemple.org"
+additional_redirect_urls = [
+  "https://tap-hub-theta.vercel.app/auth/callback",
+  "http://localhost:3000/auth/callback",
+  "https://tap-hub.nehtemple.org/auth/callback",
+  "https://tap-hub.nehtemple.org/",
+  # token_hash targets used by the email templates ({{ .RedirectTo }});
+  # localhost here is what makes auth emails work in local dev.
+  "https://tap-hub-theta.vercel.app/auth/confirm",
+  "http://localhost:3000/auth/confirm",
+  "https://tap-hub.nehtemple.org/auth/confirm",
+]
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# New accounts must confirm their email before signing in.
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+# Branded auth email templates (navy/gold, matching the portal).
+# The links use the token_hash + /auth/confirm pattern so each email type
+# always lands on the right page, independent of the redirect-URL allowlist.
+[auth.email.template.recovery]
+subject = "Reset your Neh Temple Portal password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your Neh Temple Portal account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your Neh Temple Portal sign-in link"
+content_path = "./supabase/templates/magic_link.html"

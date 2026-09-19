@@ -1,5 +1,6 @@
 import type { EventRow } from "./supabase/queries";
-import { nextOccurrence, recurrenceLabel, type RecurringEventFields } from "./events-occurrence";
+import { recurrenceLabel, type RecurringEventFields } from "./events-occurrence";
+import { detroitDayIso, nextOccurrence, upcomingOccurrences } from "./event-calendar";
 import { CHURCH_TZ } from "./tz";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -12,7 +13,10 @@ export function hueFromSlug(slug: string): number {
 }
 
 export function formatEventDateChip(d: Date): { month: string; day: string } {
-  return { month: MONTHS[d.getMonth()], day: String(d.getDate()).padStart(2, "0") };
+  // Detroit-anchored: local getMonth/getDate would flip an evening event to
+  // the next day when rendered on a UTC server.
+  const [, mo, day] = detroitDayIso(d).split("-");
+  return { month: MONTHS[Number(mo) - 1], day };
 }
 
 // All event-card date/time formatting uses the church's timezone so
@@ -132,4 +136,91 @@ export function sortByNextOccurrence(events: DisplayEvent[]): DisplayEvent[] {
     if (b.nextOccurrenceIso) return 1;
     return 0;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Per-occurrence expansion for the events list
+// ---------------------------------------------------------------------------
+
+/** How far ahead the list expands a recurring series into dated cards. */
+export const EXPANSION_WINDOW_DAYS = 42; // 6 weeks
+/** Cap per series so a weekly small group doesn't drown the list. */
+export const MAX_OCCURRENCES_PER_SERIES = 4;
+
+export type DisplayOccurrence = DisplayEvent & {
+  /** Detroit calendar date (YYYY-MM-DD) of this occurrence. */
+  occurrenceDate: string;
+  /** Exact UTC instant this occurrence starts. */
+  occurrenceIso: string;
+  /** Stable list key: `${slug}:${occurrenceDate}`. */
+  occurrenceKey: string;
+};
+
+/** Card-ready display for one specific occurrence of an event. */
+export function toDisplayOccurrence(row: EventRow, start: Date, fromDate: Date = new Date()): DisplayOccurrence {
+  const date = detroitDayIso(start);
+  const chip = formatEventDateChip(start);
+  const end = row.ends_at ? new Date(row.ends_at) : null;
+  const durationMs = end ? end.getTime() - new Date(row.starts_at).getTime() : 0;
+  const occEnd = durationMs > 0 ? new Date(start.getTime() + durationMs) : null;
+  const timeText = occEnd ? `${fmtTime(start)} – ${fmtTime(occEnd)}` : fmtTime(start);
+  // daily/weekdays runs keep their range-style whenText ("Mon–Fri Jul 24 –
+  // Aug 28 · 9 AM"); everything else shows this occurrence's own date.
+  const whenText =
+    row.recurrence_kind === "daily" || row.recurrence_kind === "weekdays"
+      ? formatWhenText(row, fromDate)
+      : `${fmtFullDate(start)} · ${timeText}`;
+  return {
+    ...row,
+    month: chip.month,
+    day: chip.day,
+    whenText,
+    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at),
+    hue: hueFromSlug(row.slug),
+    nextOccurrenceIso: start.toISOString(),
+    signupOpen: true,
+    occurrenceDate: date,
+    occurrenceIso: start.toISOString(),
+    occurrenceKey: `${row.slug}:${date}`,
+  };
+}
+
+/**
+ * Expand one event row into card-ready occurrences.
+ *
+ * weekly / biweekly / monthly / monthly_weekday series become one card per
+ * upcoming date (within EXPANSION_WINDOW_DAYS, capped at
+ * MAX_OCCURRENCES_PER_SERIES, always including at least the next one so a
+ * far-out monthly event still shows). daily / weekdays runs stay a single
+ * card — their whenText already reads as a date range, and a card per day
+ * would flood the list.
+ */
+export function toDisplayOccurrences(row: EventRow, fromDate: Date = new Date()): DisplayOccurrence[] {
+  const expand =
+    row.recurrence_kind === "weekly" ||
+    row.recurrence_kind === "biweekly" ||
+    row.recurrence_kind === "monthly" ||
+    row.recurrence_kind === "monthly_weekday";
+
+  const starts = expand
+    ? upcomingOccurrences(row as RecurringEventFields, MAX_OCCURRENCES_PER_SERIES, fromDate)
+    : upcomingOccurrences(row as RecurringEventFields, 1, fromDate);
+  if (starts.length === 0) {
+    // No future occurrence (e.g. a multi-day block already in progress) —
+    // keep the single card the old list rendered.
+    const base = toDisplayEvent(row, fromDate);
+    const start = new Date(row.starts_at);
+    const date = detroitDayIso(start);
+    return [{ ...base, occurrenceDate: date, occurrenceIso: start.toISOString(), occurrenceKey: `${row.slug}:${date}` }];
+  }
+
+  const windowEnd = fromDate.getTime() + EXPANSION_WINDOW_DAYS * 86400000;
+  return starts
+    .filter((d, i) => i === 0 || d.getTime() <= windowEnd)
+    .map((start) => toDisplayOccurrence(row, start, fromDate));
+}
+
+/** Sort expanded occurrences chronologically. */
+export function sortOccurrences(items: DisplayOccurrence[]): DisplayOccurrence[] {
+  return [...items].sort((a, b) => a.occurrenceIso.localeCompare(b.occurrenceIso));
 }

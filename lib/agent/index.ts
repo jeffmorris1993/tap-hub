@@ -3,7 +3,7 @@ import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { buildAgentTools } from "./tools";
 import { supabaseAdmin } from "../supabase/server";
-import { isApprover } from "../approvers";
+import { getRoleForEmail } from "../portal-auth";
 import {
   loadThread,
   appendToThread,
@@ -201,9 +201,11 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     month: "long",
     day: "numeric",
   })} (ISO ${today.toISOString().slice(0, 10)}). The church timezone is America/Detroit.`;
-  const senderLine = `Sender: ${input.sender} (${
-    isApprover(input.sender) ? "IS an approver" : "is NOT an approver"
-  }). Only approvers may call approve_event or reject_event.`;
+  const senderRole = await getRoleForEmail(input.sender);
+  const senderIsApprover = senderRole === "pastoral";
+  const senderLine = `Sender: ${input.sender} (role: ${senderRole ?? "unknown"} — ${
+    senderIsApprover ? "IS an approver" : "is NOT an approver"
+  }). Only pastoral leadership may call approve_event or reject_event.`;
   const userPrompt = `${localDateLine}\n${senderLine}\n\n${input.text}`;
 
   // Load persisted history if a threadKey is set; otherwise use the caller's
@@ -222,7 +224,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       model: openai(DEFAULT_MODEL),
       system: SYSTEM_PROMPT,
       messages,
-      tools: buildAgentTools({ sender: input.sender }),
+      tools: buildAgentTools({ sender: input.sender, senderIsApprover }),
       stopWhen: stepCountIs(8),
     });
 
@@ -287,8 +289,15 @@ async function logAgentRun(p: LogPayload): Promise<void> {
   }
 }
 
-export function isAllowedAgentSender(senderEmail: string | null | undefined): boolean {
+/** Agent channels are staff surfaces: lead or pastoral role required.
+ *  The env-domain check remains as a bootstrap fallback so staff whose
+ *  profiles haven't been role-assigned yet aren't locked out of SMS/email. */
+export async function isAllowedAgentSender(senderEmail: string | null | undefined): Promise<boolean> {
   if (!senderEmail) return false;
+  const role = await getRoleForEmail(senderEmail);
+  if (role === "lead" || role === "pastoral") return true;
+  if (role === "member") return false;
+  // No profile yet — fall back to the staff-domain check.
   const at = senderEmail.lastIndexOf("@");
   if (at < 0) return false;
   const domain = senderEmail.slice(at + 1).toLowerCase();

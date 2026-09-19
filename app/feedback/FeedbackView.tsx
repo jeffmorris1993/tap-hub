@@ -63,6 +63,7 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
   const [prName, setPrName] = useState("");
   const [contact, setContact] = useState("");
   const [request, setRequest] = useState("");
+  const [prMinistry, setPrMinistry] = useState("General");
 
   const [result, setResult] = useState<FeedbackResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -93,6 +94,7 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
         name: prName,
         contact,
         request,
+        ministry: prMinistry,
       });
       setResult(r);
     });
@@ -285,8 +287,31 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
               onChange={(e) => setRequest(e.target.value)}
               rows={4}
               placeholder="How can we pray for you?"
-              style={{ ...inputStyle, resize: "vertical", marginBottom: "16px" }}
+              style={{ ...inputStyle, resize: "vertical", marginBottom: "12px" }}
             />
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#9aa3b8",
+                marginBottom: "7px",
+              }}
+            >
+              Related ministry (optional)
+            </div>
+            <select
+              value={prMinistry}
+              onChange={(e) => setPrMinistry(e.target.value)}
+              style={{ ...inputStyle, marginBottom: "16px", WebkitAppearance: "none", fontWeight: 600 }}
+            >
+              {["General", "Youth", "Sisterhood", "Brotherhood", "Marriage"].map((m) => (
+                <option key={m} value={m}>
+                  {m === "General" ? "General / Church-wide" : m}
+                </option>
+              ))}
+            </select>
             <div
               style={{
                 display: "flex",

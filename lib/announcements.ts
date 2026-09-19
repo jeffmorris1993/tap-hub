@@ -1,8 +1,9 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase/server";
 import { listPublishedEvents } from "./supabase/queries";
-import { nextOccurrence, type RecurringEventFields } from "./events-occurrence";
-import { CHURCH_TZ, detroitNow } from "./tz";
+import type { RecurringEventFields } from "./events-occurrence";
+import { nextOccurrence } from "./event-calendar";
+import { CHURCH_TZ, detroitDateIso, localToUtcIso } from "./tz";
 import {
   ANNOUNCEMENT_CATEGORIES,
   ANNOUNCEMENT_COLORS,
@@ -141,9 +142,12 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   // filtering on nextOccurrence — once the start time has passed we stop
   // surfacing the event in announcements (the events page still holds it
   // for the rest of the day with its "Live"/"Done" badges).
-  const now = detroitNow();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
+  // Real instants: the engine works in UTC instants and resolves Detroit
+  // wall time internally, so "start of today" must be the true UTC moment
+  // Detroit's day began — not a locally re-parsed shifted Date.
+  const now = new Date();
+  const todayStartIso = localToUtcIso(`${detroitDateIso()}T00:00`);
+  const todayStart = todayStartIso ? new Date(todayStartIso) : now;
 
   const fromEvents: Announcement[] = events.flatMap((e) => {
     // Skip events that have already kicked off. For a one-time event the

@@ -50,7 +50,7 @@ export async function pushSubmissionToApprovers(
   submitterEmail: string,
   approverEmails: string[],
 ): Promise<void> {
-  const editUrl = `${siteUrl()}/admin/events/${event.id}`;
+  const editUrl = `${siteUrl()}/portal/events/${event.id}`;
   const body = `Submitted by *${submitterEmail}*\n\n${eventLines(event)}`;
   await Promise.all(
     approverEmails.map(async (email) => {
@@ -93,7 +93,7 @@ export async function pushRejectionToSubmitter(
 ): Promise<void> {
   const space = await findThreadKeyByEmail("chat", submitterEmail);
   if (!space) return;
-  const editUrl = `${siteUrl()}/admin/events/${event.id}`;
+  const editUrl = `${siteUrl()}/portal/events/${event.id}`;
   const body = [
     `Reviewed by *${approverEmail}*`,
     "",
@@ -136,7 +136,7 @@ export async function pushAnnouncementSubmissionToApprovers(
   submitterEmail: string,
   approverEmails: string[],
 ): Promise<void> {
-  const editUrl = `${siteUrl()}/admin/announcements/${a.id}`;
+  const editUrl = `${siteUrl()}/portal/announcements/${a.id}`;
   const body = `Submitted by *${submitterEmail}*\n\n${announcementLines(a)}`;
   await Promise.all(
     approverEmails.map(async (email) => {
@@ -177,7 +177,7 @@ export async function pushAnnouncementRejectionToSubmitter(
 ): Promise<void> {
   const space = await findThreadKeyByEmail("chat", submitterEmail);
   if (!space) return;
-  const editUrl = `${siteUrl()}/admin/announcements/${a.id}`;
+  const editUrl = `${siteUrl()}/portal/announcements/${a.id}`;
   const body = [
     `Reviewed by *${approverEmail}*`,
     "",
