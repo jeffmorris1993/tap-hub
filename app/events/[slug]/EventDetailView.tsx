@@ -156,6 +156,30 @@ function AddToCalendarRow({
   );
 }
 
+/** Render description text with URLs as tappable links (e.g. Zoom links). */
+function LinkifiedText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#e7b84e", fontWeight: 700, wordBreak: "break-all" }}
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function segmentStyle(on: boolean): React.CSSProperties {
   return {
     flex: 1,
@@ -447,8 +471,8 @@ export function EventDetailView({
               )}
             </div>
             <AddToCalendarRow event={event} occurrence={occurrence} />
-            <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px" }}>
-              {event.description_long}
+            <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px", whiteSpace: "pre-line" }}>
+              <LinkifiedText text={event.description_long} />
             </p>
 
             {!hasExternalRegister && !hasInAppAttend && !hasInAppVolunteer ? (
