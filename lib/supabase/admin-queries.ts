@@ -121,7 +121,11 @@ export type SignupRow = {
   name: string;
   contact: string;
   role: "attendee" | "volunteer";
+  notes: string | null;
   occurrence_date: string | null;
+  /** StoredResponse[] jsonb — parse with parseStoredResponses, never cast. */
+  responses: unknown;
+  attendance: "yes" | "maybe" | null;
   created_at: string;
   events: { slug: string; title: string } | null;
 };
@@ -133,13 +137,16 @@ export type EventSignupRow = {
   role: "attendee" | "volunteer";
   notes: string | null;
   occurrence_date: string | null;
+  /** StoredResponse[] jsonb — parse with parseStoredResponses, never cast. */
+  responses: unknown;
+  attendance: "yes" | "maybe" | null;
   created_at: string;
 };
 
 export async function listSignupsForEvent(eventId: string): Promise<EventSignupRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("event_signups")
-    .select("id, name, contact, role, notes, occurrence_date, created_at")
+    .select("id, name, contact, role, notes, occurrence_date, responses, attendance, created_at")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -153,8 +160,8 @@ export async function listSignups(limit = 200, scope: string[] | null = null): P
     .from("event_signups")
     .select(
       scope
-        ? "id, event_id, name, contact, role, occurrence_date, created_at, events!inner(slug, title, category)"
-        : "id, event_id, name, contact, role, occurrence_date, created_at, events(slug, title)",
+        ? "id, event_id, name, contact, role, notes, occurrence_date, responses, attendance, created_at, events!inner(slug, title, category)"
+        : "id, event_id, name, contact, role, notes, occurrence_date, responses, attendance, created_at, events(slug, title)",
     );
   if (scope) q = q.in("events.category", scope);
   const { data, error } = await q
@@ -263,13 +270,16 @@ export type AdminEventRow = {
   recurrence_kind: RecurrenceKind;
   recurrence_byday: number | null;
   recurrence_until: string | null;
+  /** Custom signup questions jsonb — parse with parseSignupQuestions, never cast. */
+  signup_questions: unknown;
 };
 
 const ADMIN_EVENT_FIELDS =
   "id, slug, title, category, starts_at, ends_at, location, description_long, " +
   "cost, accepts_rsvps, allow_volunteers, registration_url, registration_label, " +
   "published, approval_status, approval_notes, " +
-  "submitted_by, reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until";
+  "submitted_by, reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until, " +
+  "signup_questions";
 
 export async function listAllEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
   let q = supabaseAdmin().from("events").select(ADMIN_EVENT_FIELDS);

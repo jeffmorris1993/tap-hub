@@ -7,6 +7,7 @@ import {
   listIgniteFamilies,
 } from "../../../../lib/supabase/admin-queries";
 import { requireLead, ministryScope, type PortalUser } from "../../../../lib/portal-auth";
+import { parseStoredResponses } from "../../../../lib/event-signup-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -577,6 +578,7 @@ function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> 
             <th style={thStyle}>Name</th>
             <th style={thStyle}>Contact</th>
             <th style={thStyle}>Role</th>
+            <th style={thStyle}>Details</th>
           </tr>
         </thead>
         <tbody>
@@ -607,20 +609,62 @@ function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> 
               <td style={{ ...tdStyle, fontWeight: 700 }}>{r.name}</td>
               <td style={tdStyle}>{r.contact}</td>
               <td style={tdStyle}>
-                <span
-                  style={{
-                    background: r.role === "volunteer" ? "rgba(78,184,107,.15)" : "rgba(78,141,231,.15)",
-                    color: r.role === "volunteer" ? "#7ed996" : "#7eaef0",
-                    fontSize: "10.5px",
-                    fontWeight: 800,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    padding: "4px 9px",
-                    borderRadius: "5px",
-                  }}
-                >
-                  {r.role}
+                <span style={{ display: "inline-flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      background: r.role === "volunteer" ? "rgba(78,184,107,.15)" : "rgba(78,141,231,.15)",
+                      color: r.role === "volunteer" ? "#7ed996" : "#7eaef0",
+                      fontSize: "10.5px",
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      padding: "4px 9px",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    {r.role}
+                  </span>
+                  {r.attendance && (
+                    <span
+                      style={{
+                        background: r.attendance === "yes" ? "rgba(78,184,107,.15)" : "rgba(231,184,78,.15)",
+                        color: r.attendance === "yes" ? "#7ed996" : "#e7b84e",
+                        fontSize: "10.5px",
+                        fontWeight: 800,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        padding: "4px 9px",
+                        borderRadius: "5px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {r.attendance === "yes" ? "For sure" : "Not sure"}
+                    </span>
+                  )}
                 </span>
+              </td>
+              <td style={{ ...tdStyle, maxWidth: "260px" }}>
+                {(() => {
+                  const responses = parseStoredResponses(r.responses);
+                  if (responses.length === 0 && !r.notes) {
+                    return <span style={{ color: "#6a738b" }}>—</span>;
+                  }
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      {responses.map((resp) => (
+                        <div key={resp.id} style={{ fontSize: "12px", color: "#9aa3b8", lineHeight: 1.4 }}>
+                          <span style={{ color: "#6a738b", fontWeight: 700 }}>{resp.label}:</span>{" "}
+                          <span style={{ color: "#cdd3e0" }}>
+                            {Array.isArray(resp.value) ? resp.value.join(", ") : resp.value}
+                          </span>
+                        </div>
+                      ))}
+                      {r.notes && (
+                        <div style={{ fontSize: "12px", color: "#9aa3b8", lineHeight: 1.4 }}>{r.notes}</div>
+                      )}
+                    </div>
+                  );
+                })()}
               </td>
             </tr>
           ))}

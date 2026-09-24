@@ -25,6 +25,12 @@ import {
   pushAnnouncementApprovalToSubmitter,
   pushAnnouncementRejectionToSubmitter,
 } from "../chat-notifications";
+import {
+  newFieldId,
+  parseSignupQuestions,
+  validateQuestionConfig,
+  type SignupQuestions,
+} from "../event-signup-forms";
 
 function slugify(s: string): string {
   return s
@@ -46,6 +52,48 @@ const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .describe("ISO date, e.g. 2026-04-05");
+
+/** One custom signup question as the model supplies it (ids are generated server-side). */
+const signupQuestionInput = z.object({
+  label: z.string().min(1).describe('The question wording, e.g. "How would you like to help?"'),
+  type: z
+    .enum(["text", "textarea", "select", "checkboxes"])
+    .describe("text = short answer, textarea = paragraph, select = choose one, checkboxes = choose many"),
+  required: z.boolean().default(false),
+  options: z
+    .array(z.string())
+    .optional()
+    .describe("The choices, for select/checkboxes only. At least one required for those types."),
+});
+
+type SignupQuestionInput = z.infer<typeof signupQuestionInput>;
+
+/**
+ * Converts the agent's question lists into the stored shape, generating
+ * stable ids. Returns the sanitized config, or an error message.
+ */
+function buildSignupQuestions(
+  attendee: SignupQuestionInput[] | undefined,
+  volunteer: SignupQuestionInput[] | undefined,
+): { ok: true; questions: SignupQuestions } | { ok: false; error: string } {
+  const ids: string[] = [];
+  const convert = (list: SignupQuestionInput[] | undefined) =>
+    (list ?? []).map((q) => {
+      const id = newFieldId(q.label, ids);
+      ids.push(id);
+      return {
+        id,
+        label: q.label,
+        type: q.type,
+        required: q.required ?? false,
+        ...(q.options ? { options: q.options } : {}),
+      };
+    });
+  const raw = { attendee: convert(attendee), volunteer: convert(volunteer) };
+  const problem = validateQuestionConfig(raw);
+  if (problem) return { ok: false, error: problem };
+  return { ok: true, questions: parseSignupQuestions(raw) };
+}
 
 async function snapshotById(id: string): Promise<EventSnapshot | null> {
   const { data, error } = await supabaseAdmin()
@@ -145,6 +193,18 @@ export function buildAgentTools(ctx: AgentContext) {
           .describe(
             "Inclusive last date of the recurrence (e.g. 2026-07-29 for a Jul 24–29 convention). Required for daily/weekdays and optional for weekly/biweekly/monthly.",
           ),
+        attendeeQuestions: z
+          .array(signupQuestionInput)
+          .optional()
+          .describe(
+            "Custom questions for the ATTENDEE signup form. Omit to keep the standard form (name, contact, notes). The form already asks 'attending for sure?' automatically — never duplicate that.",
+          ),
+        volunteerQuestions: z
+          .array(signupQuestionInput)
+          .optional()
+          .describe(
+            "Custom questions for the VOLUNTEER signup form, e.g. how someone wants to help. Omit to keep the standard form.",
+          ),
         submitForApproval: z.boolean().default(true).describe("Submit for review now? Defaults to true."),
         slug: z.string().optional(),
       }),
@@ -160,6 +220,9 @@ export function buildAgentTools(ctx: AgentContext) {
         const slug = slugify(input.slug || input.title) || `event-${Date.now()}`;
         const wantsRecurrenceByday =
           input.recurrenceKind === "weekly" || input.recurrenceKind === "biweekly";
+
+        const questionsResult = buildSignupQuestions(input.attendeeQuestions, input.volunteerQuestions);
+        if (!questionsResult.ok) return { ok: false, error: questionsResult.error };
 
         // Approvers' own events skip the queue and publish directly. The
         // submitForApproval input still toggles "publish now vs. save as
@@ -185,6 +248,7 @@ export function buildAgentTools(ctx: AgentContext) {
           recurrence_kind: input.recurrenceKind,
           recurrence_byday: wantsRecurrenceByday ? input.recurrenceByday ?? startsAt.getDay() : null,
           recurrence_until: input.recurrenceUntil ?? null,
+          signup_questions: questionsResult.questions,
           approval_status: !wantsToPublishOrSubmit
             ? "draft"
             : isSenderApprover
@@ -239,6 +303,51 @@ export function buildAgentTools(ctx: AgentContext) {
         }
 
         return { ok: true, id, slug, summary };
+      },
+    }),
+
+    set_event_signup_questions: tool({
+      description:
+        "REPLACE the custom signup questions on an EXISTING event, found by its slug. " +
+        "Use when staff want the RSVP or volunteer form to ask something specific (e.g. 'ask volunteers if they'll bring a decorated trunk, donate candy, or help another way'). " +
+        "This replaces the event's whole question set — include every question the event should keep. " +
+        "Pass empty arrays to reset a form back to the standard name/contact/notes fields. " +
+        "The attend form already asks 'attending for sure?' automatically — never add a duplicate question for that.",
+      inputSchema: z.object({
+        slug: z.string().min(1).describe("The event's URL slug, e.g. 'harvest-on-the-lot'."),
+        attendeeQuestions: z
+          .array(signupQuestionInput)
+          .default([])
+          .describe("Custom questions for the attendee signup form. Empty = standard form."),
+        volunteerQuestions: z
+          .array(signupQuestionInput)
+          .default([])
+          .describe("Custom questions for the volunteer signup form. Empty = standard form."),
+      }),
+      execute: async (input) => {
+        const questionsResult = buildSignupQuestions(input.attendeeQuestions, input.volunteerQuestions);
+        if (!questionsResult.ok) return { ok: false, error: questionsResult.error };
+
+        const { data, error } = await supabaseAdmin()
+          .from("events")
+          .update({ signup_questions: questionsResult.questions })
+          .eq("slug", input.slug)
+          .select("id, slug, title")
+          .limit(1);
+        if (error) return { ok: false, error: error.message };
+        const row = data?.[0];
+        if (!row) return { ok: false, error: `No event found with slug "${input.slug}".` };
+
+        const counts = [
+          questionsResult.questions.attendee.length &&
+            `${questionsResult.questions.attendee.length} attendee question(s)`,
+          questionsResult.questions.volunteer.length &&
+            `${questionsResult.questions.volunteer.length} volunteer question(s)`,
+        ].filter(Boolean);
+        const summary = counts.length
+          ? `Updated "${row.title}" with ${counts.join(" and ")}.`
+          : `Reset "${row.title}" to the standard signup form.`;
+        return { ok: true, id: row.id, slug: row.slug, summary };
       },
     }),
 

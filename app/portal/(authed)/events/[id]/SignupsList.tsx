@@ -1,5 +1,6 @@
 import { fmtDateTime } from "../../../../../lib/format";
 import type { EventSignupRow } from "../../../../../lib/supabase/admin-queries";
+import { parseStoredResponses } from "../../../../../lib/event-signup-forms";
 
 function looksLikeEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -17,6 +18,27 @@ function contactHref(contact: string): string | null {
   return null;
 }
 
+function attendancePill(attendance: "yes" | "maybe") {
+  const sure = attendance === "yes";
+  return (
+    <span
+      style={{
+        background: sure ? "rgba(78,184,107,.16)" : "rgba(231,184,78,.16)",
+        color: sure ? "#7ed996" : "#e7b84e",
+        fontSize: "10px",
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        padding: "2px 7px",
+        borderRadius: "5px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {sure ? "For sure" : "Not sure"}
+    </span>
+  );
+}
+
 function Section({
   title,
   rows,
@@ -26,6 +48,9 @@ function Section({
   rows: EventSignupRow[];
   emptyLabel: string;
 }) {
+  // "3 for sure · 1 not sure" next to the count, once any attendance data exists.
+  const sure = rows.filter((s) => s.attendance === "yes").length;
+  const unsure = rows.filter((s) => s.attendance === "maybe").length;
   return (
     <div>
       <div
@@ -48,6 +73,7 @@ function Section({
           {title}
         </h3>
         <span style={{ color: "#6a738b", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em" }}>
+          {sure + unsure > 0 ? `${sure} for sure · ${unsure} not sure · ` : ""}
           {rows.length}
         </span>
       </div>
@@ -70,6 +96,7 @@ function Section({
         <ul style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {rows.map((s) => {
             const href = contactHref(s.contact);
+            const responses = parseStoredResponses(s.responses);
             return (
               <li
                 key={s.id}
@@ -84,7 +111,10 @@ function Section({
                 }}
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: "13.5px", color: "#f4f1ea" }}>{s.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 800, fontSize: "13.5px", color: "#f4f1ea" }}>{s.name}</span>
+                    {s.attendance && attendancePill(s.attendance)}
+                  </div>
                   <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "2px" }}>
                     {href ? (
                       <a href={href} style={{ color: "#cdd3e0", textDecoration: "none" }}>
@@ -109,6 +139,39 @@ function Section({
                       }}
                     >
                       {s.notes}
+                    </div>
+                  )}
+                  {responses.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: "8px",
+                        padding: "8px 10px",
+                        background: "#121a2e",
+                        border: "1px solid rgba(244,241,234,.07)",
+                        borderRadius: "8px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "7px",
+                      }}
+                    >
+                      {responses.map((r) => (
+                        <div key={r.id}>
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 800,
+                              letterSpacing: "0.07em",
+                              textTransform: "uppercase",
+                              color: "#6a738b",
+                            }}
+                          >
+                            {r.label}
+                          </div>
+                          <div style={{ fontSize: "12.5px", color: "#cdd3e0", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
+                            {Array.isArray(r.value) ? r.value.join(", ") : r.value}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -165,11 +228,14 @@ export function SignupsList({
   acceptsRsvps,
   allowVolunteers,
   isRecurring = false,
+  eventId,
 }: {
   signups: EventSignupRow[];
   acceptsRsvps: boolean;
   allowVolunteers: boolean;
   isRecurring?: boolean;
+  /** When set (and there are signups), the header shows an Export CSV link. */
+  eventId?: string;
 }) {
   // Recurring events group signups per occurrence date; one-off events keep
   // a single flat block (their signups all carry a null occurrence_date).
@@ -207,8 +273,28 @@ export function SignupsList({
         >
           Signups
         </h2>
-        <span style={{ color: "#9aa3b8", fontSize: "12px", fontWeight: 700 }}>
-          {signups.length} total
+        <span style={{ display: "flex", alignItems: "baseline", gap: "14px" }}>
+          {eventId && signups.length > 0 && (
+            <a
+              href={`/portal/events/${eventId}/export`}
+              style={{
+                color: "#e7b84e",
+                fontSize: "11.5px",
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                textDecoration: "none",
+                border: "1px solid rgba(231,184,78,.35)",
+                borderRadius: "8px",
+                padding: "6px 12px",
+              }}
+            >
+              Export CSV
+            </a>
+          )}
+          <span style={{ color: "#9aa3b8", fontSize: "12px", fontWeight: 700 }}>
+            {signups.length} total
+          </span>
         </span>
       </div>
 

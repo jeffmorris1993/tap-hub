@@ -8,6 +8,13 @@ import {
   occurrenceOnDate,
 } from "../../../lib/event-calendar";
 import type { RecurringEventFields } from "../../../lib/events-occurrence";
+import {
+  buildStoredResponses,
+  parseSignupQuestions,
+  questionsForRole,
+  validateAnswers,
+  type SignupAnswers,
+} from "../../../lib/event-signup-forms";
 
 export type EventSignupInput = {
   slug: string;
@@ -15,6 +22,10 @@ export type EventSignupInput = {
   contact: string;
   role: "attendee" | "volunteer";
   notes?: string;
+  /** Attendees only: "attending for sure?" — yes | maybe. */
+  attendance?: string;
+  /** Answers to the event's custom questions, keyed by field id. */
+  responses?: SignupAnswers;
   /** Detroit calendar date (YYYY-MM-DD) of the occurrence being joined. */
   occurrenceDate?: string;
 };
@@ -30,7 +41,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
     .from("events")
-    .select("id, allow_volunteers, starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
+    .select("id, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
     .eq("slug", input.slug)
     .limit(1);
   if (lookupError) {
@@ -42,6 +53,26 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   if (input.role === "volunteer" && !row.allow_volunteers) {
     return { ok: false, error: "This event isn't accepting volunteers." };
   }
+
+  // Attendees say whether they're coming for sure; volunteers never do.
+  let attendance: "yes" | "maybe" | null = null;
+  if (input.role === "attendee") {
+    if (input.attendance !== "yes" && input.attendance !== "maybe") {
+      return { ok: false, error: "Let us know if you're attending for sure." };
+    }
+    attendance = input.attendance;
+  }
+
+  // Custom questions replace the generic notes field for their role. Answers
+  // are validated against the event's current schema — choice values are
+  // whitelisted, unknown keys dropped, labels snapshotted from the schema.
+  const fields = questionsForRole(parseSignupQuestions(row.signup_questions), input.role);
+  if (fields.length > 0) {
+    const errors = validateAnswers(fields, input.responses ?? {});
+    const first = Object.values(errors)[0];
+    if (first) return { ok: false, error: first };
+  }
+  const responses = fields.length > 0 ? buildStoredResponses(fields, input.responses ?? {}) : null;
 
   // Resolve which date this signup is for. The client's date is never
   // trusted: it must be a genuine occurrence of the series, and upcoming.
@@ -76,13 +107,15 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     // No session cookies (or auth unavailable) — anonymous signup.
   }
 
-  const notes = input.notes?.trim();
+  const notes = fields.length > 0 ? null : input.notes?.trim() || null;
   const { error } = await sb.from("event_signups").insert({
     event_id: row.id,
     name: input.name.trim(),
     contact: input.contact.trim(),
     role: input.role,
-    notes: notes ? notes : null,
+    notes,
+    attendance,
+    responses: responses && responses.length > 0 ? responses : null,
     occurrence_date: occurrenceDate,
     user_id: userId,
   });

@@ -15,6 +15,8 @@ import {
 import { useToast } from "../Toaster";
 import type { RecurrenceKind } from "../../../../lib/events-occurrence";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { SignupQuestionsEditor } from "./SignupQuestionsEditor";
+import { parseSignupQuestions, type SignupQuestions } from "../../../../lib/event-signup-forms";
 
 const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
 const RECURRENCE_KINDS = [
@@ -99,6 +101,7 @@ type Initial = {
   recurrence_kind?: RecurrenceKind;
   recurrence_byday?: number | null;
   recurrence_until?: string | null;
+  signup_questions?: unknown;
 };
 
 export function EventForm({
@@ -146,6 +149,9 @@ export function EventForm({
   );
   const [recurrenceByday, setRecurrenceByday] = useState<number | null>(initial?.recurrence_byday ?? null);
   const [recurrenceUntil, setRecurrenceUntil] = useState<string>(initial?.recurrence_until ?? "");
+  const [signupQuestions, setSignupQuestions] = useState<SignupQuestions>(() =>
+    parseSignupQuestions(initial?.signup_questions),
+  );
 
   const status = (initial?.approval_status ?? "draft") as ApprovalStatus;
   const statusStyle = STATUS_STYLES[status];
@@ -170,6 +176,7 @@ export function EventForm({
       recurrence_kind: recurrenceKind,
       recurrence_byday: recurrenceKind === "weekly" || recurrenceKind === "biweekly" ? recurrenceByday : null,
       recurrence_until: recurrenceUntil || null,
+      signup_questions: signupQuestions,
     };
   }
 
@@ -511,6 +518,15 @@ export function EventForm({
         />
         Allow volunteer signups
       </label>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <SignupQuestionsEditor
+          value={signupQuestions}
+          onChange={setSignupQuestions}
+          showAttendee={acceptsRsvps && !registrationUrl.trim()}
+          showVolunteer={allowVolunteers}
+        />
+      </div>
 
       {error && (
         <div style={{ gridColumn: "1 / -1", color: "#ff8a8a", fontSize: "13px", fontWeight: 700 }}>{error}</div>

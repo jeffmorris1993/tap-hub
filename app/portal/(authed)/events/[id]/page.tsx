@@ -51,6 +51,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
           acceptsRsvps={event.accepts_rsvps}
           allowVolunteers={event.allow_volunteers}
           isRecurring={event.recurrence_kind !== "none"}
+          eventId={event.id}
         />
       ) : (
         <section

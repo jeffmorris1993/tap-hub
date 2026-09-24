@@ -17,6 +17,11 @@ import {
   pushApprovalToSubmitter,
   pushRejectionToSubmitter,
 } from "../../../../lib/chat-notifications";
+import {
+  parseSignupQuestions,
+  validateQuestionConfig,
+  type SignupQuestions,
+} from "../../../../lib/event-signup-forms";
 
 export type EventFormInput = {
   id?: string;
@@ -36,6 +41,7 @@ export type EventFormInput = {
   recurrence_kind: RecurrenceKind;
   recurrence_byday: number | null;
   recurrence_until: string | null;
+  signup_questions?: SignupQuestions;
 };
 
 export type EventActionResult = { ok: true; id: string } | { ok: false; error: string };
@@ -111,6 +117,13 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
   if (!location) return { ok: false, error: "Location is required." };
   const ends_at = toIso(input.ends_at_local);
 
+  // Custom signup questions: validate the RAW client value (so blank labels
+  // and optionless choice questions surface as save errors instead of being
+  // silently dropped), then store only the sanitized parse.
+  const questionError = validateQuestionConfig(input.signup_questions);
+  if (questionError) return { ok: false, error: questionError };
+  const signup_questions = parseSignupQuestions(input.signup_questions);
+
   const payload = {
     slug: slugify(slug),
     title,
@@ -129,6 +142,7 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
       ? input.recurrence_byday
       : null,
     recurrence_until: input.recurrence_until || null,
+    signup_questions,
   };
 
   if (input.id) {

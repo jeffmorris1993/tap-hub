@@ -6,6 +6,15 @@ import { PhoneShell } from "../../../components/PhoneShell";
 import { BackBar } from "../../../components/BackBar";
 import { submitEventSignup, type EventSignupResult } from "./actions";
 import type { DisplayEvent } from "../../../lib/events-display";
+import {
+  parseSignupQuestions,
+  questionsForRole,
+  validateAnswers,
+  type Attendance,
+  type FieldErrors,
+  type SignupAnswers,
+  type SignupField,
+} from "../../../lib/event-signup-forms";
 import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
 import { googleCalendarUrl, outlookCalendarUrl } from "../../../lib/event-calendar";
 
@@ -180,6 +189,127 @@ function LinkifiedText({ text }: { text: string }) {
   );
 }
 
+const fieldLabelStyle: React.CSSProperties = {
+  fontSize: "11.5px",
+  fontWeight: 800,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "#cdd3e0",
+  marginBottom: "9px",
+};
+
+const fieldErrorStyle: React.CSSProperties = {
+  color: "#ff8a8a",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "-6px 0 12px",
+};
+
+const choiceRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "11px",
+  padding: "12px 14px",
+  border: "1.5px solid rgba(244,241,234,.14)",
+  borderRadius: "11px",
+  background: "#0b101c",
+  color: "#f4f1ea",
+  fontSize: "14px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+/** One custom question, rendered by type. Errors show inline below. */
+function QuestionField({
+  field,
+  value,
+  error,
+  onChange,
+}: {
+  field: SignupField;
+  value: string | string[] | undefined;
+  error: string | undefined;
+  onChange: (value: string | string[]) => void;
+}) {
+  const label = (
+    <div style={fieldLabelStyle}>
+      {field.label}
+      {field.required && <span style={{ color: "#e7b84e", marginLeft: "4px" }}>*</span>}
+    </div>
+  );
+  const errorLine = error ? <div style={fieldErrorStyle}>{error}</div> : null;
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        {label}
+        <textarea
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          style={{ ...inputStyle, marginBottom: "12px", resize: "vertical", minHeight: "78px" }}
+        />
+        {errorLine}
+      </div>
+    );
+  }
+  if (field.type === "select" || field.type === "checkboxes") {
+    const multi = field.type === "checkboxes";
+    const selected = multi
+      ? new Set(Array.isArray(value) ? value : [])
+      : new Set(typeof value === "string" && value ? [value] : []);
+    return (
+      <div>
+        {label}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+          {(field.options ?? []).map((option) => {
+            const on = selected.has(option);
+            return (
+              <label
+                key={option}
+                style={{
+                  ...choiceRowStyle,
+                  borderColor: on ? "#e7b84e" : "rgba(244,241,234,.14)",
+                }}
+              >
+                <input
+                  type={multi ? "checkbox" : "radio"}
+                  name={field.id}
+                  checked={on}
+                  onChange={() => {
+                    if (multi) {
+                      const next = new Set(selected);
+                      if (next.has(option)) next.delete(option);
+                      else next.add(option);
+                      onChange([...next]);
+                    } else {
+                      onChange(option);
+                    }
+                  }}
+                  style={{ accentColor: "#e7b84e", width: "16px", height: "16px", flexShrink: 0 }}
+                />
+                {option}
+              </label>
+            );
+          })}
+        </div>
+        {errorLine}
+      </div>
+    );
+  }
+  return (
+    <div>
+      {label}
+      <input
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ ...inputStyle, marginBottom: "12px" }}
+      />
+      {errorLine}
+    </div>
+  );
+}
+
 function segmentStyle(on: boolean): React.CSSProperties {
   return {
     flex: 1,
@@ -223,17 +353,55 @@ export function EventDetailView({
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [notes, setNotes] = useState("");
+  const [attendance, setAttendance] = useState<Attendance | null>(null);
+  const [answers, setAnswers] = useState<SignupAnswers>({});
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [result, setResult] = useState<EventSignupResult | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Custom questions for the active role. When present they replace the
+  // generic notes textarea; when absent the form is exactly the old default.
+  const signupQuestions = parseSignupQuestions(event.signup_questions);
+  const customFields = questionsForRole(signupQuestions, role);
+  const hasCustomFields = customFields.length > 0;
+
+  function switchRole(next: "attendee" | "volunteer") {
+    setRole(next);
+    setFieldErrors({});
+    setResult(null);
+  }
+
+  function setAnswer(id: string, value: string | string[]) {
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
   function onSubmit() {
+    // Pre-flight the parts the server would bounce anyway, so errors land
+    // inline next to the field instead of as one message at the bottom.
+    const errors: FieldErrors = hasCustomFields ? validateAnswers(customFields, answers) : {};
+    if (role === "attendee" && !attendance) {
+      errors.__attendance = "Let us know if you're attending for sure.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
     startTransition(async () => {
       const r = await submitEventSignup({
         slug: event.slug,
         name,
         contact,
         role,
-        notes,
+        notes: hasCustomFields ? undefined : notes,
+        attendance: role === "attendee" ? (attendance ?? undefined) : undefined,
+        responses: hasCustomFields ? answers : undefined,
         occurrenceDate: occurrence?.date,
       });
       setResult(r);
@@ -563,10 +731,10 @@ export function EventDetailView({
                       I&apos;d like to —
                     </div>
                     <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-                      <button type="button" onClick={() => setRole("attendee")} style={segmentStyle(role === "attendee")}>
+                      <button type="button" onClick={() => switchRole("attendee")} style={segmentStyle(role === "attendee")}>
                         Attend
                       </button>
-                      <button type="button" onClick={() => setRole("volunteer")} style={segmentStyle(role === "volunteer")}>
+                      <button type="button" onClick={() => switchRole("volunteer")} style={segmentStyle(role === "volunteer")}>
                         Volunteer
                       </button>
                     </div>
@@ -633,17 +801,73 @@ export function EventDetailView({
                       placeholder="Email or phone"
                       style={{ ...inputStyle, marginBottom: "12px" }}
                     />
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder={
-                        role === "volunteer"
-                          ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
-                          : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
-                      }
-                      rows={3}
-                      style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
-                    />
+                    {role === "attendee" && (
+                      <div style={{ marginBottom: "12px" }}>
+                        <div style={fieldLabelStyle}>Are you attending for sure?</div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendance("yes");
+                              setFieldErrors((prev) => {
+                                if (!prev.__attendance) return prev;
+                                const next = { ...prev };
+                                delete next.__attendance;
+                                return next;
+                              });
+                            }}
+                            style={segmentStyle(attendance === "yes")}
+                          >
+                            Yes, for sure
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendance("maybe");
+                              setFieldErrors((prev) => {
+                                if (!prev.__attendance) return prev;
+                                const next = { ...prev };
+                                delete next.__attendance;
+                                return next;
+                              });
+                            }}
+                            style={segmentStyle(attendance === "maybe")}
+                          >
+                            Not sure yet
+                          </button>
+                        </div>
+                        {fieldErrors.__attendance && (
+                          <div style={{ ...fieldErrorStyle, margin: "8px 0 0" }}>
+                            {fieldErrors.__attendance}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {hasCustomFields ? (
+                      <div style={{ marginBottom: "6px" }}>
+                        {customFields.map((field) => (
+                          <QuestionField
+                            key={field.id}
+                            field={field}
+                            value={answers[field.id]}
+                            error={fieldErrors[field.id]}
+                            onChange={(value) => setAnswer(field.id, value)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder={
+                          role === "volunteer"
+                            ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
+                            : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
+                        }
+                        rows={3}
+                        style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
+                      />
+                    )}
                     {result && !result.ok && (
                       <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
                         {result.error}
