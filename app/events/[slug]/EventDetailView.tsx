@@ -347,36 +347,61 @@ export function EventDetailView({
   const hasInAppVolunteer = event.allow_volunteers;
   const showToggle = hasInAppAttend && hasInAppVolunteer;
 
-  const [role, setRole] = useState<"attendee" | "volunteer">(
-    hasInAppAttend ? "attendee" : "volunteer",
+  // Both chips can be on at once — attending and volunteering is one
+  // submission, not two visits to the page.
+  const [roles, setRoles] = useState<("attendee" | "volunteer")[]>(
+    hasInAppAttend ? ["attendee"] : ["volunteer"],
   );
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [notes, setNotes] = useState("");
   const [attendance, setAttendance] = useState<Attendance | null>(null);
-  const [answers, setAnswers] = useState<SignupAnswers>({});
+  const [attendeeAnswers, setAttendeeAnswers] = useState<SignupAnswers>({});
+  const [volunteerAnswers, setVolunteerAnswers] = useState<SignupAnswers>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [result, setResult] = useState<EventSignupResult | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Custom questions for the active role. When present they replace the
-  // generic notes textarea; when absent the form is exactly the old default.
-  const signupQuestions = parseSignupQuestions(event.signup_questions);
-  const customFields = questionsForRole(signupQuestions, role);
-  const hasCustomFields = customFields.length > 0;
+  const attending = roles.includes("attendee") && hasInAppAttend;
+  const volunteering = roles.includes("volunteer") && hasInAppVolunteer;
 
-  function switchRole(next: "attendee" | "volunteer") {
-    setRole(next);
+  // Custom questions per role. When a role has them they replace the generic
+  // notes textarea for that role; when absent the form is the old default.
+  const signupQuestions = parseSignupQuestions(event.signup_questions);
+  const attendeeFields = questionsForRole(signupQuestions, "attendee");
+  const volunteerFields = questionsForRole(signupQuestions, "volunteer");
+
+  // The notes box covers whichever selected roles have no custom questions.
+  const notesForAttend = attending && attendeeFields.length === 0;
+  const notesForVolunteer = volunteering && volunteerFields.length === 0;
+  const showNotes = notesForAttend || notesForVolunteer;
+  const notesPlaceholder = notesForVolunteer && !notesForAttend
+    ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
+    : notesForAttend && !notesForVolunteer
+      ? "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
+      : "Anything we should know? — optional";
+
+  function toggleRole(role: "attendee" | "volunteer") {
+    setRoles((prev) => {
+      if (prev.includes(role)) {
+        // Always keep at least one selected — tapping the only active chip
+        // is a no-op rather than an empty form.
+        return prev.length > 1 ? prev.filter((r) => r !== role) : prev;
+      }
+      return [...prev, role];
+    });
     setFieldErrors({});
     setResult(null);
   }
 
-  function setAnswer(id: string, value: string | string[]) {
-    setAnswers((prev) => ({ ...prev, [id]: value }));
+  function setAnswer(role: "attendee" | "volunteer", id: string, value: string | string[]) {
+    const set = role === "attendee" ? setAttendeeAnswers : setVolunteerAnswers;
+    set((prev) => ({ ...prev, [id]: value }));
+    const key = `${role}:${id}`;
     setFieldErrors((prev) => {
-      if (!prev[id]) return prev;
+      if (!prev[key]) return prev;
       const next = { ...prev };
-      delete next[id];
+      delete next[key];
       return next;
     });
   }
@@ -384,24 +409,37 @@ export function EventDetailView({
   function onSubmit() {
     // Pre-flight the parts the server would bounce anyway, so errors land
     // inline next to the field instead of as one message at the bottom.
-    const errors: FieldErrors = hasCustomFields ? validateAnswers(customFields, answers) : {};
-    if (role === "attendee" && !attendance) {
-      errors.__attendance = "Let us know if you're attending for sure.";
+    const errors: FieldErrors = {};
+    if (attending) {
+      if (!attendance) errors.__attendance = "Let us know if you're attending for sure.";
+      for (const [id, msg] of Object.entries(validateAnswers(attendeeFields, attendeeAnswers))) {
+        errors[`attendee:${id}`] = msg;
+      }
+    }
+    if (volunteering) {
+      for (const [id, msg] of Object.entries(validateAnswers(volunteerFields, volunteerAnswers))) {
+        errors[`volunteer:${id}`] = msg;
+      }
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
     setFieldErrors({});
+    const effectiveRoles = [
+      ...(attending ? (["attendee"] as const) : []),
+      ...(volunteering ? (["volunteer"] as const) : []),
+    ];
     startTransition(async () => {
       const r = await submitEventSignup({
         slug: event.slug,
         name,
         contact,
-        role,
-        notes: hasCustomFields ? undefined : notes,
-        attendance: role === "attendee" ? (attendance ?? undefined) : undefined,
-        responses: hasCustomFields ? answers : undefined,
+        roles: effectiveRoles,
+        notes: showNotes ? notes : undefined,
+        attendance: attending ? (attendance ?? undefined) : undefined,
+        attendeeResponses: attending && attendeeFields.length > 0 ? attendeeAnswers : undefined,
+        volunteerResponses: volunteering && volunteerFields.length > 0 ? volunteerAnswers : undefined,
         occurrenceDate: occurrence?.date,
       });
       setResult(r);
@@ -411,10 +449,14 @@ export function EventDetailView({
   if (result?.ok) {
     const forDate =
       event.recurrence_kind !== "none" && occurrence ? ` on ${occurrence.label}` : "";
+    const didAttend = result.roles.includes("attendee");
+    const didVolunteer = result.roles.includes("volunteer");
     const doneMsg =
-      result.role === "volunteer"
-        ? `Thank you for volunteering for ${event.title}${forDate}! Our team will follow up with details and your role.`
-        : `We've saved your spot for ${event.title}${forDate}. Watch for a reminder and any updates.`;
+      didAttend && didVolunteer
+        ? `We've saved your spot for ${event.title}${forDate} — and thank you for volunteering! Our team will follow up with details and your role.`
+        : didVolunteer
+          ? `Thank you for volunteering for ${event.title}${forDate}! Our team will follow up with details and your role.`
+          : `We've saved your spot for ${event.title}${forDate}. Watch for a reminder and any updates.`;
     return (
       <PhoneShell>
         <div className="th-slide" style={{ minHeight: "100vh" }}>
@@ -713,9 +755,9 @@ export function EventDetailView({
                   </div>
                 )}
 
-                {/* 2) In-app forms — Attend, Volunteer, or both via
-                       toggle. The toggle is only needed when both
-                       compete for the same form fields. */}
+                {/* 2) In-app forms — Attend, Volunteer, or BOTH. The chips
+                       multi-select: attending and volunteering is one
+                       combined form and one submit, not two visits. */}
                 {showToggle && (
                   <>
                     <div
@@ -730,13 +772,16 @@ export function EventDetailView({
                     >
                       I&apos;d like to —
                     </div>
-                    <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-                      <button type="button" onClick={() => switchRole("attendee")} style={segmentStyle(role === "attendee")}>
-                        Attend
+                    <div style={{ display: "flex", gap: "10px", marginBottom: "6px" }}>
+                      <button type="button" onClick={() => toggleRole("attendee")} style={segmentStyle(attending)}>
+                        {attending ? "✓ " : ""}Attend
                       </button>
-                      <button type="button" onClick={() => switchRole("volunteer")} style={segmentStyle(role === "volunteer")}>
-                        Volunteer
+                      <button type="button" onClick={() => toggleRole("volunteer")} style={segmentStyle(volunteering)}>
+                        {volunteering ? "✓ " : ""}Volunteer
                       </button>
+                    </div>
+                    <div style={{ color: "#9aa3b8", fontSize: "12px", fontWeight: 600, marginBottom: "16px" }}>
+                      Doing both? Tap both — one signup covers it.
                     </div>
                   </>
                 )}
@@ -801,7 +846,7 @@ export function EventDetailView({
                       placeholder="Email or phone"
                       style={{ ...inputStyle, marginBottom: "12px" }}
                     />
-                    {role === "attendee" && (
+                    {attending && (
                       <div style={{ marginBottom: "12px" }}>
                         <div style={fieldLabelStyle}>Are you attending for sure?</div>
                         <div style={{ display: "flex", gap: "10px" }}>
@@ -843,27 +888,51 @@ export function EventDetailView({
                         )}
                       </div>
                     )}
-                    {hasCustomFields ? (
+                    {attending && attendeeFields.length > 0 && (
                       <div style={{ marginBottom: "6px" }}>
-                        {customFields.map((field) => (
+                        {attendeeFields.map((field) => (
                           <QuestionField
                             key={field.id}
                             field={field}
-                            value={answers[field.id]}
-                            error={fieldErrors[field.id]}
-                            onChange={(value) => setAnswer(field.id, value)}
+                            value={attendeeAnswers[field.id]}
+                            error={fieldErrors[`attendee:${field.id}`]}
+                            onChange={(value) => setAnswer("attendee", field.id, value)}
                           />
                         ))}
                       </div>
-                    ) : (
+                    )}
+                    {volunteering && volunteerFields.length > 0 && (
+                      <div style={{ marginBottom: "6px" }}>
+                        {attending && (
+                          <div
+                            style={{
+                              fontSize: "11.5px",
+                              fontWeight: 800,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              color: "#e7b84e",
+                              margin: "6px 0 10px",
+                            }}
+                          >
+                            Volunteering
+                          </div>
+                        )}
+                        {volunteerFields.map((field) => (
+                          <QuestionField
+                            key={field.id}
+                            field={field}
+                            value={volunteerAnswers[field.id]}
+                            error={fieldErrors[`volunteer:${field.id}`]}
+                            onChange={(value) => setAnswer("volunteer", field.id, value)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {showNotes && (
                       <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder={
-                          role === "volunteer"
-                            ? "Anything we should know? (which dates you're available, role you'd prefer, etc.) — optional"
-                            : "Anything we should know? (dietary needs, kids' ages, etc.) — optional"
-                        }
+                        placeholder={notesPlaceholder}
                         rows={3}
                         style={{ ...inputStyle, marginBottom: "18px", resize: "vertical", minHeight: "78px" }}
                       />
@@ -892,7 +961,13 @@ export function EventDetailView({
                         opacity: pending ? 0.7 : 1,
                       }}
                     >
-                      {pending ? "Sending…" : role === "volunteer" ? "Sign Up to Volunteer" : "Sign Up to Attend"}
+                      {pending
+                        ? "Sending…"
+                        : attending && volunteering
+                          ? "Sign Up to Attend & Volunteer"
+                          : volunteering
+                            ? "Sign Up to Volunteer"
+                            : "Sign Up to Attend"}
                     </button>
                   </>
                 )}

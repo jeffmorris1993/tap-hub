@@ -14,29 +14,47 @@ import {
   questionsForRole,
   validateAnswers,
   type SignupAnswers,
+  type SignupRole,
 } from "../../../lib/event-signup-forms";
 
 export type EventSignupInput = {
   slug: string;
   name: string;
   contact: string;
-  role: "attendee" | "volunteer";
+  /** One or both roles — a person can attend AND volunteer in one submission. */
+  roles?: SignupRole[];
+  /** Legacy single-role clients (pre-combined-flow tabs still open). */
+  role?: SignupRole;
   notes?: string;
-  /** Attendees only: "attending for sure?" — yes | maybe. */
+  /** Required when attending: "attending for sure?" — yes | maybe. */
   attendance?: string;
-  /** Answers to the event's custom questions, keyed by field id. */
+  /** Answers to the attendee form's custom questions, keyed by field id. */
+  attendeeResponses?: SignupAnswers;
+  /** Answers to the volunteer form's custom questions, keyed by field id. */
+  volunteerResponses?: SignupAnswers;
+  /** Legacy answers for the single `role`. */
   responses?: SignupAnswers;
   /** Detroit calendar date (YYYY-MM-DD) of the occurrence being joined. */
   occurrenceDate?: string;
 };
 
 export type EventSignupResult =
-  | { ok: true; role: "attendee" | "volunteer" }
+  | { ok: true; roles: SignupRole[] }
   | { ok: false; error: string };
 
 export async function submitEventSignup(input: EventSignupInput): Promise<EventSignupResult> {
   if (!input.name?.trim()) return { ok: false, error: "Please share your name." };
   if (!input.contact?.trim()) return { ok: false, error: "Email or phone helps us follow up." };
+
+  // Accept the new multi-role shape and the legacy single `role`, dropping
+  // anything that isn't a real role.
+  const roles: SignupRole[] = [];
+  for (const r of input.roles ?? (input.role ? [input.role] : [])) {
+    if ((r === "attendee" || r === "volunteer") && !roles.includes(r)) roles.push(r);
+  }
+  if (roles.length === 0) {
+    return { ok: false, error: "Pick whether you're attending, volunteering, or both." };
+  }
 
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
@@ -50,29 +68,18 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   }
   const row = event?.[0];
   if (!row) return { ok: false, error: "That event no longer exists." };
-  if (input.role === "volunteer" && !row.allow_volunteers) {
+  if (roles.includes("volunteer") && !row.allow_volunteers) {
     return { ok: false, error: "This event isn't accepting volunteers." };
   }
 
-  // Attendees say whether they're coming for sure; volunteers never do.
+  // Attendees say whether they're coming for sure; volunteer rows never do.
   let attendance: "yes" | "maybe" | null = null;
-  if (input.role === "attendee") {
+  if (roles.includes("attendee")) {
     if (input.attendance !== "yes" && input.attendance !== "maybe") {
       return { ok: false, error: "Let us know if you're attending for sure." };
     }
     attendance = input.attendance;
   }
-
-  // Custom questions replace the generic notes field for their role. Answers
-  // are validated against the event's current schema — choice values are
-  // whitelisted, unknown keys dropped, labels snapshotted from the schema.
-  const fields = questionsForRole(parseSignupQuestions(row.signup_questions), input.role);
-  if (fields.length > 0) {
-    const errors = validateAnswers(fields, input.responses ?? {});
-    const first = Object.values(errors)[0];
-    if (first) return { ok: false, error: first };
-  }
-  const responses = fields.length > 0 ? buildStoredResponses(fields, input.responses ?? {}) : null;
 
   // Resolve which date this signup is for. The client's date is never
   // trusted: it must be a genuine occurrence of the series, and upcoming.
@@ -107,22 +114,41 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     // No session cookies (or auth unavailable) — anonymous signup.
   }
 
-  const notes = fields.length > 0 ? null : input.notes?.trim() || null;
-  const { error } = await sb.from("event_signups").insert({
-    event_id: row.id,
-    name: input.name.trim(),
-    contact: input.contact.trim(),
-    role: input.role,
-    notes,
-    attendance,
-    responses: responses && responses.length > 0 ? responses : null,
-    occurrence_date: occurrenceDate,
-    user_id: userId,
-  });
+  // One row per role, validated against that role's custom questions.
+  // Custom questions replace the generic notes field for their role; choice
+  // answers are whitelisted, unknown keys dropped, labels snapshotted.
+  const sq = parseSignupQuestions(row.signup_questions);
+  const inserts = [];
+  for (const role of roles) {
+    const fields = questionsForRole(sq, role);
+    const answers =
+      role === "attendee"
+        ? (input.attendeeResponses ?? (input.role === "attendee" ? input.responses : undefined))
+        : (input.volunteerResponses ?? (input.role === "volunteer" ? input.responses : undefined));
+    if (fields.length > 0) {
+      const errors = validateAnswers(fields, answers ?? {});
+      const first = Object.values(errors)[0];
+      if (first) return { ok: false, error: first };
+    }
+    const responses = fields.length > 0 ? buildStoredResponses(fields, answers ?? {}) : null;
+    inserts.push({
+      event_id: row.id,
+      name: input.name.trim(),
+      contact: input.contact.trim(),
+      role,
+      notes: fields.length > 0 ? null : input.notes?.trim() || null,
+      attendance: role === "attendee" ? attendance : null,
+      responses: responses && responses.length > 0 ? responses : null,
+      occurrence_date: occurrenceDate,
+      user_id: userId,
+    });
+  }
+
+  const { error } = await sb.from("event_signups").insert(inserts);
   if (error) {
     console.error("[event-signup] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  return { ok: true, role: input.role };
+  return { ok: true, roles };
 }
