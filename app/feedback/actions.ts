@@ -3,6 +3,8 @@
 import { supabaseAdmin } from "../../lib/supabase/server";
 import { supabaseSession } from "../../lib/supabase/auth";
 import { notifyPrayerTeam } from "../../lib/email/prayer";
+import { notifyPastoralOfFeedback } from "../../lib/email/feedback";
+import { resolveNotificationRecipients } from "../../lib/notification-routes";
 import { EVENT_CATEGORIES } from "../../lib/event-categories";
 
 export type FeedbackInput = {
@@ -47,18 +49,33 @@ function ministryForFeedbackCategory(category: string): string {
 export async function submitFeedback(input: FeedbackInput): Promise<FeedbackResult> {
   if (!input.message?.trim()) return { ok: false, error: "Please share a bit about your experience." };
 
+  const rating = input.rating || null;
+  const ministry = ministryForFeedbackCategory(input.category);
+  const name = input.name?.trim() || null;
+  const message = input.message.trim();
+
   const { error } = await supabaseAdmin().from("feedback").insert({
-    rating: input.rating || null,
+    rating,
     category: input.category,
-    ministry: ministryForFeedbackCategory(input.category),
-    name: input.name?.trim() || null,
-    message: input.message.trim(),
+    ministry,
+    name,
+    message,
     user_id: await sessionUserId(),
   });
   if (error) {
     console.error("[feedback] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
+
+  await notifyPastoralOfFeedback({
+    to: await resolveNotificationRecipients("feedback"),
+    rating,
+    category: input.category,
+    ministry,
+    name,
+    message,
+  });
+
   return { ok: true, kind: "feedback" };
 }
 

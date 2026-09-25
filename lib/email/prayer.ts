@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
+import { resolveNotificationRecipients } from "../notification-routes";
 
 const DEFAULT_FROM = "TapHub Prayer <onboarding@resend.dev>";
 
@@ -18,9 +19,9 @@ export type PrayerEmailPayload = {
  */
 export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.PRAYER_TEAM_EMAIL;
-  if (!apiKey || !to) {
-    console.warn("[prayer-routing] skipped: RESEND_API_KEY or PRAYER_TEAM_EMAIL not set");
+  const to = await resolveNotificationRecipients("prayer");
+  if (!apiKey || to.length === 0) {
+    console.warn("[prayer-routing] skipped: RESEND_API_KEY or recipients not set");
     return;
   }
   const from = process.env.PRAYER_TEAM_FROM || DEFAULT_FROM;

@@ -90,6 +90,12 @@ export const ICONS: Record<string, ReactNode> = {
       <path d="M16 6a3 3 0 0 1 0 6M21 20c0-2.5-1.5-4-3.5-4.6" />
     </svg>
   ),
+  bell: (
+    <svg {...ic}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+      <path d="M10.3 19a2 2 0 0 0 3.4 0" />
+    </svg>
+  ),
 };
 
 /**
@@ -143,6 +149,7 @@ export function buildNavForRole(
     },
     { href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/portal/users", label: "Users", icon: ICONS.users },
+    { href: "/portal/notifications", label: "Notifications", icon: ICONS.bell },
     { href: "/portal/agent", label: "Agent", icon: ICONS.bot },
     { href: "/portal/agent-log", label: "Agent log", icon: ICONS.list },
     ...memberItems,

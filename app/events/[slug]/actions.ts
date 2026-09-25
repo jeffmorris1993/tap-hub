@@ -15,7 +15,10 @@ import {
   validateAnswers,
   type SignupAnswers,
   type SignupRole,
+  type StoredResponse,
 } from "../../../lib/event-signup-forms";
+import { notifyOrganizerOfSignup } from "../../../lib/email/event-signup";
+import { listApproverEmails } from "../../../lib/approvers";
 
 export type EventSignupInput = {
   slug: string;
@@ -59,7 +62,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
     .from("events")
-    .select("id, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
+    .select("id, title, submitted_by, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
     .eq("slug", input.slug)
     .limit(1);
   if (lookupError) {
@@ -119,6 +122,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   // answers are whitelisted, unknown keys dropped, labels snapshotted.
   const sq = parseSignupQuestions(row.signup_questions);
   const inserts = [];
+  const emailResponses: { role: SignupRole; items: StoredResponse[] }[] = [];
   for (const role of roles) {
     const fields = questionsForRole(sq, role);
     const answers =
@@ -131,6 +135,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
       if (first) return { ok: false, error: first };
     }
     const responses = fields.length > 0 ? buildStoredResponses(fields, answers ?? {}) : null;
+    emailResponses.push({ role, items: responses ?? [] });
     inserts.push({
       event_id: row.id,
       name: input.name.trim(),
@@ -149,6 +154,26 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     console.error("[event-signup] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
+
+  // Tell the organizer. Older events without a submitter fall back to the
+  // pastoral list so no signup goes unnoticed.
+  const organizer =
+    typeof row.submitted_by === "string" && row.submitted_by.trim()
+      ? [row.submitted_by.trim()]
+      : await listApproverEmails();
+  await notifyOrganizerOfSignup({
+    to: organizer,
+    event: { id: row.id, title: row.title },
+    signup: {
+      name: input.name.trim(),
+      contact: input.contact.trim(),
+      roles,
+      attendance,
+      occurrenceDate,
+      notes: input.notes?.trim() || null,
+      responses: emailResponses,
+    },
+  });
 
   return { ok: true, roles };
 }
