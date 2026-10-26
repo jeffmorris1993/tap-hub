@@ -25,7 +25,7 @@ export const IGNITE_PARENT_FORM_ENABLED =
 export const IGNITE_PARENT_FORM_CLOSE_DATE =
   process.env.IGNITE_PARENT_FORM_CLOSE_DATE ?? "2026-12-31T23:59";
 
-/** The QR-code destination. Works independently of the Tap Hub promo card. */
+/** The QR-code destination. Works independently of the NT Gateway promo card. */
 export const IGNITE_PARENT_FORM_PATH = "/ignite/parent-update";
 
 function closeInstantMs(): number | null {
@@ -43,7 +43,7 @@ function closeInstantMs(): number | null {
   return new Date(iso).getTime();
 }
 
-/** True while the form accepts submissions and the Tap Hub card should show. */
+/** True while the form accepts submissions and the NT Gateway card should show. */
 export function igniteParentFormOpen(now: Date = new Date()): boolean {
   if (!IGNITE_PARENT_FORM_ENABLED) return false;
   const closeMs = closeInstantMs();

@@ -134,7 +134,7 @@ export function renderBrandedEmail(input: BrandedEmailInput): string {
             <td style="padding:18px 36px 30px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 ${footer}
-                <tr><td style="padding:8px 0 0;"><p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.04em;color:#6a738b;">Nehemiah&apos;s Temple Apostolic Church &middot; Madison Heights, MI &middot; via TapHub</p></td></tr>
+                <tr><td style="padding:8px 0 0;"><p style="margin:0;font-size:11px;font-weight:700;letter-spacing:.04em;color:#6a738b;">Nehemiah&apos;s Temple Apostolic Church &middot; Madison Heights, MI &middot; via NT Gateway</p></td></tr>
               </table>
             </td>
           </tr>

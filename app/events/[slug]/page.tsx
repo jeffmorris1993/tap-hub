@@ -8,6 +8,7 @@ import {
   upcomingOccurrences,
 } from "../../../lib/event-calendar";
 import { CHURCH_TZ } from "../../../lib/tz";
+import { getPortalUser } from "../../../lib/portal-auth";
 import { EventDetailView, type OccurrenceChoice, type SelectedOccurrence } from "./EventDetailView";
 
 // Reading ?date= makes this page dynamic (request-time rendering); the
@@ -23,6 +24,10 @@ export default async function EventDetail({
   const [{ slug }, { date }] = await Promise.all([params, searchParams]);
   const event = await getEventBySlug(slug);
   if (!event) notFound();
+
+  // Read-only session peek (no redirect): signed-in members get their
+  // name/email pre-filled on the signup form.
+  const pu = await getPortalUser().catch(() => null);
 
   const now = new Date();
 
@@ -64,5 +69,17 @@ export default async function EventDetail({
     ? toDisplayOccurrence(event, selectedStart, now)
     : toDisplayEvent(event, now);
 
-  return <EventDetailView event={display} occurrence={occurrence} choices={choices} />;
+  return (
+    <EventDetailView
+      event={display}
+      occurrence={occurrence}
+      choices={choices}
+      signedIn={!!pu}
+      prefill={
+        pu
+          ? { name: pu.profile?.full_name ?? "", contact: pu.email ?? "" }
+          : undefined
+      }
+    />
+  );
 }

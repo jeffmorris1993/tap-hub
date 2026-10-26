@@ -381,7 +381,7 @@ export function ParentUpdateForm() {
                 textDecoration: "none",
               }}
             >
-              Return to Tap Hub
+              Return to NT Gateway
             </Link>
           </div>
         </div>

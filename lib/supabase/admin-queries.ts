@@ -25,7 +25,7 @@ export async function getDashboardCounts(scope: string[] | null = null): Promise
     : sb.from("event_signups").select("*", { count: "exact", head: true });
   const eventsQ = sb
     .from("events")
-    .select("starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
+    .select("starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
     .eq("published", true)
     .eq("approval_status", "approved");
   const pendingQ = sb.from("events").select("*", { count: "exact", head: true }).eq("approval_status", "pending");
@@ -102,14 +102,22 @@ export type PrayerRow = {
   confidential: boolean;
   prayer_wall: boolean;
   ministry: string;
+  visibility: "bishop" | "pastoral";
   created_at: string;
 };
 
-export async function listPrayers(limit = 100, scope: string[] | null = null): Promise<PrayerRow[]> {
+/** Bishop-only requests are visible only when the viewer IS the Bishop —
+ *  hidden from leads and non-bishop pastoral alike. */
+export async function listPrayers(
+  limit = 100,
+  scope: string[] | null = null,
+  viewerIsBishop = false,
+): Promise<PrayerRow[]> {
   let q = supabaseAdmin()
     .from("prayer_requests")
-    .select("id, name, contact, request, confidential, prayer_wall, ministry, created_at");
+    .select("id, name, contact, request, confidential, prayer_wall, ministry, visibility, created_at");
   if (scope) q = q.in("ministry", scope);
+  if (!viewerIsBishop) q = q.eq("visibility", "pastoral");
   const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return data ?? [];
@@ -268,8 +276,11 @@ export type AdminEventRow = {
   submitted_at: string | null;
   reviewed_at: string | null;
   recurrence_kind: RecurrenceKind;
-  recurrence_byday: number | null;
+  recurrence_interval: number;
+  recurrence_bydays: number[] | null;
+  recurrence_count: number | null;
   recurrence_until: string | null;
+  all_day: boolean;
   /** Custom signup questions jsonb — parse with parseSignupQuestions, never cast. */
   signup_questions: unknown;
 };
@@ -278,7 +289,8 @@ const ADMIN_EVENT_FIELDS =
   "id, slug, title, category, starts_at, ends_at, location, description_long, " +
   "cost, accepts_rsvps, allow_volunteers, registration_url, registration_label, " +
   "published, approval_status, approval_notes, " +
-  "submitted_by, reviewed_by, submitted_at, reviewed_at, recurrence_kind, recurrence_byday, recurrence_until, " +
+  "submitted_by, reviewed_by, submitted_at, reviewed_at, " +
+  "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, " +
   "signup_questions";
 
 export async function listAllEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
@@ -318,9 +330,15 @@ export type ActivityItem = {
 /** Merged recent activity across all submission tables, newest first.
  *  Scoped (lead) view filters by ministry and skips visitors — visitor
  *  follow-up is a pastoral surface. */
-export async function getRecentActivity(limit = 8, scope: string[] | null = null): Promise<ActivityItem[]> {
+export async function getRecentActivity(
+  limit = 8,
+  scope: string[] | null = null,
+  viewerIsBishop = false,
+): Promise<ActivityItem[]> {
   const sb = supabaseAdmin();
-  const prayersQ = sb.from("prayer_requests").select("name, request, created_at");
+  let prayersQ = sb.from("prayer_requests").select("name, request, created_at");
+  // Bishop-only requests never surface in a shared activity feed.
+  if (!viewerIsBishop) prayersQ = prayersQ.eq("visibility", "pastoral");
   const feedbackQ = sb.from("feedback").select("name, category, rating, created_at");
   const signupsQ = scope
     ? sb.from("event_signups").select("name, role, created_at, events!inner(title, category)").in("events.category", scope)

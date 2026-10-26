@@ -74,7 +74,10 @@ function EventCard({ e, past }: { e: AdminEventRow; past?: boolean }) {
           )}
           {e.recurrence_kind !== "none" && (
             <span style={{ ...smallPill, background: "rgba(78,141,231,.16)", color: "#9bbcf2" }}>
-              {recurrenceLabel(e.recurrence_kind, e.starts_at) || e.recurrence_kind}
+              {recurrenceLabel(e.recurrence_kind, e.starts_at, {
+                interval: e.recurrence_interval,
+                bydays: e.recurrence_bydays,
+              }) || e.recurrence_kind}
             </span>
           )}
           {e.approval_status === "approved" && !e.published && (

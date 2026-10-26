@@ -21,22 +21,20 @@ import { parseSignupQuestions, type SignupQuestions } from "../../../../lib/even
 const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
 const RECURRENCE_KINDS = [
   { value: "none", label: "Doesn't repeat" },
-  { value: "daily", label: "Every day (multi-day event)" },
-  { value: "weekdays", label: "Every weekday (Mon–Fri)" },
-  { value: "weekly", label: "Every week" },
-  { value: "biweekly", label: "Every 2 weeks" },
-  { value: "monthly", label: "Every month (same date)" },
-  { value: "monthly_weekday", label: "Every month (same weekday, e.g. 2nd Friday — from start date)" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly (same date)" },
+  { value: "monthly_weekday", label: "Monthly (same weekday, e.g. 2nd Friday — from start date)" },
 ] as const;
-const DOW_OPTIONS = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-];
+type FormRecurrenceKind = (typeof RECURRENCE_KINDS)[number]["value"];
+const DOW_CHIPS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const INTERVAL_UNITS: Record<Exclude<FormRecurrenceKind, "none">, string> = {
+  daily: "days",
+  weekly: "weeks",
+  monthly: "months",
+  monthly_weekday: "months",
+};
+type RecurrenceEndsMode = "never" | "until" | "count";
 
 type ApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -100,7 +98,11 @@ type Initial = {
   reviewed_by?: string | null;
   recurrence_kind?: RecurrenceKind;
   recurrence_byday?: number | null;
+  recurrence_interval?: number | null;
+  recurrence_bydays?: number[] | null;
+  recurrence_count?: number | null;
   recurrence_until?: string | null;
+  all_day?: boolean | null;
   signup_questions?: unknown;
 };
 
@@ -144,11 +146,27 @@ export function EventForm({
   const [cost, setCost] = useState(initial?.cost ?? "");
   const [registrationUrl, setRegistrationUrl] = useState(initial?.registration_url ?? "");
   const [registrationLabel, setRegistrationLabel] = useState(initial?.registration_label ?? "");
-  const [recurrenceKind, setRecurrenceKind] = useState<RecurrenceKind>(
-    initial?.recurrence_kind ?? "none",
+  // Legacy kinds normalize into the v2 shape on load: biweekly → weekly every
+  // 2 weeks, weekdays → weekly Mon–Fri.
+  const initKind: RecurrenceKind = initial?.recurrence_kind ?? "none";
+  const [recurrenceKind, setRecurrenceKind] = useState<FormRecurrenceKind>(
+    initKind === "biweekly" || initKind === "weekdays" ? "weekly" : (initKind as FormRecurrenceKind),
   );
-  const [recurrenceByday, setRecurrenceByday] = useState<number | null>(initial?.recurrence_byday ?? null);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(
+    initKind === "biweekly" ? Math.max(2, initial?.recurrence_interval ?? 1) : initial?.recurrence_interval ?? 1,
+  );
+  const [recurrenceBydays, setRecurrenceBydays] = useState<number[]>(() => {
+    if (initial?.recurrence_bydays?.length) return [...new Set(initial.recurrence_bydays)].sort((a, b) => a - b);
+    if (initKind === "weekdays") return [1, 2, 3, 4, 5];
+    if (initial?.recurrence_byday != null) return [initial.recurrence_byday];
+    return [];
+  });
   const [recurrenceUntil, setRecurrenceUntil] = useState<string>(initial?.recurrence_until ?? "");
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(initial?.recurrence_count ?? 10);
+  const [endsMode, setEndsMode] = useState<RecurrenceEndsMode>(
+    initial?.recurrence_until ? "until" : initial?.recurrence_count ? "count" : "never",
+  );
+  const [allDay, setAllDay] = useState<boolean>(initial?.all_day ?? false);
   const [signupQuestions, setSignupQuestions] = useState<SignupQuestions>(() =>
     parseSignupQuestions(initial?.signup_questions),
   );
@@ -157,16 +175,33 @@ export function EventForm({
   const statusStyle = STATUS_STYLES[status];
   const isExisting = !!initial?.id;
   const canSubmit = !isExisting || status === "draft" || status === "rejected";
+  // While awaiting approval, only the approver may edit — the server enforces
+  // the same rule in saveEvent.
+  const locked = isExisting && status === "pending" && !canApprove;
+
+  // The weekday of the current start date — the default chip for weekly series.
+  function startDayOfWeek(): number {
+    const probe = startsAt ? new Date(allDay ? `${startsAt.slice(0, 10)}T12:00` : startsAt) : new Date();
+    return isNaN(probe.getTime()) ? new Date().getDay() : probe.getDay();
+  }
 
   function buildPayload(): EventFormInput {
+    const bydays =
+      recurrenceKind === "weekly"
+        ? recurrenceBydays.length
+          ? recurrenceBydays
+          : [startDayOfWeek()]
+        : null;
     return {
       id: initial?.id,
       slug,
       title,
       description_long: description,
       category,
-      starts_at_local: startsAt,
-      ends_at_local: endsAt,
+      // All-day events store midnight → end-of-day Detroit wall times so
+      // range display and "still live until it's over" logic stay correct.
+      starts_at_local: allDay ? (startsAt ? `${startsAt.slice(0, 10)}T00:00` : "") : startsAt,
+      ends_at_local: allDay ? (endsAt ? `${endsAt.slice(0, 10)}T23:59` : "") : endsAt,
       location,
       accepts_rsvps: acceptsRsvps,
       allow_volunteers: allowVolunteers,
@@ -174,8 +209,15 @@ export function EventForm({
       registration_label: registrationLabel.trim() || null,
       cost: cost.trim() || null,
       recurrence_kind: recurrenceKind,
-      recurrence_byday: recurrenceKind === "weekly" || recurrenceKind === "biweekly" ? recurrenceByday : null,
-      recurrence_until: recurrenceUntil || null,
+      recurrence_interval:
+        recurrenceKind === "none" ? 1 : Math.min(12, Math.max(1, Math.round(recurrenceInterval) || 1)),
+      recurrence_bydays: bydays,
+      recurrence_until: recurrenceKind !== "none" && endsMode === "until" ? recurrenceUntil || null : null,
+      recurrence_count:
+        recurrenceKind !== "none" && endsMode === "count"
+          ? Math.min(500, Math.max(1, Math.round(recurrenceCount) || 1))
+          : null,
+      all_day: allDay,
       signup_questions: signupQuestions,
     };
   }
@@ -288,7 +330,17 @@ export function EventForm({
     });
   }
 
-  const needsBydayPicker = recurrenceKind === "weekly" || recurrenceKind === "biweekly";
+  const needsBydayPicker = recurrenceKind === "weekly";
+
+  function toggleByday(dow: number) {
+    setRecurrenceBydays((prev) => {
+      if (prev.includes(dow)) {
+        const next = prev.filter((d) => d !== dow);
+        return next.length ? next : prev; // at least one day stays selected
+      }
+      return [...prev, dow].sort((a, b) => a - b);
+    });
+  }
 
   return (
     <form onSubmit={onSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -332,6 +384,23 @@ export function EventForm({
           )}
         </div>
       )}
+      {locked && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            background: "rgba(231,184,78,.08)",
+            border: "1px solid rgba(231,184,78,.35)",
+            borderRadius: "12px",
+            padding: "12px 16px",
+            color: "#e7b84e",
+            fontSize: "13px",
+            fontWeight: 600,
+            lineHeight: 1.5,
+          }}
+        >
+          Locked while awaiting approval — a pastor can approve it, or request changes to unlock edits.
+        </div>
+      )}
       {status === "rejected" && initial?.approval_notes && (
         <div
           style={{
@@ -351,13 +420,16 @@ export function EventForm({
         </div>
       )}
 
+      {/* display:contents keeps the grid layout while `disabled` propagates to
+          every field when the event is locked for review. */}
+      <fieldset disabled={locked} style={{ display: "contents", border: "none", margin: 0, padding: 0, minWidth: 0 }}>
       <div style={{ gridColumn: "1 / -1" }}>
         <label style={labelStyle}>Title</label>
         <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} required />
       </div>
 
       <div>
-        <label style={labelStyle}>Slug (URL)</label>
+        <label style={labelStyle}>Slug (URL, optional)</label>
         <input
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
@@ -378,21 +450,39 @@ export function EventForm({
         </select>
       </div>
 
-      <div>
-        <label style={labelStyle}>Starts at</label>
+      <label
+        style={{
+          gridColumn: "1 / -1",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          color: "#cdd3e0",
+          fontSize: "13.5px",
+        }}
+      >
         <input
-          type="datetime-local"
-          value={startsAt}
+          type="checkbox"
+          checked={allDay}
+          onChange={(e) => setAllDay(e.target.checked)}
+          style={{ width: "18px", height: "18px", accentColor: "#e7b84e" }}
+        />
+        All-day (no start/end time — e.g. a multi-week drive or campaign)
+      </label>
+      <div>
+        <label style={labelStyle}>{allDay ? "Start date" : "Starts at"}</label>
+        <input
+          type={allDay ? "date" : "datetime-local"}
+          value={allDay ? startsAt.slice(0, 10) : startsAt}
           onChange={(e) => setStartsAt(e.target.value)}
           style={inputStyle}
           required
         />
       </div>
       <div>
-        <label style={labelStyle}>Ends at (optional)</label>
+        <label style={labelStyle}>{allDay ? "End date (optional)" : "Ends at (optional)"}</label>
         <input
-          type="datetime-local"
-          value={endsAt}
+          type={allDay ? "date" : "datetime-local"}
+          value={allDay ? endsAt.slice(0, 10) : endsAt}
           onChange={(e) => setEndsAt(e.target.value)}
           style={inputStyle}
         />
@@ -416,10 +506,16 @@ export function EventForm({
 
       {/* Recurrence */}
       <div>
-        <label style={labelStyle}>Recurrence</label>
+        <label style={labelStyle}>Repeats</label>
         <select
           value={recurrenceKind}
-          onChange={(e) => setRecurrenceKind(e.target.value as typeof recurrenceKind)}
+          onChange={(e) => {
+            const kind = e.target.value as FormRecurrenceKind;
+            setRecurrenceKind(kind);
+            if (kind === "weekly" && recurrenceBydays.length === 0) {
+              setRecurrenceBydays([startDayOfWeek()]);
+            }
+          }}
           style={{ ...inputStyle, WebkitAppearance: "none", appearance: "none" }}
         >
           {RECURRENCE_KINDS.map((r) => (
@@ -429,34 +525,116 @@ export function EventForm({
           ))}
         </select>
       </div>
-      {needsBydayPicker ? (
+      {recurrenceKind !== "none" ? (
         <div>
-          <label style={labelStyle}>Day of week</label>
-          <select
-            value={recurrenceByday ?? ""}
-            onChange={(e) => setRecurrenceByday(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-            style={{ ...inputStyle, WebkitAppearance: "none", appearance: "none" }}
-          >
-            <option value="">Use start day</option>
-            {DOW_OPTIONS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
+          <label style={labelStyle}>Repeat every</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={recurrenceInterval}
+              onChange={(e) => setRecurrenceInterval(parseInt(e.target.value, 10) || 1)}
+              style={{ ...inputStyle, width: "90px" }}
+            />
+            <span style={{ color: "#cdd3e0", fontSize: "13.5px" }}>
+              {recurrenceInterval === 1
+                ? INTERVAL_UNITS[recurrenceKind].replace(/s$/, "")
+                : INTERVAL_UNITS[recurrenceKind]}
+            </span>
+          </div>
         </div>
       ) : (
         <div />
       )}
+      {needsBydayPicker && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>On days</label>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {DOW_CHIPS.map((name, dow) => {
+              const on = recurrenceBydays.includes(dow);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleByday(dow)}
+                  aria-pressed={on}
+                  style={{
+                    background: on ? "#e7b84e" : "#1a2438",
+                    color: on ? "#0b101c" : "#cdd3e0",
+                    border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
+                    fontWeight: 800,
+                    fontSize: "12px",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    padding: "9px 13px",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {recurrenceKind !== "none" && (
         <div style={{ gridColumn: "1 / -1" }}>
-          <label style={labelStyle}>Recurrence ends (optional)</label>
-          <input
-            type="date"
-            value={recurrenceUntil}
-            onChange={(e) => setRecurrenceUntil(e.target.value)}
-            style={inputStyle}
-          />
+          <label style={labelStyle}>Ends</label>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+            {(
+              [
+                { value: "never", label: "Never" },
+                { value: "until", label: "On a date" },
+                { value: "count", label: "After # times" },
+              ] as const
+            ).map((m) => {
+              const on = endsMode === m.value;
+              return (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setEndsMode(m.value)}
+                  style={{
+                    background: on ? "#e7b84e" : "#1a2438",
+                    color: on ? "#0b101c" : "#cdd3e0",
+                    border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
+                    fontWeight: 800,
+                    fontSize: "12px",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    padding: "9px 14px",
+                    borderRadius: "9px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+            {endsMode === "until" && (
+              <input
+                type="date"
+                value={recurrenceUntil}
+                onChange={(e) => setRecurrenceUntil(e.target.value)}
+                style={{ ...inputStyle, width: "190px" }}
+              />
+            )}
+            {endsMode === "count" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={recurrenceCount}
+                  onChange={(e) => setRecurrenceCount(parseInt(e.target.value, 10) || 1)}
+                  style={{ ...inputStyle, width: "90px" }}
+                />
+                <span style={{ color: "#cdd3e0", fontSize: "13.5px" }}>occurrences</span>
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -527,6 +705,7 @@ export function EventForm({
           showVolunteer={allowVolunteers}
         />
       </div>
+      </fieldset>
 
       {error && (
         <div style={{ gridColumn: "1 / -1", color: "#ff8a8a", fontSize: "13px", fontWeight: 700 }}>{error}</div>
@@ -534,25 +713,27 @@ export function EventForm({
 
       {/* Action bar */}
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
-        <button
-          type="submit"
-          disabled={pending}
-          style={{
-            background: "#1a2438",
-            color: "#cdd3e0",
-            fontWeight: 800,
-            fontSize: "13px",
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-            padding: "12px 22px",
-            borderRadius: "10px",
-            border: "1px solid rgba(244,241,234,.14)",
-            cursor: pending ? "wait" : "pointer",
-            opacity: pending ? 0.7 : 1,
-          }}
-        >
-          {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
-        </button>
+        {!locked && (
+          <button
+            type="submit"
+            disabled={pending}
+            style={{
+              background: "#1a2438",
+              color: "#cdd3e0",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(244,241,234,.14)",
+              cursor: pending ? "wait" : "pointer",
+              opacity: pending ? 0.7 : 1,
+            }}
+          >
+            {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
+          </button>
+        )}
         {canSubmit && (
           <button
             type="button"

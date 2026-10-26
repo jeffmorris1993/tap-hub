@@ -52,7 +52,7 @@ type ManualRow = {
   created_at: string;
 };
 
-function fmtEventDateLabel(starts_at: string, ends_at: string | null): string {
+function fmtEventDateLabel(starts_at: string, ends_at: string | null, allDay = false): string {
   const start = new Date(starts_at);
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: CHURCH_TZ,
@@ -65,6 +65,7 @@ function fmtEventDateLabel(starts_at: string, ends_at: string | null): string {
   const parts = fmt.formatToParts(start);
   const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
   const date = `${get("weekday")}, ${get("month")} ${get("day")}`;
+  if (allDay) return date;
   const time = `${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
   if (ends_at) {
     const end = new Date(ends_at);
@@ -173,7 +174,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
         category: e.category,
         title: e.title,
         body: e.description_long,
-        dateLabel: fmtEventDateLabel(startIso, endIso),
+        dateLabel: fmtEventDateLabel(startIso, endIso, e.all_day),
         sortDate: startIso,
         pinned: false,
         link: e.accepts_rsvps

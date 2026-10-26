@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, type Field } from "./template";
 
-const DEFAULT_FROM = "TapHub Agent <agent@nehtemple.org>";
+const DEFAULT_FROM = "NT Gateway Agent <agent@nehtemple.org>";
 
 export type AgentReplyInput = {
   to: string;
@@ -34,13 +34,13 @@ export async function sendAgentReply(input: AgentReplyInput): Promise<void> {
       label: "Tool calls",
       value:
         input.toolCallsCount === 1
-          ? "1 action taken on TapHub"
-          : `${input.toolCallsCount} actions taken on TapHub`,
+          ? "1 action taken on NT Gateway"
+          : `${input.toolCallsCount} actions taken on NT Gateway`,
     });
   }
 
   const html = renderBrandedEmail({
-    eyebrow: "TapHub Agent",
+    eyebrow: "NT Gateway Agent",
     headline: "Reply from your assistant",
     body: { label: "Response", content: input.reply },
     fields: meta,

@@ -128,6 +128,9 @@ export function AnnouncementForm({
   const statusStyle = STATUS_STYLES[status];
   const isExisting = !!initial?.id;
   const canSubmit = !isExisting || status === "draft" || status === "rejected";
+  // While awaiting approval, only the approver may edit — the server enforces
+  // the same rule in saveAnnouncement.
+  const locked = isExisting && status === "pending" && !canApprove;
 
   function buildPayload(): AnnouncementInput {
     let finalLinkUrl: string | null = null;
@@ -304,6 +307,23 @@ export function AnnouncementForm({
           )}
         </div>
       )}
+      {locked && (
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            background: "rgba(231,184,78,.08)",
+            border: "1px solid rgba(231,184,78,.35)",
+            borderRadius: "12px",
+            padding: "12px 16px",
+            color: "#e7b84e",
+            fontSize: "13px",
+            fontWeight: 600,
+            lineHeight: 1.5,
+          }}
+        >
+          Locked while awaiting approval — a pastor can approve it, or request changes to unlock edits.
+        </div>
+      )}
       {status === "rejected" && initial?.approval_notes && (
         <div
           style={{
@@ -332,6 +352,9 @@ export function AnnouncementForm({
         </div>
       )}
 
+      {/* display:contents keeps the grid layout while `disabled` propagates to
+          every field when the announcement is locked for review. */}
+      <fieldset disabled={locked} style={{ display: "contents", border: "none", margin: 0, padding: 0, minWidth: 0 }}>
       <div>
         <label style={labelStyle}>Category</label>
         <select
@@ -479,6 +502,7 @@ export function AnnouncementForm({
         />
         Pin to the top
       </label>
+      </fieldset>
 
       {/* Action bar */}
       <div
@@ -490,25 +514,27 @@ export function AnnouncementForm({
           flexWrap: "wrap",
         }}
       >
-        <button
-          type="submit"
-          disabled={pending}
-          style={{
-            background: "#1a2438",
-            color: "#cdd3e0",
-            fontWeight: 800,
-            fontSize: "13px",
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-            padding: "12px 22px",
-            borderRadius: "10px",
-            border: "1px solid rgba(244,241,234,.14)",
-            cursor: pending ? "wait" : "pointer",
-            opacity: pending ? 0.7 : 1,
-          }}
-        >
-          {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
-        </button>
+        {!locked && (
+          <button
+            type="submit"
+            disabled={pending}
+            style={{
+              background: "#1a2438",
+              color: "#cdd3e0",
+              fontWeight: 800,
+              fontSize: "13px",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "1px solid rgba(244,241,234,.14)",
+              cursor: pending ? "wait" : "pointer",
+              opacity: pending ? 0.7 : 1,
+            }}
+          >
+            {pending ? "Saving…" : isExisting ? "Save changes" : "Save draft"}
+          </button>
+        )}
         {canSubmit && (
           <button
             type="button"

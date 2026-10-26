@@ -17,8 +17,12 @@ import {
   type SignupRole,
   type StoredResponse,
 } from "../../../lib/event-signup-forms";
-import { notifyOrganizerOfSignup } from "../../../lib/email/event-signup";
+import { notifyOrganizerOfSignup, notifySignerOfSignup } from "../../../lib/email/event-signup";
 import { listApproverEmails } from "../../../lib/approvers";
+import { formatWhenText } from "../../../lib/events-display";
+import type { EventRow } from "../../../lib/supabase/queries";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type EventSignupInput = {
   slug: string;
@@ -62,7 +66,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
     .from("events")
-    .select("id, title, submitted_by, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_byday, recurrence_until")
+    .select("id, slug, title, location, submitted_by, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
     .eq("slug", input.slug)
     .limit(1);
   if (lookupError) {
@@ -149,7 +153,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     });
   }
 
-  const { error } = await sb.from("event_signups").insert(inserts);
+  const { data: insertedRows, error } = await sb.from("event_signups").insert(inserts).select("id");
   if (error) {
     console.error("[event-signup] insert failed", error);
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
@@ -175,5 +179,49 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     },
   });
 
+  // Confirm to the signer-up too, when their contact is an email address.
+  const contact = input.contact.trim();
+  if (EMAIL_RE.test(contact)) {
+    const whenText = occurrenceDate
+      ? `${fmtOccurrenceDay(occurrenceDate)}${row.all_day ? "" : ` · ${fmtStartTime(row.starts_at)}`}`
+      : formatWhenText(row as unknown as EventRow, new Date());
+    const sent = await notifySignerOfSignup({
+      to: contact,
+      event: { slug: row.slug, title: row.title, location: row.location },
+      signup: { name: input.name.trim(), roles, attendance, occurrenceDate, whenText },
+    });
+    if (sent && insertedRows?.length) {
+      await sb
+        .from("event_signups")
+        .update({ confirmation_sent_at: new Date().toISOString() })
+        .in(
+          "id",
+          insertedRows.map((r) => (r as { id: string }).id),
+        );
+    }
+  }
+
   return { ok: true, roles };
+}
+
+/** "2026-10-03" → "Fri, Oct 3, 2026" without timezone day-shift. */
+function fmtOccurrenceDay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function fmtStartTime(startsAtIso: string): string {
+  return new Date(startsAtIso).toLocaleTimeString("en-US", {
+    timeZone: "America/Detroit",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }

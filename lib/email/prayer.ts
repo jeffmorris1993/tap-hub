@@ -2,14 +2,17 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 import { resolveNotificationRecipients } from "../notification-routes";
+import { getBishopEmails } from "../approvers";
 
-const DEFAULT_FROM = "TapHub Prayer <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Prayer <onboarding@resend.dev>";
 
 export type PrayerEmailPayload = {
   name: string | null;
   contact: string | null;
   request: string;
   prayerWall: boolean;
+  /** "bishop" routes only to BISHOP_EMAIL; "pastoral" uses the normal routing. */
+  visibility?: "bishop" | "pastoral";
 };
 
 /**
@@ -19,15 +22,22 @@ export type PrayerEmailPayload = {
  */
 export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
-  const to = await resolveNotificationRecipients("prayer");
+  const bishopOnly = payload.visibility === "bishop";
+  const to = bishopOnly ? getBishopEmails() : await resolveNotificationRecipients("prayer");
   if (!apiKey || to.length === 0) {
-    console.warn("[prayer-routing] skipped: RESEND_API_KEY or recipients not set");
+    console.warn(
+      bishopOnly
+        ? "[prayer-routing] skipped bishop-only request: RESEND_API_KEY or BISHOP_EMAIL not set"
+        : "[prayer-routing] skipped: RESEND_API_KEY or recipients not set",
+    );
     return;
   }
   const from = process.env.PRAYER_TEAM_FROM || DEFAULT_FROM;
 
   const fromName = payload.name?.trim() || "(anonymous)";
-  const subject = `Confidential prayer request — ${fromName}`;
+  const subject = bishopOnly
+    ? `Bishop-only prayer request — ${fromName}`
+    : `Confidential prayer request — ${fromName}`;
 
   const fields: Field[] = [
     { label: "From", value: fromName },
@@ -39,10 +49,12 @@ export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<voi
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Pastoral Care",
     headline: "New prayer request",
-    intro: "A member of the congregation just shared a confidential prayer request through TapHub.",
+    intro: "A member of the congregation just shared a confidential prayer request through NT Gateway.",
     notice: {
       variant: "highlight",
-      text: "Confidential — pastoral team only. Please don't share or post.",
+      text: bishopOnly
+        ? "Bishop only — the sender asked that this go to the Bishop alone. Please don't share or forward."
+        : "Confidential — pastoral team only. Please don't share or post.",
     },
     fields,
     body: { label: "Their request", content: payload.request },
@@ -51,7 +63,7 @@ export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<voi
   });
 
   const textLines = [
-    "A new confidential prayer request has been submitted through TapHub.",
+    "A new confidential prayer request has been submitted through NT Gateway.",
     "",
     `From:    ${fromName}`,
     `Contact: ${payload.contact?.trim() || "Not shared"}`,
@@ -62,7 +74,9 @@ export async function notifyPrayerTeam(payload: PrayerEmailPayload): Promise<voi
     `Open admin inbox: ${ctaHref}`,
     "",
     "—",
-    "Confidential — for the pastoral team only.",
+    bishopOnly
+      ? "Bishop only — the sender asked that this go to the Bishop alone."
+      : "Confidential — for the pastoral team only.",
   ];
 
   try {

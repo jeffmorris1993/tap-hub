@@ -22,8 +22,11 @@ export type EventRow = {
   registration_url: string | null;
   registration_label: string | null;
   recurrence_kind: RecurrenceKind;
-  recurrence_byday: number | null;
+  recurrence_interval: number;
+  recurrence_bydays: number[] | null;
+  recurrence_count: number | null;
   recurrence_until: string | null;
+  all_day: boolean;
   /** Custom signup questions jsonb — parse with parseSignupQuestions, never cast. */
   signup_questions: unknown;
 };
@@ -56,7 +59,7 @@ export type ParentResourceRow = {
 const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
   "cost, accepts_rsvps, allow_volunteers, registration_url, registration_label, " +
-  "recurrence_kind, recurrence_byday, recurrence_until, signup_questions";
+  "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, signup_questions";
 
 /** Standard schedule for a specific day_of_week (Detroit-local active-date filter). */
 export async function getScheduleForDayOfWeek(dayOfWeek: number): Promise<ScheduleRow[]> {

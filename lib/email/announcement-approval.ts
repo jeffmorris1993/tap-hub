@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "TapHub Announcements <events@nehtemple.org>";
+const DEFAULT_FROM = "NT Gateway Announcements <events@nehtemple.org>";
 
 export type AnnouncementSnapshot = {
   id: string;
@@ -57,7 +57,7 @@ export async function notifyApproversOfAnnouncementSubmission(
   });
 
   const text = [
-    "A new announcement has been submitted for your approval through TapHub.",
+    "A new announcement has been submitted for your approval through NT Gateway.",
     "",
     `Title:    ${a.title}`,
     `Category: ${a.category}`,
@@ -91,7 +91,7 @@ export async function notifySubmitterOfAnnouncementApproval(
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Announcement Approved",
     headline: "Your announcement is approved",
-    intro: `${reviewedBy} approved your submission. It's now live on the TapHub Announcements tab.`,
+    intro: `${reviewedBy} approved your submission. It's now live on the NT Gateway Announcements tab.`,
     fields: commonFields(a),
     cta: { label: "View public page", href: publicHref },
   });

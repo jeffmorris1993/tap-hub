@@ -9,6 +9,7 @@ import {
 import { fmtDateTime } from "../../../lib/format";
 import { CHURCH_TZ } from "../../../lib/tz";
 import { requirePortalUser, ministryScope } from "../../../lib/portal-auth";
+import { isBishop } from "../../../lib/approvers";
 import { MemberOverview } from "./member-overview";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export default async function AdminDashboard() {
 
   const [counts, recent, pending] = await Promise.all([
     getDashboardCounts(scope),
-    getRecentActivity(6, scope),
+    getRecentActivity(6, scope, isBishop(pu.email)),
     listPendingEvents(scope),
   ]);
 
@@ -98,7 +99,7 @@ export default async function AdminDashboard() {
   return (
     <div>
       <p style={{ color: "#9aa3b8", fontSize: "15px", fontWeight: 600, marginBottom: "4px" }}>
-        {greeting} — here&apos;s what&apos;s going on at TapHub.
+        {greeting} — here&apos;s what&apos;s going on at NT Gateway.
       </p>
 
       {/* stat tiles */}

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 // iOS expects a 180×180 PNG. We render the same gold block-glyph logo
-// over the brand navy so a TapHub bookmark on a home screen looks
+// over the brand navy so a NT Gateway bookmark on a home screen looks
 // like the in-app sidebar tile.
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";

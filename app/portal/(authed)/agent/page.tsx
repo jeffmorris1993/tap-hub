@@ -28,7 +28,7 @@ export default async function AgentPage() {
         Agent
       </h1>
       <p style={{ color: "#9aa3b8", fontSize: "14px", marginBottom: "24px", maxWidth: "640px" }}>
-        Talk to the TapHub assistant in plain English. It can create events (one-offs like an evening
+        Talk to the NT Gateway assistant in plain English. It can create events (one-offs like an evening
         service, or recurring series), post the weekly lesson, and check the inbox. Every message and the
         tools it calls are logged to <code style={{ color: "#cdd3e0" }}>/portal/agent-log</code>.
       </p>

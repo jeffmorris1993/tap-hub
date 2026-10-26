@@ -22,6 +22,7 @@ import {
   validateQuestionConfig,
   type SignupQuestions,
 } from "../../../../lib/event-signup-forms";
+import { syncEventToCalendar, removeEventFromCalendar } from "../../../../lib/google-calendar";
 
 export type EventFormInput = {
   id?: string;
@@ -39,8 +40,11 @@ export type EventFormInput = {
   registration_url: string | null;
   registration_label: string | null;
   recurrence_kind: RecurrenceKind;
-  recurrence_byday: number | null;
+  recurrence_interval: number;
+  recurrence_bydays: number[] | null;
+  recurrence_count: number | null;
   recurrence_until: string | null;
+  all_day: boolean;
   signup_questions?: SignupQuestions;
 };
 
@@ -76,9 +80,15 @@ function inScope(pu: PortalUser, category: string): boolean {
   return pu.role === "pastoral" || pu.ministries.includes(category);
 }
 
-async function eventCategory(id: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("events").select("category").eq("id", id).limit(1);
-  return (data?.[0] as { category?: string } | undefined)?.category ?? null;
+async function eventMeta(
+  id: string,
+): Promise<{ category: string; approval_status: string; published: boolean } | null> {
+  const { data } = await supabaseAdmin()
+    .from("events")
+    .select("category, approval_status, published")
+    .eq("id", id)
+    .limit(1);
+  return (data?.[0] as { category: string; approval_status: string; published: boolean } | undefined) ?? null;
 }
 
 function revalidateAllEventSurfaces(slug?: string) {
@@ -98,10 +108,17 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
   if (!inScope(pu, input.category)) {
     return { ok: false, error: `You can only manage ${pu.ministries.join(", ") || "your ministry's"} events.` };
   }
+  let existing: Awaited<ReturnType<typeof eventMeta>> = null;
   if (input.id) {
-    const existing = await eventCategory(input.id);
-    if (existing && !inScope(pu, existing)) {
+    existing = await eventMeta(input.id);
+    if (existing && !inScope(pu, existing.category)) {
       return { ok: false, error: "That event belongs to another ministry." };
+    }
+    if (existing?.approval_status === "pending" && pu.role !== "pastoral") {
+      return {
+        ok: false,
+        error: "This event is awaiting review and can't be edited. A pastor can approve it, or reject it with notes to unlock edits.",
+      };
     }
   }
   const sb = supabaseAdmin();
@@ -138,16 +155,29 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
     registration_label: input.registration_label?.trim() ? input.registration_label.trim() : null,
     cost: input.cost?.trim() ? input.cost.trim() : null,
     recurrence_kind: input.recurrence_kind,
-    recurrence_byday: input.recurrence_kind === "weekly" || input.recurrence_kind === "biweekly"
-      ? input.recurrence_byday
-      : null,
-    recurrence_until: input.recurrence_until || null,
+    recurrence_interval:
+      input.recurrence_kind === "none"
+        ? 1
+        : Math.min(12, Math.max(1, Math.round(input.recurrence_interval) || 1)),
+    recurrence_bydays:
+      input.recurrence_kind === "weekly" && input.recurrence_bydays?.length
+        ? [...new Set(input.recurrence_bydays.filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b)
+        : null,
+    // "On a date" and "after N occurrences" are mutually exclusive ends.
+    recurrence_until: input.recurrence_kind !== "none" && input.recurrence_until ? input.recurrence_until : null,
+    recurrence_count:
+      input.recurrence_kind !== "none" && !input.recurrence_until && input.recurrence_count
+        ? Math.min(500, Math.max(1, Math.round(input.recurrence_count)))
+        : null,
+    all_day: !!input.all_day,
     signup_questions,
   };
 
   if (input.id) {
     const { error } = await sb.from("events").update(payload).eq("id", input.id);
     if (error) return { ok: false, error: error.message };
+    // Keep the church Google Calendar in step with edits to live events.
+    if (existing?.published) await syncEventToCalendar(input.id);
     revalidateAllEventSurfaces(payload.slug);
     return { ok: true, id: input.id };
   }
@@ -182,8 +212,8 @@ async function loadSnapshot(id: string): Promise<EventSnapshot | null> {
 export async function submitForApproval(id: string): Promise<EventActionResult> {
   const pu = await requireStaff();
   const email = pu.email;
-  const category = await eventCategory(id);
-  if (category && !inScope(pu, category)) {
+  const meta = await eventMeta(id);
+  if (meta && !inScope(pu, meta.category)) {
     return { ok: false, error: "That event belongs to another ministry." };
   }
 
@@ -245,6 +275,7 @@ async function publishDirectly(id: string, email: string): Promise<EventActionRe
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await syncEventToCalendar(id);
   revalidateAllEventSurfaces();
   return { ok: true, id };
 }
@@ -274,6 +305,8 @@ export async function approveEvent(id: string): Promise<EventActionResult> {
     })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  await syncEventToCalendar(id);
 
   const snap = await loadSnapshot(id);
   if (snap && submittedBy) {
@@ -317,6 +350,8 @@ export async function rejectEvent(id: string, notes: string): Promise<EventActio
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
+  await removeEventFromCalendar(id);
+
   const snap = await loadSnapshot(id);
   if (snap && submittedBy) {
     await Promise.all([
@@ -337,6 +372,8 @@ export async function rejectEvent(id: string, notes: string): Promise<EventActio
 export async function deleteEvent(id: string): Promise<void> {
   const pu = await getPortalUser();
   if (!pu || pu.role !== "pastoral") throw new Error("Only pastoral leadership can delete events.");
+  // Before the row (and its stored calendar id) disappears.
+  await removeEventFromCalendar(id);
   const sb = supabaseAdmin();
   const { error } = await sb.from("events").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -349,6 +386,7 @@ export async function unpublishEvent(id: string): Promise<EventActionResult> {
   if (!pu || pu.role !== "pastoral") return { ok: false, error: "Only pastoral leadership can unpublish." };
   const { error } = await supabaseAdmin().from("events").update({ published: false }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await removeEventFromCalendar(id);
   revalidateAllEventSurfaces();
   return { ok: true, id };
 }
@@ -366,6 +404,7 @@ export async function republishEvent(id: string): Promise<EventActionResult> {
   if (status !== "approved") return { ok: false, error: "Event must be approved before publishing." };
   const { error } = await supabaseAdmin().from("events").update({ published: true }).eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await syncEventToCalendar(id);
   revalidateAllEventSurfaces();
   return { ok: true, id };
 }

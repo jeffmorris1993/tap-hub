@@ -3,8 +3,8 @@ import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 import type { RecurrenceKind } from "../events-occurrence";
 
-const DEFAULT_SUBMIT_FROM = "TapHub Events <events@nehtemple.org>";
-const DEFAULT_RESPONSE_FROM = "TapHub Events <events@nehtemple.org>";
+const DEFAULT_SUBMIT_FROM = "NT Gateway Events <events@nehtemple.org>";
+const DEFAULT_RESPONSE_FROM = "NT Gateway Events <events@nehtemple.org>";
 
 export type EventSnapshot = {
   id: string;
@@ -81,7 +81,7 @@ export async function notifyApproversOfSubmission(
   });
 
   const text = [
-    "A new event has been submitted for your approval through TapHub.",
+    "A new event has been submitted for your approval through NT Gateway.",
     "",
     `Title:     ${event.title}`,
     `When:      ${fmtDate(event.starts_at)}`,
@@ -117,7 +117,7 @@ export async function notifySubmitterOfApproval(
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Event Approved",
     headline: "Your event is approved",
-    intro: `${reviewedBy} approved your submission. It's now live on the TapHub events page.`,
+    intro: `${reviewedBy} approved your submission. It's now live on the NT Gateway events page.`,
     fields: commonFields(event),
     cta: { label: "View public page", href: publicHref },
   });

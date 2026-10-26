@@ -13,7 +13,6 @@ import { igniteParentFormOpen } from "../lib/ignite-form";
 const CHURCH_PHONE = "+12485551234";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
 const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
-const GIVE_URL = process.env.NEXT_PUBLIC_EXTERNAL_GIVE_URL ?? "";
 
 // Force-dynamic so the LivePoller's router.refresh() actually re-runs
 // the data fetches every 30s; ISR would cache the announcements strip
@@ -155,8 +154,7 @@ export default async function Hub() {
             }
           />
           <HubTile
-            href={GIVE_URL || "#"}
-            external
+            href="/give"
             title="Give"
             sub="Support the ministry"
             icon={

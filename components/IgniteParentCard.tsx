@@ -5,7 +5,7 @@ import {
 } from "../lib/ignite-form";
 
 /**
- * Temporary Tap Hub promotion for the Ignite Youth parent/family update form.
+ * Temporary NT Gateway promotion for the Ignite Youth parent/family update form.
  *
  * Rendered only while igniteParentFormOpen() is true (see app/page.tsx), so it
  * retires itself on the close date without anyone deleting code. Uses Ignite's

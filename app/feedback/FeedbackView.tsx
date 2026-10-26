@@ -63,7 +63,7 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
   const [prName, setPrName] = useState("");
   const [contact, setContact] = useState("");
   const [request, setRequest] = useState("");
-  const [prMinistry, setPrMinistry] = useState("General");
+  const [prVisibility, setPrVisibility] = useState<"pastoral" | "bishop">("pastoral");
 
   const [result, setResult] = useState<FeedbackResult | null>(null);
   const [pending, startTransition] = useTransition();
@@ -94,7 +94,7 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
         name: prName,
         contact,
         request,
-        ministry: prMinistry,
+        visibility: prVisibility,
       });
       setResult(r);
     });
@@ -299,19 +299,52 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
                 marginBottom: "7px",
               }}
             >
-              Related ministry (optional)
+              Who should see this?
             </div>
-            <select
-              value={prMinistry}
-              onChange={(e) => setPrMinistry(e.target.value)}
-              style={{ ...inputStyle, marginBottom: "16px", WebkitAppearance: "none", fontWeight: 600 }}
-            >
-              {["General", "Youth", "Sisterhood", "Brotherhood", "Marriage"].map((m) => (
-                <option key={m} value={m}>
-                  {m === "General" ? "General / Church-wide" : m}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+              {(
+                [
+                  {
+                    value: "pastoral",
+                    label: "Bishop + Pastoral team",
+                    sub: "The Bishop and our pastors pray together over your request",
+                  },
+                  {
+                    value: "bishop",
+                    label: "Bishop only",
+                    sub: "Goes to the Bishop alone — no one else sees it",
+                  },
+                ] as const
+              ).map((opt) => {
+                const on = prVisibility === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPrVisibility(opt.value)}
+                    aria-pressed={on}
+                    style={{
+                      textAlign: "left",
+                      background: on ? "rgba(231,184,78,.12)" : "#0b101c",
+                      border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.14)"}`,
+                      borderRadius: "11px",
+                      padding: "12px 14px",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "3px",
+                    }}
+                  >
+                    <span style={{ fontSize: "14px", fontWeight: 800, color: on ? "#e7b84e" : "#f4f1ea" }}>
+                      {opt.label}
+                    </span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 500, color: "#9aa3b8", lineHeight: 1.4 }}>
+                      {opt.sub}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             <div
               style={{
                 display: "flex",
@@ -339,7 +372,9 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
                 <path d="M9.5 12l1.8 1.8 3.2-3.6" />
               </svg>
               <div style={{ fontSize: "13px", fontWeight: 600, color: "#cdd3e0", lineHeight: 1.45 }}>
-                Your prayer request is confidential and goes only to our pastoral team.
+                {prVisibility === "bishop"
+                  ? "Your prayer request is confidential and goes only to the Bishop."
+                  : "Your prayer request is confidential and goes only to the Bishop and our pastoral team."}
               </div>
             </div>
             {result && !result.ok && (

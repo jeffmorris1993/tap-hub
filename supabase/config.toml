@@ -19,6 +19,14 @@ additional_redirect_urls = [
   "https://tap-hub.nehtemple.org/auth/confirm",
 ]
 
+# Portal sessions must not live forever: hard cap at 7 days, signed out
+# after 24 hours of inactivity. Supabase-side enforcement needs a Pro plan
+# (config push 402s on free tier), so proxy.ts enforces the same limits at
+# the app level. Uncomment after upgrading to Pro:
+# [auth.sessions]
+# timebox = "168h"
+# inactivity_timeout = "24h"
+
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true

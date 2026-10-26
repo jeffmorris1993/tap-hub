@@ -7,6 +7,7 @@ import {
   listIgniteFamilies,
 } from "../../../../lib/supabase/admin-queries";
 import { requireLead, ministryScope, type PortalUser } from "../../../../lib/portal-auth";
+import { isBishop } from "../../../../lib/approvers";
 import { parseStoredResponses } from "../../../../lib/event-signup-forms";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +99,7 @@ export default async function Submissions({
 async function loadTab(tab: Tab, pu: PortalUser) {
   const scope = ministryScope(pu);
   if (tab === "visitors") return await listVisitors();
-  if (tab === "prayers") return await listPrayers(100, scope);
+  if (tab === "prayers") return await listPrayers(100, scope, isBishop(pu.email));
   if (tab === "feedback") return await listFeedback(100, scope);
   if (tab === "ignite") return await listIgniteFamilies();
   return await listSignups(200, scope);
@@ -237,7 +238,26 @@ function PrayersTable({ rows }: { rows: Awaited<ReturnType<typeof listPrayers>> 
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
-            <div style={{ fontWeight: 700, fontSize: "14px" }}>{r.name ?? "(anonymous)"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ fontWeight: 700, fontSize: "14px" }}>{r.name ?? "(anonymous)"}</div>
+              {r.visibility === "bishop" && (
+                <span
+                  style={{
+                    background: "rgba(231,184,78,.16)",
+                    color: "#e7b84e",
+                    fontSize: "10.5px",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Bishop only
+                </span>
+              )}
+            </div>
             <div style={{ color: "#9aa3b8", fontSize: "12.5px", whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</div>
           </div>
           {r.contact && (

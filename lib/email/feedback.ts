@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "TapHub Feedback <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Feedback <onboarding@resend.dev>";
 
 export type FeedbackEmailPayload = {
   to: string[];
@@ -42,14 +42,14 @@ export async function notifyPastoralOfFeedback(payload: FeedbackEmailPayload): P
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Feedback",
     headline: "New feedback received",
-    intro: "Someone just shared feedback through TapHub.",
+    intro: "Someone just shared feedback through NT Gateway.",
     fields,
     body: { label: "Their feedback", content: payload.message },
     cta: { label: "Open feedback inbox", href: ctaHref },
   });
 
   const textLines = [
-    "New feedback has been submitted through TapHub.",
+    "New feedback has been submitted through NT Gateway.",
     "",
     `From:     ${fromName}`,
     `Rating:   ${payload.rating ? `${payload.rating} / 5` : "Not rated"}`,

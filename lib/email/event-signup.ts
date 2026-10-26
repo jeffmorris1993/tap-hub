@@ -8,7 +8,7 @@ import {
   type StoredResponse,
 } from "../event-signup-forms";
 
-const DEFAULT_FROM = "TapHub Events <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Events <onboarding@resend.dev>";
 
 const ROLE_LABEL: Record<SignupRole, string> = {
   attendee: "Attending",
@@ -120,5 +120,85 @@ export async function notifyOrganizerOfSignup(payload: SignupEmailPayload): Prom
     if (error) console.error("[event-signup-email] resend error", error);
   } catch (err) {
     console.error("[event-signup-email] send failed", err);
+  }
+}
+
+export type SignerConfirmationPayload = {
+  to: string;
+  event: { slug: string; title: string; location: string };
+  signup: {
+    name: string;
+    roles: SignupRole[];
+    attendance: Attendance | null;
+    /** Detroit calendar date (YYYY-MM-DD) for recurring series, else null. */
+    occurrenceDate: string | null;
+    /** Human-readable when text ("Sat, Oct 24, 2026 · 12:00 PM"). */
+    whenText: string;
+  };
+};
+
+/**
+ * Fire-and-forget confirmation to the person who signed up (only when their
+ * contact looks like an email). Returns true when the send was handed to
+ * Resend without error, so the caller can stamp confirmation_sent_at.
+ */
+export async function notifySignerOfSignup(payload: SignerConfirmationPayload): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !payload.to) return false;
+  const from = process.env.EVENT_SIGNUP_FROM || DEFAULT_FROM;
+  const { event, signup } = payload;
+
+  const roleLabel = signup.roles.map((r) => ROLE_LABEL[r]).join(" + ");
+  const eventHref = `${siteUrl()}/events/${event.slug}${
+    signup.occurrenceDate ? `?date=${signup.occurrenceDate}` : ""
+  }`;
+
+  const fields: Field[] = [
+    { label: "Event", value: event.title },
+    { label: "When", value: signup.whenText },
+    { label: "Where", value: event.location },
+    { label: "You're", value: roleLabel },
+    {
+      label: "Attending for sure?",
+      value: signup.attendance ? ATTENDANCE_LABEL[signup.attendance] : null,
+    },
+  ];
+
+  const html = renderBrandedEmail({
+    eyebrow: "Nehemiah's Temple · Events",
+    headline: "You're signed up!",
+    intro: `Thanks, ${signup.name} — we've saved your spot for ${event.title}. We'll send a reminder before the event.`,
+    fields,
+    cta: { label: "View event details", href: eventHref },
+    footnote: "Need to make a change? Reply to this email or reach out to the church office.",
+  });
+
+  const textLines = [
+    `You're signed up for ${event.title}!`,
+    "",
+    ...fields
+      .filter((f) => f.value != null && String(f.value).trim() !== "")
+      .map((f) => `${f.label}: ${f.value}`),
+    "",
+    `Event details: ${eventHref}`,
+  ];
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from,
+      to: [payload.to],
+      subject: `You're signed up — ${event.title}`,
+      text: textLines.join("\n"),
+      html,
+    });
+    if (error) {
+      console.error("[event-signup-email] signer confirmation resend error", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[event-signup-email] signer confirmation failed", err);
+    return false;
   }
 }

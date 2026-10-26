@@ -5,7 +5,6 @@ import { supabaseSession } from "../../lib/supabase/auth";
 import { notifyPrayerTeam } from "../../lib/email/prayer";
 import { notifyPastoralOfFeedback } from "../../lib/email/feedback";
 import { resolveNotificationRecipients } from "../../lib/notification-routes";
-import { EVENT_CATEGORIES } from "../../lib/event-categories";
 
 export type FeedbackInput = {
   kind: "feedback";
@@ -20,8 +19,8 @@ export type PrayerInput = {
   name: string;
   contact: string;
   request: string;
-  /** Optional ministry tag (Youth / Sisterhood / … / General). */
-  ministry?: string;
+  /** Who may see the request: the Bishop alone, or Bishop + pastoral team. */
+  visibility?: "bishop" | "pastoral";
 };
 
 export type FeedbackResult =
@@ -85,9 +84,7 @@ export async function submitPrayer(input: PrayerInput): Promise<FeedbackResult> 
   const name = input.name?.trim() || null;
   const contact = input.contact?.trim() || null;
   const request = input.request.trim();
-  const ministry = (EVENT_CATEGORIES as readonly string[]).includes(input.ministry ?? "")
-    ? (input.ministry as string)
-    : "General";
+  const visibility = input.visibility === "bishop" ? "bishop" : "pastoral";
 
   const { error } = await supabaseAdmin().from("prayer_requests").insert({
     name,
@@ -95,7 +92,7 @@ export async function submitPrayer(input: PrayerInput): Promise<FeedbackResult> 
     request,
     confidential: true,
     prayer_wall: false,
-    ministry,
+    visibility,
     user_id: await sessionUserId(),
   });
   if (error) {
@@ -103,7 +100,7 @@ export async function submitPrayer(input: PrayerInput): Promise<FeedbackResult> 
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  await notifyPrayerTeam({ name, contact, request, prayerWall: false });
+  await notifyPrayerTeam({ name, contact, request, prayerWall: false, visibility });
 
   return { ok: true, kind: "prayer" };
 }

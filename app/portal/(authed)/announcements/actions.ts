@@ -63,6 +63,11 @@ async function announcementCategory(id: string): Promise<string | null> {
   return (data?.[0] as { category?: string } | undefined)?.category ?? null;
 }
 
+async function announcementStatus(id: string): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("announcements").select("approval_status").eq("id", id).limit(1);
+  return (data?.[0] as { approval_status?: string } | undefined)?.approval_status ?? null;
+}
+
 function bustCaches() {
   revalidatePath("/announcements");
   revalidatePath("/");
@@ -86,6 +91,12 @@ export async function saveAnnouncement(input: AnnouncementInput): Promise<Announ
     const existing = await announcementCategory(input.id);
     if (existing && !inScope(pu, existing)) {
       return { ok: false, error: "That announcement belongs to another ministry." };
+    }
+    if ((await announcementStatus(input.id)) === "pending" && pu.role !== "pastoral") {
+      return {
+        ok: false,
+        error: "This announcement is awaiting review and can't be edited. A pastor can approve it, or reject it with notes to unlock edits.",
+      };
     }
   }
 

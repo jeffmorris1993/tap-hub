@@ -18,7 +18,7 @@ export default async function MyForms() {
   return (
     <div>
       <p style={{ color: "#9aa3b8", fontSize: "14.5px", fontWeight: 600, marginBottom: "18px" }}>
-        Everything you&apos;ve submitted through the Tap Hub.
+        Everything you&apos;ve submitted through the NT Gateway.
       </p>
 
       {forms.length === 0 ? (

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { signUp } from "./actions";
+import { PasswordInput } from "../../../../components/PasswordInput";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -76,13 +77,12 @@ export function SignupForm() {
         placeholder="you@email.com"
         style={inputStyle}
       />
-      <input
-        type="password"
+      <PasswordInput
         required
         minLength={8}
         autoComplete="new-password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={setPassword}
         placeholder="Password (8+ characters)"
         style={inputStyle}
       />

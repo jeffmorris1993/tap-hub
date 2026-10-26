@@ -61,6 +61,19 @@ function eventToTimeline(e: DisplayEvent, nowMinutes: number): TimelineRow {
     const end = new Date(e.ends_at);
     durationMinutes = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
   }
+  // All-day events pin to the top of the list and show "All day" instead of
+  // a midnight timestamp, staying "live" for the whole day.
+  if (e.all_day) {
+    return {
+      label: e.title,
+      where: e.location,
+      time: "All",
+      ampm: "day",
+      status: "live",
+      href: `/events/${e.slug}`,
+      sortMinutes: -1,
+    };
+  }
   const t = formatTime(startMinutes);
   return {
     label: e.title,

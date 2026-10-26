@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   if (parsed.eventType === "ADDED_TO_SPACE") {
     const text =
-      "👋 TapHub assistant connected. Talk to me in plain English — schedule services, " +
+      "👋 NT Gateway assistant connected. Talk to me in plain English — schedule services, " +
       "add events, post the youth lesson, or ask 'how many new visitors today'.";
     await logRow({
       sender: parsed.senderEmail ?? "(unknown)",

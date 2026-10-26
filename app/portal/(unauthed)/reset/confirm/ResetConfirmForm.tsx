@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { confirmPasswordReset } from "../actions";
+import { PasswordInput } from "../../../../../components/PasswordInput";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -74,14 +75,12 @@ export function ResetConfirmForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <input
-        type="password"
+      <PasswordInput
         required
         minLength={8}
         autoComplete="new-password"
-        autoFocus
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={setPassword}
         placeholder="New password (8+ characters)"
         style={inputStyle}
       />

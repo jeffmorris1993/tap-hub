@@ -17,7 +17,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "Nehemiah's Temple · Tap Hub",
+  title: "Nehemiah's Temple · NT Gateway",
   description:
     "Welcome to Nehemiah's Temple Apostolic Church. Tap in for today's schedule, events, and ways to get plugged in.",
 };

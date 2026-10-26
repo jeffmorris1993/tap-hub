@@ -13,6 +13,28 @@ const PUBLIC_PORTAL_PATHS = [
   "/auth/sign-out",
 ];
 
+// App-level session limits (Supabase's own [auth.sessions] timebox needs a
+// Pro plan): hard cap 7 days, signed out after 24h without portal activity.
+const SESSION_TIMEBOX_MS = 7 * 24 * 3600_000;
+const SESSION_IDLE_MS = 24 * 3600_000;
+const SESSION_START_COOKIE = "portal-session-start";
+const SESSION_SEEN_COOKIE = "portal-last-seen";
+
+function expireSession(request: NextRequest, pathname: string): NextResponse {
+  const redirect = new URL("/portal/login", request.url);
+  redirect.searchParams.set("next", pathname);
+  redirect.searchParams.set("error", "expired");
+  const res = NextResponse.redirect(redirect);
+  // Drop the Supabase auth cookies plus our trackers so the next visit
+  // starts clean.
+  for (const c of request.cookies.getAll()) {
+    if (c.name.startsWith("sb-")) res.cookies.delete(c.name);
+  }
+  res.cookies.delete(SESSION_START_COOKIE);
+  res.cookies.delete(SESSION_SEEN_COOKIE);
+  return res;
+}
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (!pathname.startsWith("/portal")) return NextResponse.next();
@@ -45,6 +67,18 @@ export async function proxy(request: NextRequest) {
     redirect.searchParams.set("next", pathname);
     return NextResponse.redirect(redirect);
   }
+
+  // Enforce session lifetime: hard 7-day cap from first portal visit of this
+  // session, 24h idle timeout between portal visits.
+  const now = Date.now();
+  const start = Number(request.cookies.get(SESSION_START_COOKIE)?.value) || 0;
+  const seen = Number(request.cookies.get(SESSION_SEEN_COOKIE)?.value) || 0;
+  if ((start && now - start > SESSION_TIMEBOX_MS) || (seen && now - seen > SESSION_IDLE_MS)) {
+    return expireSession(request, pathname);
+  }
+  const cookieOpts = { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: 30 * 24 * 3600 };
+  if (!start) response.cookies.set({ name: SESSION_START_COOKIE, value: String(now), ...cookieOpts });
+  response.cookies.set({ name: SESSION_SEEN_COOKIE, value: String(now), ...cookieOpts });
 
   return response;
 }

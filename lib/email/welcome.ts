@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "TapHub Welcome <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Welcome <onboarding@resend.dev>";
 
 export type WelcomeEmailPayload = {
   name: string;
@@ -51,7 +51,7 @@ export async function notifyWelcomeTeam(payload: WelcomeEmailPayload): Promise<v
   const ctaHref = `${siteUrl()}/portal/submissions?tab=visitors`;
 
   const html = renderBrandedEmail({
-    eyebrow: "Nehemiah's Temple · TapHub Welcome",
+    eyebrow: "Nehemiah's Temple · NT Gateway Welcome",
     headline: isFirstTime ? "New first-time visitor" : "New connect card",
     intro: isFirstTime
       ? "Someone just filled out the I'm New Here card and said it's their first time. A quick reach-out from the welcome team this week would mean a lot."
@@ -61,11 +61,11 @@ export async function notifyWelcomeTeam(payload: WelcomeEmailPayload): Promise<v
       : { variant: "info", text: "Heads up — they didn't share contact info, so following up directly isn't possible." },
     fields,
     cta: { label: ctaLabel, href: ctaHref },
-    footnote: "The full record is also saved in the TapHub admin inbox.",
+    footnote: "The full record is also saved in the NT Gateway admin inbox.",
   });
 
   const textLines = [
-    "A new I'm New Here submission has been received through TapHub.",
+    "A new I'm New Here submission has been received through NT Gateway.",
     "",
     `Name:        ${payload.name}`,
     `Email:       ${payload.email ?? "(none shared)"}`,

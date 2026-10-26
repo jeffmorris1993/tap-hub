@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // response came.
     await sendTwilioSms({
       to: fromPhone,
-      body: "This TapHub agent only accepts texts from staff phones on the allowlist. Contact websitemediaadmin@nehtemple.org to be added.",
+      body: "This NT Gateway agent only accepts texts from staff phones on the allowlist. Contact websitemediaadmin@nehtemple.org to be added.",
     });
     return twiml("");
   }

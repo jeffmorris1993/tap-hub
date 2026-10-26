@@ -58,9 +58,12 @@ function fmtRangeDate(d: Date, withYear = false): string {
 export function formatWhenText(row: EventRow, fromDate: Date): string {
   const start = new Date(row.starts_at);
   const end = row.ends_at ? new Date(row.ends_at) : null;
+  const allDay = !!row.all_day;
   const startTime = fmtTime(start);
   const endTime = end ? fmtTime(end) : null;
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
+  // All-day events carry no meaningful times — show dates alone.
+  const withTime = (datePart: string) => (allDay ? datePart : `${datePart} · ${timeRange}`);
 
   // Recurring with a bounded window — show the range + daily time.
   if (
@@ -68,25 +71,31 @@ export function formatWhenText(row: EventRow, fromDate: Date): string {
     row.recurrence_until
   ) {
     const until = new Date(`${row.recurrence_until}T23:59:59`);
-    const sameYear = start.getFullYear() === until.getFullYear();
+    const sameYear = detroitDayIso(start).slice(0, 4) === row.recurrence_until.slice(0, 4);
     const startStr = fmtRangeDate(start, !sameYear);
     const untilStr = fmtRangeDate(until, true);
-    const prefix = row.recurrence_kind === "weekdays" ? "Mon–Fri" : "Daily";
-    return `${prefix} ${startStr} – ${untilStr} · ${timeRange}`;
+    const prefix =
+      recurrenceLabel(row.recurrence_kind, row.starts_at, {
+        interval: row.recurrence_interval,
+        bydays: row.recurrence_bydays,
+      }) || "Daily";
+    return withTime(`${prefix} ${startStr} – ${untilStr}`);
   }
 
-  // One-off multi-day continuous block (no recurrence, ends on a different day)
-  if (row.recurrence_kind === "none" && end && start.toDateString() !== end.toDateString()) {
-    const sameYear = start.getFullYear() === end.getFullYear();
+  // One-off multi-day continuous block (no recurrence, ends on a different
+  // Detroit day — toDateString() would compare server-local days).
+  if (row.recurrence_kind === "none" && end && detroitDayIso(start) !== detroitDayIso(end)) {
+    const sameYear = detroitDayIso(start).slice(0, 4) === detroitDayIso(end).slice(0, 4);
     const startStr = fmtRangeDate(start, !sameYear);
     const endStr = fmtRangeDate(end, true);
-    return `${startStr} – ${endStr} · ${timeRange}`;
+    return withTime(`${startStr} – ${endStr}`);
   }
 
   // Default: show the next occurrence date + time
   const next = nextOccurrence(row as RecurringEventFields, fromDate) ?? start;
-  const nextEnd = end ? new Date(next.getTime() + (end.getTime() - start.getTime())) : null;
   const fullDate = fmtFullDate(next);
+  if (allDay) return fullDate;
+  const nextEnd = end ? new Date(next.getTime() + (end.getTime() - start.getTime())) : null;
   if (nextEnd) return `${fullDate} · ${fmtTime(next)} – ${fmtTime(nextEnd)}`;
   return `${fullDate} · ${fmtTime(next)}`;
 }
@@ -118,7 +127,10 @@ export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): Disp
     month: chip.month,
     day: chip.day,
     whenText: formatWhenText(row, fromDate),
-    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at),
+    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at, {
+      interval: row.recurrence_interval,
+      bydays: row.recurrence_bydays,
+    }),
     hue: hueFromSlug(row.slug),
     nextOccurrenceIso: next ? next.toISOString() : null,
     signupOpen: next !== null,
@@ -161,21 +173,30 @@ export function toDisplayOccurrence(row: EventRow, start: Date, fromDate: Date =
   const date = detroitDayIso(start);
   const chip = formatEventDateChip(start);
   const end = row.ends_at ? new Date(row.ends_at) : null;
+  const allDay = !!row.all_day;
   const durationMs = end ? end.getTime() - new Date(row.starts_at).getTime() : 0;
   const occEnd = durationMs > 0 ? new Date(start.getTime() + durationMs) : null;
   const timeText = occEnd ? `${fmtTime(start)} – ${fmtTime(occEnd)}` : fmtTime(start);
-  // daily/weekdays runs keep their range-style whenText ("Mon–Fri Jul 24 –
-  // Aug 28 · 9 AM"); everything else shows this occurrence's own date.
+  // daily/weekdays runs and one-off multi-day blocks keep their range-style
+  // whenText ("Mon–Fri Jul 24 – Aug 28 · 9 AM", "Oct 24 – Dec 6, 2026");
+  // everything else shows this occurrence's own date.
+  const isMultiDayBlock =
+    row.recurrence_kind === "none" && end && detroitDayIso(new Date(row.starts_at)) !== detroitDayIso(end);
   const whenText =
-    row.recurrence_kind === "daily" || row.recurrence_kind === "weekdays"
+    row.recurrence_kind === "daily" || row.recurrence_kind === "weekdays" || isMultiDayBlock
       ? formatWhenText(row, fromDate)
-      : `${fmtFullDate(start)} · ${timeText}`;
+      : allDay
+        ? fmtFullDate(start)
+        : `${fmtFullDate(start)} · ${timeText}`;
   return {
     ...row,
     month: chip.month,
     day: chip.day,
     whenText,
-    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at),
+    recurrenceLabel: recurrenceLabel(row.recurrence_kind, row.starts_at, {
+      interval: row.recurrence_interval,
+      bydays: row.recurrence_bydays,
+    }),
     hue: hueFromSlug(row.slug),
     nextOccurrenceIso: start.toISOString(),
     signupOpen: true,

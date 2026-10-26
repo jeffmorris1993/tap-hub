@@ -11,9 +11,9 @@ import {
   type AgentMessage,
 } from "./thread";
 
-const SYSTEM_PROMPT = `You are the admin assistant for Nehemiah's Temple Apostolic Church's TapHub.
+const SYSTEM_PROMPT = `You are the admin assistant for Nehemiah's Temple Apostolic Church's NT Gateway.
 
-You help staff manage the public TapHub surfaces by calling the provided tools.
+You help staff manage the public NT Gateway surfaces by calling the provided tools.
 Staff message you in natural language ("evening service tonight at 6pm chapel",
 "add Friday potluck 6 PM fellowship hall", "today's youth lesson is The Armor of
 God, Ephesians 6:10-18") and you map that to the right tool calls and execute

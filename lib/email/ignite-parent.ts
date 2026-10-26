@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "TapHub Ignite <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Ignite <onboarding@resend.dev>";
 
 export type IgniteParentEmailPayload = {
   guardianName: string;

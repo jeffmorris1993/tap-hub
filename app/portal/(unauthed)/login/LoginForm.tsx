@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { sendMagicLink, signInWithPassword } from "./actions";
+import { PasswordInput } from "../../../../components/PasswordInput";
+
+// Bank-style "remember me": only the email is kept (localStorage), never
+// the password.
+const REMEMBER_KEY = "portal-remembered-email";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -35,12 +40,27 @@ export function LoginForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [magic, setMagic] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_KEY);
+      if (saved) {
+        setEmail(saved);
+        setRemember(true);
+      }
+    } catch {}
+  }, []);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    try {
+      if (remember && email) localStorage.setItem(REMEMBER_KEY, email);
+      else localStorage.removeItem(REMEMBER_KEY);
+    } catch {}
     startTransition(async () => {
       const r = magic
         ? await sendMagicLink({ email, next })
@@ -64,16 +84,42 @@ export function LoginForm({ next }: { next: string }) {
         style={inputStyle}
       />
       {!magic && (
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="current-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
           placeholder="Password"
           style={inputStyle}
         />
       )}
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "9px",
+          color: "#9aa3b8",
+          fontSize: "13px",
+          fontWeight: 700,
+          marginBottom: "14px",
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={(e) => {
+            setRemember(e.target.checked);
+            if (!e.target.checked) {
+              try {
+                localStorage.removeItem(REMEMBER_KEY);
+              } catch {}
+            }
+          }}
+          style={{ width: "16px", height: "16px", accentColor: "#e7b84e" }}
+        />
+        Remember my email
+      </label>
       {error && (
         <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>{error}</div>
       )}

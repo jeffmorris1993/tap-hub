@@ -66,7 +66,7 @@ export default function ParentUpdate() {
           </p>
           <p style={{ color: "#9aa3b8", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "12px" }}>
             If you still need to reach us, talk with an Ignite leader on a Sunday or Wednesday, or
-            send us a note through the Tap Hub.
+            send us a note through the NT Gateway.
           </p>
           <div
             style={{
@@ -92,7 +92,7 @@ export default function ParentUpdate() {
                 textDecoration: "none",
               }}
             >
-              Back to Tap Hub
+              Back to NT Gateway
             </Link>
             <Link
               href="/feedback"

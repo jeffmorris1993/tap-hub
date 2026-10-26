@@ -78,15 +78,104 @@ export function detroitDayIso(instant: Date): string {
   return wallDateIso(detroitWall(instant));
 }
 
+type EffectiveRecurrence = {
+  kind: "none" | "daily" | "weekly" | "monthly" | "monthly_weekday";
+  interval: number;
+  bydays: number[] | null;
+};
+
+/**
+ * Normalizes an event's recurrence onto the v2 shape: legacy `biweekly`
+ * becomes weekly/interval-2, legacy `weekdays` becomes weekly Mon–Fri, the
+ * legacy single `recurrence_byday` feeds `bydays` when the array is unset.
+ */
+export function effectiveRecurrence(event: RecurringEventFields): EffectiveRecurrence {
+  const interval = Math.max(1, event.recurrence_interval ?? 1);
+  const bydays = event.recurrence_bydays?.length
+    ? [...new Set(event.recurrence_bydays)].sort((a, b) => a - b)
+    : event.recurrence_byday != null
+      ? [event.recurrence_byday]
+      : null;
+  switch (event.recurrence_kind) {
+    case "biweekly":
+      return { kind: "weekly", interval: Math.max(2, interval), bydays };
+    case "weekdays":
+      return { kind: "weekly", interval, bydays: bydays ?? [1, 2, 3, 4, 5] };
+    case "daily":
+    case "weekly":
+    case "monthly":
+    case "monthly_weekday":
+      return { kind: event.recurrence_kind, interval, bydays };
+    default:
+      return { kind: "none", interval: 1, bydays: null };
+  }
+}
+
+// Backstop for unbounded series scans (a daily event running for decades).
+const MAX_SERIES_SCAN = 20000;
+
+/** Yields the series' occurrence days (epoch-day numbers) in order, unbounded. */
+function* seriesDays(eff: EffectiveRecurrence, startDay: number): Generator<number> {
+  if (eff.kind === "daily") {
+    for (let d = startDay; ; d += eff.interval) yield d;
+  } else if (eff.kind === "weekly") {
+    const bydays = eff.bydays?.length ? eff.bydays : [dayOfWeek(startDay)];
+    // Weeks are Sunday-anchored; the phase is pinned to the start date's week.
+    const anchor = startDay - dayOfWeek(startDay);
+    for (let week = anchor; ; week += 7 * eff.interval) {
+      for (const dow of bydays) {
+        const day = week + dow;
+        if (day >= startDay) yield day;
+      }
+    }
+  } else if (eff.kind === "monthly") {
+    const w = dayToWall(startDay);
+    let year = w.y;
+    let month = w.mo;
+    for (;;) {
+      const ms = Date.UTC(year, month - 1, w.d);
+      // Skips invalid dates (Feb 30 → Mar 2 would change the month).
+      if (new Date(ms).getUTCMonth() === month - 1) yield Math.round(ms / DAY_MS);
+      month += eff.interval;
+      while (month > 12) {
+        month -= 12;
+        year += 1;
+      }
+    }
+  } else if (eff.kind === "monthly_weekday") {
+    const w = dayToWall(startDay);
+    const wantDow = dayOfWeek(startDay);
+    const nth = Math.floor((w.d - 1) / 7); // 0-based week-of-month
+    let year = w.y;
+    let month = w.mo;
+    for (;;) {
+      const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+      const dom = 1 + ((wantDow - firstDow + 7) % 7) + nth * 7;
+      const ms = Date.UTC(year, month - 1, dom);
+      // A 5th weekday can overflow into the next month — skip those.
+      if (new Date(ms).getUTCMonth() === month - 1) {
+        const day = Math.round(ms / DAY_MS);
+        if (day >= startDay) yield day;
+      }
+      month += eff.interval;
+      while (month > 12) {
+        month -= 12;
+        year += 1;
+      }
+    }
+  }
+}
+
 /**
  * The next occurrence starting at or after `now` (Detroit semantics), or
  * null when the event has none left — a one-off in the past, or a recurrence
- * window that has ended.
+ * that ended (recurrence_until passed, or recurrence_count exhausted).
  */
 export function nextOccurrence(event: RecurringEventFields, now: Date = new Date()): Date | null {
   const start = new Date(event.starts_at);
   if (isNaN(start.getTime())) return null;
-  if (event.recurrence_kind === "none") {
+  const eff = effectiveRecurrence(event);
+  if (eff.kind === "none") {
     return start.getTime() >= now.getTime() ? start : null;
   }
 
@@ -100,67 +189,15 @@ export function nextOccurrence(event: RecurringEventFields, now: Date = new Date
     base += 1;
   }
 
-  let candidate: number | null = null;
-
-  if (event.recurrence_kind === "daily") {
-    candidate = base;
-  } else if (event.recurrence_kind === "weekdays") {
-    candidate = base;
-    while (dayOfWeek(candidate) === 0 || dayOfWeek(candidate) === 6) candidate += 1;
-  } else if (event.recurrence_kind === "weekly" || event.recurrence_kind === "biweekly") {
-    const wantDow = event.recurrence_byday ?? dayOfWeek(startDay);
-    candidate = base + ((wantDow - dayOfWeek(base) + 7) % 7);
-    if (event.recurrence_kind === "biweekly") {
-      const phase = (((candidate - startDay) % 14) + 14) % 14;
-      if (phase !== 0) candidate += 14 - phase;
-    }
-  } else if (event.recurrence_kind === "monthly") {
-    const wantDom = w.d;
-    const baseW = dayToWall(base);
-    let year = baseW.y;
-    let month = baseW.mo;
-    for (let i = 0; i < 24; i++) {
-      const ms = Date.UTC(year, month - 1, wantDom);
-      const valid = new Date(ms).getUTCMonth() === month - 1; // weeds out Feb 30 → Mar 2
-      const day = Math.round(ms / DAY_MS);
-      if (valid && day >= base) {
-        candidate = day;
-        break;
-      }
-      month += 1;
-      if (month > 12) {
-        month = 1;
-        year += 1;
-      }
-    }
-  } else if (event.recurrence_kind === "monthly_weekday") {
-    const wantDow = dayOfWeek(startDay);
-    const nth = Math.floor((w.d - 1) / 7); // 0-based week-of-month
-    const baseW = dayToWall(base);
-    let year = baseW.y;
-    let month = baseW.mo;
-    for (let i = 0; i < 24; i++) {
-      const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-      const dom = 1 + ((wantDow - firstDow + 7) % 7) + nth * 7;
-      const ms = Date.UTC(year, month - 1, dom);
-      const valid = new Date(ms).getUTCMonth() === month - 1; // a 5th weekday can overflow
-      const day = Math.round(ms / DAY_MS);
-      if (valid && day >= base) {
-        candidate = day;
-        break;
-      }
-      month += 1;
-      if (month > 12) {
-        month = 1;
-        year += 1;
-      }
-    }
+  let index = 0; // occurrences before the one under consideration
+  for (const day of seriesDays(eff, startDay)) {
+    if (event.recurrence_count != null && index >= event.recurrence_count) return null;
+    if (event.recurrence_until && wallDateIso(dayToWall(day)) > event.recurrence_until) return null;
+    if (day >= base) return wallToInstant(dayToWall(day), w.hh, w.mm);
+    index += 1;
+    if (index >= MAX_SERIES_SCAN) return null;
   }
-
-  if (candidate === null) return null;
-  const candW = dayToWall(candidate);
-  if (event.recurrence_until && wallDateIso(candW) > event.recurrence_until) return null;
-  return wallToInstant(candW, w.hh, w.mm);
+  return null;
 }
 
 /**
@@ -197,7 +234,17 @@ export function occurrenceOnDate(event: RecurringEventFields, dateIso: string): 
 export function isSeriesOver(event: RecurringEventFields, todayIso: string): boolean {
   const midnight = localToUtcIso(`${todayIso}T00:00`);
   if (!midnight) return false;
-  return nextOccurrence(event, new Date(new Date(midnight).getTime() - 60000)) === null;
+  if (event.recurrence_kind === "none") {
+    // A multi-day block (ends_at on a later day) stays live until it's over —
+    // nextOccurrence alone would drop it the day after it starts. Over means
+    // the whole block finished before today began.
+    const s = new Date(event.starts_at).getTime();
+    const e = event.ends_at ? new Date(event.ends_at).getTime() : NaN;
+    const last = Math.max(s, isNaN(e) ? s : e);
+    return last < new Date(midnight).getTime();
+  }
+  const probe = new Date(new Date(midnight).getTime() - 60000);
+  return nextOccurrence(event, probe) === null;
 }
 
 /**
@@ -231,47 +278,48 @@ export type CalendarLinkOptions = {
   occurrence?: Date | null;
 };
 
-/** Start/end instants for the calendar entry. Defaults to 1 hour when ends_at is unset. */
+/** Start/end instants for the calendar entry. Defaults to 1 hour when ends_at
+ *  is unset (a full day for all-day events). */
 export function calendarTimes(event: RecurringEventFields, opts: CalendarLinkOptions = {}): { start: Date; end: Date } {
   const start = opts.occurrence ?? occurrenceStart(event, opts.now);
   const s = new Date(event.starts_at).getTime();
   const e = event.ends_at ? new Date(event.ends_at).getTime() : NaN;
-  const durationMs = e > s ? e - s : 3600000;
+  const durationMs = e > s ? e - s : event.all_day ? DAY_MS - 60000 : 3600000;
   return { start, end: new Date(start.getTime() + durationMs) };
 }
 
 /** RRULE body (no "RRULE:" prefix) for recurring events, else null. */
 export function buildRrule(event: RecurringEventFields, dtstart: Date): string | null {
-  if (event.recurrence_kind === "none") return null;
+  const eff = effectiveRecurrence(event);
+  if (eff.kind === "none") return null;
   const w = detroitWall(dtstart);
-  const byday = ICAL_DAYS[dayOfWeek(dayNumber(w))];
+  const startByday = ICAL_DAYS[dayOfWeek(dayNumber(w))];
   let rule: string;
-  switch (event.recurrence_kind) {
+  switch (eff.kind) {
     case "daily":
       rule = "FREQ=DAILY";
       break;
-    case "weekdays":
-      rule = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+    case "weekly": {
+      const days = (eff.bydays?.length ? eff.bydays : [dayOfWeek(dayNumber(w))])
+        .map((d) => ICAL_DAYS[d])
+        .join(",");
+      rule = `FREQ=WEEKLY;BYDAY=${days}`;
       break;
-    case "weekly":
-      rule = `FREQ=WEEKLY;BYDAY=${byday}`;
-      break;
-    case "biweekly":
-      rule = `FREQ=WEEKLY;INTERVAL=2;BYDAY=${byday}`;
-      break;
+    }
     case "monthly":
       rule = `FREQ=MONTHLY;BYMONTHDAY=${w.d}`;
       break;
     case "monthly_weekday":
-      rule = `FREQ=MONTHLY;BYDAY=${Math.floor((w.d - 1) / 7) + 1}${byday}`;
+      rule = `FREQ=MONTHLY;BYDAY=${Math.floor((w.d - 1) / 7) + 1}${startByday}`;
       break;
-    default:
-      return null;
   }
+  if (eff.interval > 1) rule += `;INTERVAL=${eff.interval}`;
   if (event.recurrence_until) {
     // recurrence_until is the inclusive last day (Detroit).
     const untilIso = localToUtcIso(`${event.recurrence_until}T23:59:59`);
     if (untilIso) rule += `;UNTIL=${icsUtcStamp(new Date(untilIso))}`;
+  } else if (event.recurrence_count != null) {
+    rule += `;COUNT=${event.recurrence_count}`;
   }
   return rule;
 }
@@ -376,7 +424,7 @@ export function buildEventIcs(event: CalendarEventInput, pageUrl?: string, opts:
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TAP Hub//Events//EN",
+    "PRODID:-//NT Gateway//Events//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     ...VTIMEZONE,

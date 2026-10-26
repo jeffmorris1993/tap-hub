@@ -328,10 +328,15 @@ export function EventDetailView({
   event,
   occurrence,
   choices,
+  prefill,
+  signedIn = false,
 }: {
   event: DisplayEvent;
   occurrence: SelectedOccurrence | null;
   choices: OccurrenceChoice[];
+  /** Signed-in member's name/email, used to pre-fill the signup form. */
+  prefill?: { name: string; contact: string };
+  signedIn?: boolean;
 }) {
   // Three independent signup affordances:
   //   1. External Register button   — whenever registration_url is set
@@ -352,8 +357,8 @@ export function EventDetailView({
   const [roles, setRoles] = useState<("attendee" | "volunteer")[]>(
     hasInAppAttend ? ["attendee"] : ["volunteer"],
   );
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [contact, setContact] = useState(prefill?.contact ?? "");
   const [notes, setNotes] = useState("");
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [attendeeAnswers, setAttendeeAnswers] = useState<SignupAnswers>({});
@@ -846,6 +851,16 @@ export function EventDetailView({
                       placeholder="Email or phone"
                       style={{ ...inputStyle, marginBottom: "12px" }}
                     />
+                    {!signedIn && (
+                      <div style={{ marginBottom: "12px", textAlign: "right" }}>
+                        <Link
+                          href={`/portal/login?next=/events/${event.slug}`}
+                          style={{ color: "#9aa3b8", fontSize: "12.5px", fontWeight: 700, textDecoration: "none" }}
+                        >
+                          Have an account? Sign in to autofill →
+                        </Link>
+                      </div>
+                    )}
                     {attending && (
                       <div style={{ marginBottom: "12px" }}>
                         <div style={fieldLabelStyle}>Are you attending for sure?</div>
