@@ -9,10 +9,12 @@ import type { SignupRole } from "../../../../lib/event-signup-forms";
 export const dynamic = "force-dynamic";
 
 /**
- * Hourly Vercel Cron (vercel.json): emails everyone signed up for an event
- * occurrence starting within the next REMINDER_HOURS_BEFORE hours (default
- * 24). The event_reminder_sends log makes reruns idempotent — each signup
- * gets at most one reminder per occurrence.
+ * Daily Vercel Cron (vercel.json, 12:00 UTC ≈ Detroit morning — Hobby plans
+ * only allow daily crons): emails everyone signed up for an event occurrence
+ * starting within the next REMINDER_HOURS_BEFORE hours (default 36, so the
+ * morning run covers everything happening through tomorrow evening). The
+ * event_reminder_sends log makes reruns idempotent — each signup gets at
+ * most one reminder per occurrence.
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,7 +57,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const hours = Number(process.env.REMINDER_HOURS_BEFORE ?? 24) || 24;
+  const hours = Number(process.env.REMINDER_HOURS_BEFORE ?? 36) || 36;
   const now = new Date();
   const windowEnd = now.getTime() + hours * 3600_000;
 
@@ -79,9 +81,8 @@ export async function GET(request: Request) {
   for (const ev of (events ?? []) as unknown as EventRowLite[]) {
     const occ = nextOccurrence(ev, now);
     if (!occ) continue;
-    // Only occurrences inside the reminder window. The hourly cadence means
-    // each occurrence enters the window exactly once; the sent-log below
-    // covers retries and manual runs.
+    // Only occurrences inside the reminder window; the sent-log below keeps
+    // repeat runs (and manual triggers) from double-sending.
     if (occ.getTime() > windowEnd) continue;
     const occDate = detroitDayIso(occ);
 

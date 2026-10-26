@@ -53,10 +53,12 @@ update on edit, delete on unpublish/reject/delete). To enable it:
 
 ## Event reminder emails (cron)
 
-`vercel.json` schedules `/api/cron/reminders` hourly. Set `CRON_SECRET` in Vercel
-(the platform sends it as a bearer token automatically). Everyone signed up with an
-email contact gets one reminder per occurrence, `REMINDER_HOURS_BEFORE` (default 24)
-hours ahead; the `event_reminder_sends` table makes reruns idempotent.
+`vercel.json` schedules `/api/cron/reminders` daily at 12:00 UTC (Detroit morning —
+Vercel Hobby only allows daily crons). Set `CRON_SECRET` in Vercel (the platform
+sends it as a bearer token automatically). Everyone signed up with an email contact
+gets one reminder per occurrence, sent the morning run before it starts
+(`REMINDER_HOURS_BEFORE` window, default 36h); the `event_reminder_sends` table
+makes reruns idempotent.
 
 ## Session expiry
 
