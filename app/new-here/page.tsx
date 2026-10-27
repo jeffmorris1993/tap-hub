@@ -109,7 +109,7 @@ export default function NewHere() {
               So glad you&apos;re here
             </h3>
             <p style={{ color: "#9aa3b8", fontSize: "15px", fontWeight: 500, lineHeight: 1.6, marginTop: "12px" }}>
-              Thanks, {result.firstName} — someone from our welcome team will reach out soon. Come say hi at the Welcome Desk this Sunday!
+              Thanks, {result.firstName} — someone from our welcome team will reach out soon.
             </p>
             <Link
               href="/"

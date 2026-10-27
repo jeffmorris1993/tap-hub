@@ -676,7 +676,7 @@ function FollowUpTab({
         }}
       >
         These are members with no recorded check-in for 3 or more Sunday services in a row. They are{" "}
-        <strong>possible</strong> follow-ups, not confirmed absences. Only Sundays that took place after a
+        <strong>possible</strong>{" "}follow-ups, not confirmed absences. Only Sundays that took place after a
         member&apos;s first check-in are counted. Nobody is contacted automatically.
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 700, fontSize: "15.5px", cursor: "pointer", minHeight: "44px" }}>
