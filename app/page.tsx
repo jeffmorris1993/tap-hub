@@ -59,6 +59,61 @@ export default async function Hub() {
           </p>
         </div>
 
+        {/* check in */}
+        <Link
+          href="/checkin"
+          style={{
+            margin: "18px 20px 0",
+            background: "#e7b84e",
+            borderRadius: "18px",
+            padding: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            boxShadow: "0 14px 34px -12px rgba(231,184,78,.55)",
+            textDecoration: "none",
+            color: "inherit",
+          }}
+        >
+          <span
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "14px",
+              background: "rgba(11,16,28,.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0b101c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8 12.5l2.7 2.7L16.5 9" />
+            </svg>
+          </span>
+          <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span
+              style={{
+                fontFamily: "var(--font-anton)",
+                fontWeight: 400,
+                textTransform: "uppercase",
+                fontSize: "26px",
+                color: "#0b101c",
+                lineHeight: 1,
+              }}
+            >
+              Check In
+            </span>
+            <span style={{ fontSize: "14px", fontWeight: 700, color: "#4d3b10", lineHeight: 1.35 }}>
+              Here for service? Let us know →
+            </span>
+          </span>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M9 6l6 6-6 6" stroke="#0b101c" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+
         <TodayBanner schedule={schedule} sundayFallback={sundayFallback} />
 
         {/* I'm New feature */}

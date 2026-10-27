@@ -96,6 +96,12 @@ export const ICONS: Record<string, ReactNode> = {
       <path d="M10.3 19a2 2 0 0 0 3.4 0" />
     </svg>
   ),
+  checkin: (
+    <svg {...ic}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l2.7 2.7L16.5 9" />
+    </svg>
+  ),
 };
 
 /**
@@ -134,6 +140,7 @@ export function buildNavForRole(
   return [
     overview,
     { href: "/portal/submissions", label: "Inbox", icon: ICONS.inbox },
+    { href: "/portal/attendance", label: "Attendance", icon: ICONS.checkin },
     { href: "/portal/events", label: "Events", icon: ICONS.calendar },
     {
       href: "/portal/events/pending",

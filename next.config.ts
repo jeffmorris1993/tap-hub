@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
         destination: "/auth/callback",
         permanent: false,
       },
+      // Printed NFC tags and QR codes point at /?checkin — keep them working.
+      {
+        source: "/",
+        has: [{ type: "query", key: "checkin" }],
+        destination: "/checkin",
+        permanent: false,
+      },
       {
         source: "/",
         has: [{ type: "query", key: "token_hash" }],
