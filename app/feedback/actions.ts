@@ -6,8 +6,8 @@ import { notifyPrayerTeam } from "../../lib/email/prayer";
 import { notifyPastoralOfFeedback } from "../../lib/email/feedback";
 import { resolveNotificationRecipients } from "../../lib/notification-routes";
 
-/** Feedback arrives as FormData so an optional photo can ride along. Fields:
- *  rating, category, name, message, photo (File, optional). */
+/** Feedback arrives as FormData so optional photos can ride along. Fields:
+ *  rating, category, name, message, photos (File, repeated, up to 4). */
 
 export type PrayerInput = {
   kind: "prayer";
@@ -40,8 +40,10 @@ function ministryForFeedbackCategory(category: string): string {
   return category === "Kids & Youth" ? "Youth" : "General";
 }
 
-// Photos cap at 4 MB — Vercel rejects request bodies over 4.5 MB.
-const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTOS = 4;
+// Photos are downscaled in the browser before upload; this is a backstop.
+// The whole request must stay under Vercel's 4.5 MB body cap.
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 
 export async function submitFeedback(form: FormData): Promise<FeedbackResult> {
   const message = String(form.get("message") ?? "").trim();
@@ -52,28 +54,37 @@ export async function submitFeedback(form: FormData): Promise<FeedbackResult> {
   const name = String(form.get("name") ?? "").trim() || null;
   const ministry = ministryForFeedbackCategory(category);
 
-  // Optional photo → private feedback-photos bucket via the service role.
-  const photo = form.get("photo");
-  let photoPath: string | null = null;
-  if (photo instanceof File && photo.size > 0) {
+  // Optional photos → private feedback-photos bucket via the service role.
+  const photos = form
+    .getAll("photos")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  if (photos.length > MAX_PHOTOS) {
+    return { ok: false, error: `You can attach up to ${MAX_PHOTOS} photos.` };
+  }
+  const photoPaths: string[] = [];
+  for (const photo of photos) {
     if (!photo.type.startsWith("image/")) {
-      return { ok: false, error: "Photos must be an image file (JPG, PNG, HEIC…)." };
+      return { ok: false, error: "Photos must be image files (JPG, PNG, HEIC…)." };
     }
     if (photo.size > MAX_PHOTO_BYTES) {
-      return { ok: false, error: "That photo is too large — please keep it under 4 MB." };
+      return { ok: false, error: "One of those photos is too large — please keep each under 2 MB." };
     }
     const ext = (photo.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    photoPath = `${crypto.randomUUID()}.${ext || "jpg"}`;
+    const path = `${crypto.randomUUID()}.${ext || "jpg"}`;
     const { error: uploadError } = await supabaseAdmin()
       .storage.from("feedback-photos")
-      .upload(photoPath, photo, { contentType: photo.type });
+      .upload(path, photo, { contentType: photo.type });
     if (uploadError) {
       console.error("[feedback] photo upload failed", uploadError);
+      if (photoPaths.length > 0) {
+        await supabaseAdmin().storage.from("feedback-photos").remove(photoPaths);
+      }
       return {
         ok: false,
-        error: "We couldn't upload that photo. Try again, or send your feedback without it.",
+        error: "We couldn't upload those photos. Try again, or send your feedback without them.",
       };
     }
+    photoPaths.push(path);
   }
 
   const { error } = await supabaseAdmin().from("feedback").insert({
@@ -82,7 +93,7 @@ export async function submitFeedback(form: FormData): Promise<FeedbackResult> {
     ministry,
     name,
     message,
-    photo_path: photoPath,
+    photo_paths: photoPaths,
     user_id: await sessionUserId(),
   });
   if (error) {
@@ -90,12 +101,14 @@ export async function submitFeedback(form: FormData): Promise<FeedbackResult> {
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  let photoUrl: string | null = null;
-  if (photoPath) {
+  let photoUrls: string[] = [];
+  if (photoPaths.length > 0) {
     const { data } = await supabaseAdmin()
       .storage.from("feedback-photos")
-      .createSignedUrl(photoPath, 60 * 60 * 24 * 7);
-    photoUrl = data?.signedUrl ?? null;
+      .createSignedUrls(photoPaths, 60 * 60 * 24 * 7);
+    photoUrls = (data ?? [])
+      .map((u) => u.signedUrl)
+      .filter((u): u is string => !!u);
   }
 
   await notifyPastoralOfFeedback({
@@ -105,7 +118,7 @@ export async function submitFeedback(form: FormData): Promise<FeedbackResult> {
     ministry,
     name,
     message,
-    photoUrl,
+    photoUrls,
   });
 
   return { ok: true, kind: "feedback" };

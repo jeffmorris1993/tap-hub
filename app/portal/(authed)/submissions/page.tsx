@@ -317,31 +317,26 @@ function FeedbackTable({ rows }: { rows: Awaited<ReturnType<typeof listFeedback>
           <p style={{ color: "#f4f1ea", fontSize: "14px", lineHeight: 1.55, marginTop: "12px", whiteSpace: "pre-wrap" }}>
             {r.message}
           </p>
-          {r.photo_url && (
-            <a
-              href={r.photo_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                marginTop: "12px",
-                color: "#e7b84e",
-                fontSize: "12.5px",
-                fontWeight: 800,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                textDecoration: "none",
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
-              View attached photo
-            </a>
+          {r.photo_urls.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "12px" }}>
+              {r.photo_urls.map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noreferrer" title="Open full size">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL */}
+                  <img
+                    src={url}
+                    alt={`Attached photo ${i + 1}`}
+                    style={{
+                      width: "84px",
+                      height: "84px",
+                      objectFit: "cover",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(244,241,234,.14)",
+                      display: "block",
+                    }}
+                  />
+                </a>
+              ))}
+            </div>
           )}
         </div>
       ))}

@@ -81,21 +81,21 @@ export type FeedbackRow = {
   ministry: string;
   name: string | null;
   message: string;
-  /** Hour-long signed URL into the private feedback-photos bucket. */
-  photo_url: string | null;
+  /** Hour-long signed URLs into the private feedback-photos bucket. */
+  photo_urls: string[];
   created_at: string;
 };
 
 export async function listFeedback(limit = 100, scope: string[] | null = null): Promise<FeedbackRow[]> {
   let q = supabaseAdmin()
     .from("feedback")
-    .select("id, rating, category, ministry, name, message, photo_path, created_at");
+    .select("id, rating, category, ministry, name, message, photo_paths, created_at");
   if (scope) q = q.in("ministry", scope);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   const rows = data ?? [];
 
-  const paths = rows.map((r) => r.photo_path).filter((p): p is string => !!p);
+  const paths = rows.flatMap((r) => r.photo_paths ?? []);
   const signed = new Map<string, string>();
   if (paths.length > 0) {
     const { data: urls } = await supabaseAdmin()
@@ -106,9 +106,11 @@ export async function listFeedback(limit = 100, scope: string[] | null = null): 
     }
   }
 
-  return rows.map(({ photo_path, ...r }) => ({
+  return rows.map(({ photo_paths, ...r }) => ({
     ...r,
-    photo_url: photo_path ? (signed.get(photo_path) ?? null) : null,
+    photo_urls: (photo_paths ?? [])
+      .map((p: string) => signed.get(p))
+      .filter((u: string | undefined): u is string => !!u),
   }));
 }
 
