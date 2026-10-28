@@ -11,12 +11,18 @@ import { ANNOUNCEMENT_COLORS } from "../../lib/announcement-types";
 
 const POLL_INTERVAL_MS = 30_000;
 
+/** Cards rendered per "page" — more reveal on tap instead of one long list. */
+const PAGE_SIZE = 8;
+
 const TABS: ("All" | EventCategory)[] = ["All", ...EVENT_CATEGORIES];
 
 export function EventsList({ events }: { events: DisplayOccurrence[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState<(typeof TABS)[number]>("All");
+  const [visible, setVisible] = useState(PAGE_SIZE);
   const list = filter === "All" ? events : events.filter((e) => e.category === filter);
+  const shown = list.slice(0, visible);
+  const remaining = list.length - shown.length;
 
   // Poll for new/changed events. router.refresh() re-runs the parent
   // server component (which re-fetches from Supabase) and swaps in fresh
@@ -50,7 +56,10 @@ export function EventsList({ events }: { events: DisplayOccurrence[] }) {
             return (
               <button
                 key={t}
-                onClick={() => setFilter(t)}
+                onClick={() => {
+                  setFilter(t);
+                  setVisible(PAGE_SIZE);
+                }}
                 style={{
                   whiteSpace: "nowrap",
                   fontWeight: 800,
@@ -77,7 +86,7 @@ export function EventsList({ events }: { events: DisplayOccurrence[] }) {
               No events yet in this category.
             </div>
           )}
-          {list.map((e) => (
+          {shown.map((e) => (
             <Link
               key={e.occurrenceKey}
               href={`/events/${e.slug}?date=${e.occurrenceDate}`}
@@ -262,6 +271,26 @@ export function EventsList({ events }: { events: DisplayOccurrence[] }) {
               </div>
             </Link>
           ))}
+          {remaining > 0 && (
+            <button
+              onClick={() => setVisible((v) => v + PAGE_SIZE)}
+              style={{
+                minHeight: "54px",
+                borderRadius: "13px",
+                border: "1.5px solid rgba(231,184,78,.45)",
+                background: "transparent",
+                color: "#e7b84e",
+                fontWeight: 800,
+                fontSize: "14px",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+                marginTop: "4px",
+              }}
+            >
+              Show more events ({remaining} more)
+            </button>
+          )}
         </div>
       </div>
     </PhoneShell>

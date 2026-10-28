@@ -115,6 +115,12 @@ export type DisplayEvent = EventRow & {
 /** Builds the card-ready event using its next occurrence on or after `fromDate`. */
 export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): DisplayEvent {
   const next = nextOccurrence(row as RecurringEventFields, fromDate);
+  // An event that has started but not finished (a multi-day block like
+  // Adopt-A-Family, or a timed event still on its final day) keeps signups
+  // open through its last Detroit calendar day — people can join until the
+  // final day even though there's no "next occurrence" ahead.
+  const end = row.ends_at ? new Date(row.ends_at) : null;
+  const stillRunning = end !== null && detroitDayIso(end) >= detroitDayIso(fromDate);
   // Chip date prefers the next upcoming occurrence so visitors see the
   // soonest day they can attend (e.g. next Monday for an ongoing weekdays
   // run that started last week). Falls back to starts_at only when the
@@ -133,7 +139,7 @@ export function toDisplayEvent(row: EventRow, fromDate: Date = new Date()): Disp
     }),
     hue: hueFromSlug(row.slug),
     nextOccurrenceIso: next ? next.toISOString() : null,
-    signupOpen: next !== null,
+    signupOpen: next !== null || stillRunning,
   };
 }
 
