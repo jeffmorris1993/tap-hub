@@ -1,5 +1,6 @@
 import type { ScheduleRow, RowStatus, RowView } from "./clock";
 import type { DisplayEvent } from "./events-display";
+import { detroitMinutesOf } from "./tz";
 
 /** A row in the unified "Today" timeline — comes from either the standard
  *  schedule_today rhythm or a one-off / recurring event instance today. */
@@ -9,18 +10,6 @@ export type TimelineRow = RowView & {
   /** Internal sort key — minutes past midnight for today's instance. */
   sortMinutes: number;
 };
-
-function detroitMinutes(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Detroit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
-  return h * 60 + m;
-}
 
 function formatTime(mins: number): { time: string; ampm: string } {
   let h = Math.floor(mins / 60);
@@ -51,7 +40,7 @@ function scheduleRowToTimeline(s: ScheduleRow, nowMinutes: number): TimelineRow 
 
 function eventToTimeline(e: DisplayEvent, nowMinutes: number): TimelineRow {
   const occurrence = e.nextOccurrenceIso ? new Date(e.nextOccurrenceIso) : new Date(e.starts_at);
-  const startMinutes = detroitMinutes(occurrence);
+  const startMinutes = detroitMinutesOf(occurrence);
   // Compute duration from the original starts_at -> ends_at delta so daily/weekday
   // events that repeat get a consistent window. If ends_at isn't set, treat as a
   // single point in time (no live window — flips straight to "done" after start).
@@ -97,7 +86,7 @@ export function buildTodayTimeline(
   todaysEvents: DisplayEvent[],
   now: Date,
 ): TimelineRow[] {
-  const nowMinutes = detroitMinutes(now);
+  const nowMinutes = detroitMinutesOf(now);
   return [
     ...schedule.map((s) => scheduleRowToTimeline(s, nowMinutes)),
     ...todaysEvents.map((e) => eventToTimeline(e, nowMinutes)),

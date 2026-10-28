@@ -3,7 +3,7 @@ import { supabaseAdmin } from "./server";
 import type { ScheduleRow } from "../clock";
 import type { RecurrenceKind, RecurringEventFields } from "../events-occurrence";
 import { isSeriesOver, occurrenceOnDate } from "../event-calendar";
-import { detroitNow, detroitDateIso, fmtDetroitTime } from "../tz";
+import { detroitNow, detroitDateIso, detroitMinutesOf, fmtDetroitTime } from "../tz";
 
 export { EVENT_CATEGORIES, type EventCategory } from "../event-categories";
 import type { EventCategory } from "../event-categories";
@@ -143,14 +143,17 @@ export async function getDerivedWeekLookahead(now: Date = detroitNow()): Promise
     const dateIso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
     const dayLabel = day.toLocaleDateString("en-US", { weekday: "short" });
 
-    const items: WeekLookaheadRow[] = [];
+    const items: { row: WeekLookaheadRow; startMinutes: number }[] = [];
     for (const e of events) {
       const occ = occurrenceOnDate(e as RecurringEventFields, dateIso);
       if (occ) {
         items.push({
-          day_label: dayLabel,
-          title: e.title,
-          detail: `${fmtDetroitTime(occ.toISOString())} · ${e.location}`,
+          row: {
+            day_label: dayLabel,
+            title: e.title,
+            detail: `${fmtDetroitTime(occ.toISOString())} · ${e.location}`,
+          },
+          startMinutes: detroitMinutesOf(occ),
         });
       }
     }
@@ -167,13 +170,23 @@ export async function getDerivedWeekLookahead(now: Date = detroitNow()): Promise
       );
     for (const r of standing) {
       items.push({
-        day_label: dayLabel,
-        title: r.label,
-        detail: `${minutesToTimeLabel(r.starts_at_minutes)} · ${r.location}`,
+        row: {
+          day_label: dayLabel,
+          title: r.label,
+          detail: `${minutesToTimeLabel(r.starts_at_minutes)} · ${r.location}`,
+        },
+        startMinutes: r.starts_at_minutes,
       });
     }
 
-    out.push(...items.slice(0, 2));
+    // Pick the day's highlights first (events, then kind priority), but
+    // display what's picked in time order — earliest first.
+    out.push(
+      ...items
+        .slice(0, 2)
+        .sort((a, b) => a.startMinutes - b.startMinutes)
+        .map((i) => i.row),
+    );
   }
   return out;
 }

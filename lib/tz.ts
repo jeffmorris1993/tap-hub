@@ -80,6 +80,19 @@ export function localToUtcIso(localValue: string): string | null {
   return new Date(naiveUtcMs + offsetMs).toISOString();
 }
 
+/** Minutes past midnight in Detroit for the given moment. */
+export function detroitMinutesOf(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CHURCH_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  return h * 60 + m;
+}
+
 /** Format an ISO timestamp as a HH:MM AM/PM string in Detroit time. */
 export function fmtDetroitTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {

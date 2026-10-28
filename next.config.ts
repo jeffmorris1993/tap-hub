@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // Default is 1 MB; feedback photos may ride along in the submit
+      // FormData (capped client- and server-side at 4 MB — Vercel rejects
+      // request bodies over 4.5 MB).
+      bodySizeLimit: "5mb",
+    },
+  },
   async redirects() {
     return [
       // The admin area became the unified member/lead/pastoral portal.

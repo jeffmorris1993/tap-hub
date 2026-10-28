@@ -11,6 +11,8 @@ export type FeedbackEmailPayload = {
   ministry: string;
   name: string | null;
   message: string;
+  /** 7-day signed URL to an attached photo, when one was uploaded. */
+  photoUrl?: string | null;
 };
 
 /**
@@ -35,6 +37,7 @@ export async function notifyPastoralOfFeedback(payload: FeedbackEmailPayload): P
     { label: "Rating", value: payload.rating ? `${payload.rating} / 5` : null },
     { label: "Topic", value: payload.category },
     { label: "Ministry", value: payload.ministry },
+    { label: "Photo", value: payload.photoUrl ? "Attached — view it in the feedback inbox" : null },
   ];
 
   const ctaHref = `${siteUrl()}/portal/submissions?tab=feedback`;
@@ -59,6 +62,7 @@ export async function notifyPastoralOfFeedback(payload: FeedbackEmailPayload): P
     "Their feedback:",
     payload.message,
     "",
+    ...(payload.photoUrl ? [`Attached photo (link expires in 7 days): ${payload.photoUrl}`, ""] : []),
     `Open feedback inbox: ${ctaHref}`,
   ];
 

@@ -81,17 +81,35 @@ export type FeedbackRow = {
   ministry: string;
   name: string | null;
   message: string;
+  /** Hour-long signed URL into the private feedback-photos bucket. */
+  photo_url: string | null;
   created_at: string;
 };
 
 export async function listFeedback(limit = 100, scope: string[] | null = null): Promise<FeedbackRow[]> {
   let q = supabaseAdmin()
     .from("feedback")
-    .select("id, rating, category, ministry, name, message, created_at");
+    .select("id, rating, category, ministry, name, message, photo_path, created_at");
   if (scope) q = q.in("ministry", scope);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
-  return data ?? [];
+  const rows = data ?? [];
+
+  const paths = rows.map((r) => r.photo_path).filter((p): p is string => !!p);
+  const signed = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: urls } = await supabaseAdmin()
+      .storage.from("feedback-photos")
+      .createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) {
+      if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+    }
+  }
+
+  return rows.map(({ photo_path, ...r }) => ({
+    ...r,
+    photo_url: photo_path ? (signed.get(photo_path) ?? null) : null,
+  }));
 }
 
 export type PrayerRow = {

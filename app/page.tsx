@@ -10,7 +10,7 @@ import { IgniteParentCard } from "../components/IgniteParentCard";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
 import { igniteParentFormOpen } from "../lib/ignite-form";
 
-const CHURCH_PHONE = "+12485551234";
+const CHURCH_PHONE = "+12483077828";
 const CHURCH_ADDRESS_Q = "Nehemiah's Temple Madison Heights MI";
 const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
 

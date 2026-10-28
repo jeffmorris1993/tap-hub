@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
 import { submitFeedback, submitPrayer, type FeedbackResult } from "./actions";
 
-const FB_TOPICS = ["General", "Sunday Service", "Kids & Youth", "Facilities", "Suggestion"];
+const FB_TOPICS = [
+  "General",
+  "Sunday Service",
+  "Kids & Youth",
+  "Facilities",
+  "Suggestion",
+  "NT Gateway Improvement",
+];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -58,6 +65,9 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
   const [category, setCategory] = useState(FB_TOPICS[0]);
   const [fbName, setFbName] = useState("");
   const [message, setMessage] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // prayer state
   const [prName, setPrName] = useState("");
@@ -74,15 +84,35 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
     window.history.replaceState(null, "", next === "prayer" ? "/feedback?tab=prayer" : "/feedback");
   }
 
+  function onPickPhoto(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Photos must be an image file (JPG, PNG, HEIC…).");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setPhotoError("That photo is too large — please keep it under 4 MB.");
+      return;
+    }
+    setPhotoError(null);
+    setPhoto(file);
+  }
+
+  function removePhoto() {
+    setPhoto(null);
+    setPhotoError(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
   function onSubmitFeedback() {
     startTransition(async () => {
-      const r = await submitFeedback({
-        kind: "feedback",
-        rating,
-        category,
-        name: fbName,
-        message,
-      });
+      const form = new FormData();
+      form.set("rating", String(rating));
+      form.set("category", category);
+      form.set("name", fbName);
+      form.set("message", message);
+      if (photo) form.set("photo", photo);
+      const r = await submitFeedback(form);
       setResult(r);
     });
   }
@@ -235,8 +265,98 @@ export function FeedbackView({ initialTab }: { initialTab: Tab }) {
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
               placeholder="Tell us what's on your mind..."
-              style={{ ...inputStyle, resize: "vertical", marginBottom: "20px" }}
+              style={{ ...inputStyle, resize: "vertical", marginBottom: "12px" }}
             />
+
+            {/* optional photo — handy for NT Gateway bug screenshots */}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => onPickPhoto(e.target.files?.[0] ?? null)}
+              style={{ display: "none" }}
+            />
+            {photo ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "20px",
+                  padding: "12px 14px",
+                  borderRadius: "11px",
+                  border: "1.5px solid rgba(244,241,234,.14)",
+                  background: "#121a2e",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e7b84e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#cdd3e0",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {photo.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  aria-label="Remove photo"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#9aa3b8",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    padding: "4px",
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "9px",
+                  width: "100%",
+                  marginBottom: "20px",
+                  padding: "13px 14px",
+                  borderRadius: "11px",
+                  border: "1.5px dashed rgba(244,241,234,.2)",
+                  background: "transparent",
+                  color: "#9aa3b8",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Add a photo (optional)
+              </button>
+            )}
+            {photoError && (
+              <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginTop: "-10px", marginBottom: "12px" }}>
+                {photoError}
+              </div>
+            )}
             {result && !result.ok && (
               <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>
                 {result.error}
