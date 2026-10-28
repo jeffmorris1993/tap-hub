@@ -66,7 +66,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
     .from("events")
-    .select("id, slug, title, location, submitted_by, allow_volunteers, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
+    .select("id, slug, title, location, submitted_by, allow_volunteers, signup_mode, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
     .eq("slug", input.slug)
     .limit(1);
   if (lookupError) {
@@ -79,9 +79,11 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     return { ok: false, error: "This event isn't accepting volunteers." };
   }
 
-  // Attendees say whether they're coming for sure; volunteer rows never do.
+  // Attendees say whether they're coming for sure; volunteer rows never do,
+  // and participation-mode events (signup tracks a commitment like gifting,
+  // not attendance) skip the question entirely.
   let attendance: "yes" | "maybe" | null = null;
-  if (roles.includes("attendee")) {
+  if (roles.includes("attendee") && row.signup_mode !== "participate") {
     if (input.attendance !== "yes" && input.attendance !== "maybe") {
       return { ok: false, error: "Let us know if you're attending for sure." };
     }

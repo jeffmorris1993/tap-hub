@@ -351,6 +351,10 @@ export function EventDetailView({
   const hasInAppAttend = event.accepts_rsvps && !hasExternalRegister;
   const hasInAppVolunteer = event.allow_volunteers;
   const showToggle = hasInAppAttend && hasInAppVolunteer;
+  // Participation-mode events track a commitment (gifting, contributing)
+  // rather than attendance: no "attending for sure?" question, and the
+  // wording drops "attend" everywhere.
+  const participate = event.signup_mode === "participate";
 
   // Both chips can be on at once — attending and volunteering is one
   // submission, not two visits to the page.
@@ -416,7 +420,7 @@ export function EventDetailView({
     // inline next to the field instead of as one message at the bottom.
     const errors: FieldErrors = {};
     if (attending) {
-      if (!attendance) errors.__attendance = "Let us know if you're attending for sure.";
+      if (!participate && !attendance) errors.__attendance = "Let us know if you're attending for sure.";
       for (const [id, msg] of Object.entries(validateAnswers(attendeeFields, attendeeAnswers))) {
         errors[`attendee:${id}`] = msg;
       }
@@ -442,7 +446,7 @@ export function EventDetailView({
         contact,
         roles: effectiveRoles,
         notes: showNotes ? notes : undefined,
-        attendance: attending ? (attendance ?? undefined) : undefined,
+        attendance: attending && !participate ? (attendance ?? undefined) : undefined,
         attendeeResponses: attending && attendeeFields.length > 0 ? attendeeAnswers : undefined,
         volunteerResponses: volunteering && volunteerFields.length > 0 ? volunteerAnswers : undefined,
         occurrenceDate: occurrence?.date,
@@ -458,10 +462,14 @@ export function EventDetailView({
     const didVolunteer = result.roles.includes("volunteer");
     const doneMsg =
       didAttend && didVolunteer
-        ? `We've saved your spot for ${event.title}${forDate} — and thank you for volunteering! Our team will follow up with details and your role.`
+        ? participate
+          ? `You're signed up for ${event.title}${forDate} — and thank you for volunteering! Our team will follow up with details.`
+          : `We've saved your spot for ${event.title}${forDate} — and thank you for volunteering! Our team will follow up with details and your role.`
         : didVolunteer
           ? `Thank you for volunteering for ${event.title}${forDate}! Our team will follow up with details and your role.`
-          : `We've saved your spot for ${event.title}${forDate}. Watch for a reminder and any updates.`;
+          : participate
+            ? `You're signed up for ${event.title}${forDate}. Thank you! Our team will follow up with any details.`
+            : `We've saved your spot for ${event.title}${forDate}. Watch for a reminder and any updates.`;
     return (
       <PhoneShell>
         <div className="th-slide" style={{ minHeight: "100vh" }}>
@@ -779,7 +787,7 @@ export function EventDetailView({
                     </div>
                     <div style={{ display: "flex", gap: "10px", marginBottom: "6px" }}>
                       <button type="button" onClick={() => toggleRole("attendee")} style={segmentStyle(attending)}>
-                        {attending ? "✓ " : ""}Attend
+                        {attending ? "✓ " : ""}{participate ? "Participate" : "Attend"}
                       </button>
                       <button type="button" onClick={() => toggleRole("volunteer")} style={segmentStyle(volunteering)}>
                         {volunteering ? "✓ " : ""}Volunteer
@@ -815,7 +823,7 @@ export function EventDetailView({
                       margin: "24px 0 11px",
                     }}
                   >
-                    RSVP
+                    {participate ? "Sign up" : "RSVP"}
                   </div>
                 )}
 
@@ -861,7 +869,7 @@ export function EventDetailView({
                         </Link>
                       </div>
                     )}
-                    {attending && (
+                    {attending && !participate && (
                       <div style={{ marginBottom: "12px" }}>
                         <div style={fieldLabelStyle}>Are you attending for sure?</div>
                         <div style={{ display: "flex", gap: "10px" }}>
@@ -979,10 +987,14 @@ export function EventDetailView({
                       {pending
                         ? "Sending…"
                         : attending && volunteering
-                          ? "Sign Up to Attend & Volunteer"
+                          ? participate
+                            ? "Sign Up & Volunteer"
+                            : "Sign Up to Attend & Volunteer"
                           : volunteering
                             ? "Sign Up to Volunteer"
-                            : "Sign Up to Attend"}
+                            : participate
+                              ? "Sign Up"
+                              : "Sign Up to Attend"}
                     </button>
                   </>
                 )}

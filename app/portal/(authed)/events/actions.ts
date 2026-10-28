@@ -36,6 +36,9 @@ export type EventFormInput = {
   location: string;
   cost: string | null;
   accepts_rsvps: boolean;
+  /** What a signup means: an attendance RSVP, or a participation
+   *  commitment (gifting, contributing) with no attendance question. */
+  signup_mode: "attend" | "participate";
   allow_volunteers: boolean;
   registration_url: string | null;
   registration_label: string | null;
@@ -150,6 +153,7 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
     ends_at,
     location,
     accepts_rsvps: input.accepts_rsvps,
+    signup_mode: input.signup_mode === "participate" ? "participate" : "attend",
     allow_volunteers: input.allow_volunteers,
     registration_url: input.registration_url?.trim() ? input.registration_url.trim() : null,
     registration_label: input.registration_label?.trim() ? input.registration_label.trim() : null,

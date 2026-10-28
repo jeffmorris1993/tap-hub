@@ -88,6 +88,7 @@ type Initial = {
   location?: string;
   cost?: string | null;
   accepts_rsvps?: boolean;
+  signup_mode?: "attend" | "participate";
   allow_volunteers?: boolean;
   registration_url?: string | null;
   registration_label?: string | null;
@@ -142,6 +143,9 @@ export function EventForm({
   const [endsAt, setEndsAt] = useState(toLocalInputValue(initial?.ends_at ?? null));
   const [location, setLocation] = useState(initial?.location ?? "");
   const [acceptsRsvps, setAcceptsRsvps] = useState(initial?.accepts_rsvps ?? true);
+  const [signupMode, setSignupMode] = useState<"attend" | "participate">(
+    initial?.signup_mode ?? "attend",
+  );
   const [allowVolunteers, setAllowVolunteers] = useState(initial?.allow_volunteers ?? true);
   const [cost, setCost] = useState(initial?.cost ?? "");
   const [registrationUrl, setRegistrationUrl] = useState(initial?.registration_url ?? "");
@@ -204,6 +208,7 @@ export function EventForm({
       ends_at_local: allDay ? (endsAt ? `${endsAt.slice(0, 10)}T23:59` : "") : endsAt,
       location,
       accepts_rsvps: acceptsRsvps,
+      signup_mode: signupMode,
       allow_volunteers: allowVolunteers,
       registration_url: registrationUrl.trim() || null,
       registration_label: registrationLabel.trim() || null,
@@ -679,6 +684,43 @@ export function EventForm({
         />
         Accept RSVPs / signups (uncheck for info-only events)
       </label>
+      {acceptsRsvps && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <span style={{ color: "#9aa3b8", fontSize: "12px", fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase" }}>
+            Signing up means —
+          </span>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {(
+              [
+                ["attend", "Attending (RSVP + “attending for sure?”)"],
+                ["participate", "Participating (gifting, contributing — no attendance question)"],
+              ] as const
+            ).map(([mode, label]) => {
+              const on = signupMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSignupMode(mode)}
+                  style={{
+                    padding: "10px 13px",
+                    borderRadius: "10px",
+                    border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.15)"}`,
+                    background: on ? "rgba(231,184,78,.14)" : "#0b101c",
+                    color: on ? "#e7b84e" : "#cdd3e0",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <label
         style={{
           display: "flex",

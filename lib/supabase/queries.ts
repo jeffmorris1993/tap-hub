@@ -18,6 +18,9 @@ export type EventRow = {
   location: string;
   cost: string | null;
   accepts_rsvps: boolean;
+  /** 'attend' = RSVP to be there; 'participate' = commitment signup
+   *  (gifting, contributing) — no "attending for sure?" question. */
+  signup_mode: "attend" | "participate";
   allow_volunteers: boolean;
   registration_url: string | null;
   registration_label: string | null;
@@ -58,7 +61,7 @@ export type ParentResourceRow = {
 
 const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
-  "cost, accepts_rsvps, allow_volunteers, registration_url, registration_label, " +
+  "cost, accepts_rsvps, signup_mode, allow_volunteers, registration_url, registration_label, " +
   "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, signup_questions";
 
 /** Standard schedule for a specific day_of_week (Detroit-local active-date filter). */

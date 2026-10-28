@@ -265,6 +265,7 @@ export type AdminEventRow = {
   description_long: string;
   cost: string | null;
   accepts_rsvps: boolean;
+  signup_mode: "attend" | "participate";
   allow_volunteers: boolean;
   registration_url: string | null;
   registration_label: string | null;
@@ -287,7 +288,7 @@ export type AdminEventRow = {
 
 const ADMIN_EVENT_FIELDS =
   "id, slug, title, category, starts_at, ends_at, location, description_long, " +
-  "cost, accepts_rsvps, allow_volunteers, registration_url, registration_label, " +
+  "cost, accepts_rsvps, signup_mode, allow_volunteers, registration_url, registration_label, " +
   "published, approval_status, approval_notes, " +
   "submitted_by, reviewed_by, submitted_at, reviewed_at, " +
   "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, " +
