@@ -60,9 +60,8 @@ export async function MemberOverview({ pu, greeting }: { pu: PortalUser; greetin
       </p>
 
       <div
+        className="p-card-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "14px",
           marginTop: "18px",
         }}
@@ -81,11 +80,11 @@ export async function MemberOverview({ pu, greeting }: { pu: PortalUser; greetin
       </div>
 
       <div
+        className="p-card-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: "18px",
           marginTop: "22px",
+          alignItems: "start",
         }}
       >
         <div style={{ background: "#121a2e", border: "1px solid rgba(244,241,234,.08)", borderRadius: "18px", padding: "20px" }}>

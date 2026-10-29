@@ -104,9 +104,8 @@ export default async function AdminDashboard() {
 
       {/* stat tiles */}
       <div
+        className="p-stat-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "14px",
           marginTop: "18px",
         }}
@@ -154,11 +153,11 @@ export default async function AdminDashboard() {
 
       {/* two-column: pending queue + recent activity */}
       <div
+        className="p-card-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: "18px",
           marginTop: "22px",
+          alignItems: "start",
         }}
       >
         {/* pending approvals queue */}

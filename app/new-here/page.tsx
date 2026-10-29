@@ -4,18 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { PhoneShell } from "../../components/PhoneShell";
 import { BackBar } from "../../components/BackBar";
+import { INTERESTS } from "../../lib/interests";
 import { submitNewHere, type NewHereResult } from "./actions";
-
-const INTERESTS = [
-  "Salvation & Baptism",
-  "Becoming a Member",
-  "Joining a Ministry",
-  "Ignite Youth",
-  "Kids Ministry",
-  "Small Groups",
-  "Serving / Volunteering",
-  "Prayer",
-];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",

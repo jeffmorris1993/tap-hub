@@ -3,13 +3,14 @@ import "server-only";
 import { listApproverEmails } from "./approvers";
 
 /**
- * Who gets prayer-request and feedback notification emails. Pastoral users
- * configure a recipient list per kind at /portal/notifications (stored in
- * notification_routes); an empty or unreadable list falls back to the
- * default so a config problem never swallows a notification.
+ * Who gets prayer-request, feedback, and check-in summary notification
+ * emails. Pastoral users configure a recipient list per kind at
+ * /portal/notifications (stored in notification_routes); an empty or
+ * unreadable list falls back to the default so a config problem never
+ * swallows a notification.
  */
 
-export const NOTIFICATION_KINDS = ["prayer", "feedback"] as const;
+export const NOTIFICATION_KINDS = ["prayer", "feedback", "checkin"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 function normalize(emails: string[]): string[] {

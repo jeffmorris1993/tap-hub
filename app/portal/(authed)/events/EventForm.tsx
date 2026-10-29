@@ -348,7 +348,7 @@ export function EventForm({
   }
 
   return (
-    <form onSubmit={onSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+    <form onSubmit={onSave} className="p-2col" style={{ display: "grid", gap: "16px" }}>
       {/* Status banner */}
       {isExisting && (
         <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>

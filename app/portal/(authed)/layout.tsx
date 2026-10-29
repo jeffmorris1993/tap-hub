@@ -61,10 +61,20 @@ export default async function PortalLayout({ children }: { children: React.React
         <PendingBadge table="announcements" />
       </Suspense>
     ),
+    pendingEventsCompact: (
+      <Suspense fallback={null}>
+        <PendingBadge table="events" variant="compact" />
+      </Suspense>
+    ),
+    pendingAnnouncementsCompact: (
+      <Suspense fallback={null}>
+        <PendingBadge table="announcements" variant="compact" />
+      </Suspense>
+    ),
   });
 
   return (
-    <AdminShell persona={persona} nav={nav}>
+    <AdminShell persona={persona} nav={nav} role={pu.role}>
       {children}
     </AdminShell>
   );

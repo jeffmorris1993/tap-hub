@@ -237,10 +237,12 @@ export function RoutesEditor({
   staff,
   prayer,
   feedback,
+  checkin,
 }: {
   staff: StaffProfile[];
   prayer: string[];
   feedback: string[];
+  checkin: string[];
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -257,6 +259,13 @@ export function RoutesEditor({
         description="Ratings and comments submitted from the feedback page."
         staff={staff}
         initial={feedback}
+      />
+      <Section
+        kind="checkin"
+        title="Check-in summaries"
+        description="Attendance numbers emailed after each service's check-in window closes."
+        staff={staff}
+        initial={checkin}
       />
     </div>
   );

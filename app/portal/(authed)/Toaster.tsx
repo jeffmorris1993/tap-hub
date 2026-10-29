@@ -75,9 +75,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         aria-live="polite"
         aria-atomic="false"
+        /* psh-toast-dock lifts toasts above the mobile bottom tab bar. */
+        className="psh-toast-dock"
         style={{
           position: "fixed",
-          bottom: "24px",
           right: "24px",
           left: "24px",
           display: "flex",

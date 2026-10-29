@@ -39,7 +39,7 @@ export function AgentTester({ examples }: { examples: string[] }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: "20px" }}>
+    <div className="p-agent-layout" style={{ display: "grid", gap: "20px" }}>
       <div>
         <div
           style={{
@@ -55,7 +55,7 @@ export function AgentTester({ examples }: { examples: string[] }) {
         >
           {turns.length === 0 && (
             <div style={{ color: "#9aa3b8", fontSize: "14px", textAlign: "center", padding: "60px 16px" }}>
-              No messages yet. Try one of the examples on the right.
+              No messages yet. Try one of the examples.
             </div>
           )}
           {turns.map((t) => (

@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "../../lib/supabase/server";
 import { supabaseSession } from "../../lib/supabase/auth";
 import { notifyWelcomeTeam } from "../../lib/email/welcome";
+import { sanitizeInterests } from "../../lib/interests";
 
 export type NewHereSubmission = {
   name: string;
@@ -25,6 +26,7 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
   const name = input.name.trim();
   const email = input.email?.trim() || null;
   const phone = input.phone?.trim() || null;
+  const interests = sanitizeInterests(input.interests);
 
   // Link to the signed-in account when there is one (for "My Forms").
   let userId: string | null = null;
@@ -41,7 +43,7 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
     email,
     phone,
     first_time: input.firstTime,
-    interests: input.interests,
+    interests,
     source: "tap-hub",
     user_id: userId,
   });
@@ -55,7 +57,7 @@ export async function submitNewHere(input: NewHereSubmission): Promise<NewHereRe
     email,
     phone,
     firstTime: input.firstTime,
-    interests: input.interests,
+    interests,
   });
 
   const firstName = (name.split(/\s+/)[0] ?? "friend").slice(0, 40);

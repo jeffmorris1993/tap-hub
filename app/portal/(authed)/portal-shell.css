@@ -1,0 +1,276 @@
+/*
+ * Portal responsive layout. Everything here is media-query driven rather
+ * than measured in JS, so the server and client render the same markup and
+ * the correct layout paints immediately (no desktop-layout flash).
+ *
+ * Breakpoints:
+ *   960px — shell: sidebar + header email vs. bottom tab bar + avatar sheet
+ *   820px — data views: real table vs. stacked cards
+ *   700px — content grids: one column vs. two (small tablet and up)
+ */
+
+/* ---------- shell visibility ---------- */
+
+/* Sidebar: hidden on phones/tablets, where the bottom tab bar takes over. */
+.psh-sidebar {
+  display: none;
+}
+
+/* Header's signed-in-as email — too wide to be useful on a phone. */
+.psh-hide-mobile {
+  display: none;
+}
+
+/* Header avatar button, logo, and other mobile-only inline affordances. */
+.psh-mobile-only {
+  display: flex;
+}
+
+/* Block-level mobile-only elements (the bottom tab bar). */
+.psh-mobile-block {
+  display: block;
+}
+
+/* Room for the fixed bottom tab bar (plus the iOS home-indicator inset). */
+.psh-main {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 960px) {
+  .psh-sidebar {
+    display: flex;
+  }
+  .psh-hide-mobile {
+    display: block;
+  }
+  .psh-mobile-only,
+  .psh-mobile-block {
+    display: none !important;
+  }
+  .psh-main {
+    margin-left: 248px;
+    padding-bottom: clamp(18px, 3vw, 32px);
+  }
+}
+
+/* Toasts clear the bottom tab bar on phones, sit in the corner on desktop. */
+.psh-toast-dock {
+  bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 960px) {
+  .psh-toast-dock {
+    bottom: 24px;
+  }
+}
+
+/* ---------- bottom sheet / dialog ---------- */
+
+@keyframes pshFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pshUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pshPop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Backdrop: sheet sits at the bottom on phones, centers as a modal on desktop. */
+.psh-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(5, 8, 15, 0.66);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: pshFade 0.2s both;
+}
+
+.psh-sheet {
+  width: 100%;
+  max-width: 100%;
+  background: #121a2e;
+  border: 1px solid rgba(244, 241, 234, 0.1);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 10px 16px calc(22px + env(safe-area-inset-bottom));
+  max-height: 86vh;
+  overflow-y: auto;
+  animation: pshUp 0.25s both;
+}
+
+@media (min-width: 700px) {
+  .psh-sheet {
+    max-width: 600px;
+  }
+}
+
+@media (min-width: 960px) {
+  .psh-scrim {
+    align-items: center;
+    padding: 24px;
+  }
+  .psh-sheet {
+    max-width: 520px;
+    border: 1px solid rgba(244, 241, 234, 0.12);
+    border-radius: 18px;
+    padding: 22px 24px 26px;
+    max-height: 88vh;
+    animation: pshPop 0.18s both;
+  }
+  /* The drag handle only makes sense on the slide-up sheet. */
+  .psh-grabber {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .psh-scrim,
+  .psh-sheet {
+    animation: none;
+  }
+}
+
+/* ---------- shared content grids ---------- */
+
+/* KPI tiles: two across on a phone, four on a tablet. */
+.p-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* Card lists: single column on a phone, two on a tablet. */
+.p-card-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Form fields that pair up on wider screens but must stack on a phone. */
+.p-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .p-stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .p-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .p-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Three-up variant for stat rows that only have three values. */
+.p-stat-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 700px) {
+  .p-stat-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Recent-lessons row: stacked on a phone, one line from 820px. */
+.p-lesson-row {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 820px) {
+  .p-lesson-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr 1fr;
+    align-items: center;
+  }
+}
+
+/* Agent tester: chat only on a phone, chat + examples rail on desktop. */
+.p-agent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 960px) {
+  .p-agent-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+/* ---------- table vs. cards ---------- */
+
+/* Both variants are rendered; CSS picks one. Keeps markup server-safe. */
+.p-table-only {
+  display: none;
+}
+
+.p-cards-only {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 820px) {
+  .p-table-only {
+    display: block;
+  }
+  .p-cards-only {
+    display: none;
+  }
+}
+
+/* ---------- tab strips ---------- */
+
+/* Scrolls sideways on a phone instead of wrapping to three ragged rows. */
+.p-tabstrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.p-tabstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.p-tabstrip > * {
+  flex-shrink: 0;
+}
+
+@media (min-width: 820px) {
+  .p-tabstrip {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}

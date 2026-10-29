@@ -27,6 +27,9 @@ export type PortalProfile = {
   full_name: string | null;
   role: PortalRole;
   ministries: string[];
+  phone: string | null;
+  /** When the profile row was created — shown as "Member since". */
+  created_at: string | null;
 };
 
 export type PortalUser = {
@@ -54,14 +57,24 @@ export const getPortalUser = cache(async (): Promise<PortalUser | null> => {
 
   const { data: rows } = await supabaseAdmin()
     .from("profiles")
-    .select("full_name, role, ministries")
+    .select("full_name, role, ministries, phone, created_at")
     .eq("id", data.user.id)
     .limit(1);
-  const p = rows?.[0] as { full_name: string | null; role: PortalRole; ministries: string[] } | undefined;
+  const p = rows?.[0] as
+    | {
+        full_name: string | null;
+        role: PortalRole;
+        ministries: string[];
+        phone: string | null;
+        created_at: string | null;
+      }
+    | undefined;
   const profile: PortalProfile = {
     full_name: p?.full_name ?? ((data.user.user_metadata?.full_name as string | undefined) ?? null),
     role: p?.role ?? "member",
     ministries: p?.ministries ?? [],
+    phone: p?.phone ?? null,
+    created_at: p?.created_at ?? data.user.created_at ?? null,
   };
   const role = effectiveRole(email, profile.role);
   return { user: data.user, email, profile, role, ministries: profile.ministries };

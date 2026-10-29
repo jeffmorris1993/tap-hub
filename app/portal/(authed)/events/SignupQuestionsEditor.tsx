@@ -104,8 +104,8 @@ function RoleSection({
               padding: "12px",
             }}
           >
-            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-              <div style={{ flex: 2 }}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div style={{ flex: "2 1 200px", minWidth: 0 }}>
                 <label style={labelStyle}>Question</label>
                 <input
                   value={field.label}
@@ -114,7 +114,7 @@ function RoleSection({
                   style={inputStyle}
                 />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 150px", minWidth: 0 }}>
                 <label style={labelStyle}>Answer style</label>
                 <select
                   value={field.type}

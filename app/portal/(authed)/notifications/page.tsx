@@ -37,11 +37,16 @@ export default async function NotificationsPage() {
   return (
     <div>
       <p style={{ color: "#9aa3b8", fontSize: "14.5px", fontWeight: 600, marginBottom: "22px" }}>
-        Choose who gets emailed when someone submits a prayer request or feedback. When a
-        list is empty, everyone with the{" "}
-        <strong style={{ color: "#cdd3e0" }}>pastoral</strong> role receives it.
+        Choose who gets emailed when someone submits a prayer request or feedback, and who
+        receives attendance numbers after check-in closes. When a list is empty, everyone
+        with the <strong style={{ color: "#cdd3e0" }}>pastoral</strong> role receives it.
       </p>
-      <RoutesEditor staff={staff} prayer={routes.prayer} feedback={routes.feedback} />
+      <RoutesEditor
+        staff={staff}
+        prayer={routes.prayer}
+        feedback={routes.feedback}
+        checkin={routes.checkin}
+      />
     </div>
   );
 }

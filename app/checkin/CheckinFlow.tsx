@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ATTENDEE_TYPE_LABEL, type AttendeeType } from "../../lib/attendance";
+import { INTERESTS } from "../../lib/interests";
 import {
   findAndCheckin,
   quickCheckin,
@@ -134,6 +135,7 @@ export function CheckinFlow({
     email: "",
     pref: "" as "" | "text" | "call" | "email",
     consent: false,
+    interests: [] as string[],
   });
   const [find, setFind] = useState({ first: "", last: "", contact: "", miss: false });
 
@@ -213,6 +215,7 @@ export function CheckinFlow({
       email: form.email,
       preferredContact: form.pref || undefined,
       contactConsent: form.consent,
+      interests: form.interests,
     });
     applyOutcome(result, "form");
   }
@@ -332,7 +335,7 @@ export function CheckinFlow({
         >
           {done.serviceName} · {done.timeLabel}
         </span>
-        {done.attendeeType === "first" && (
+        {(done.attendeeType === "first" || done.attendeeType === "returning") && (
           <div
             style={{
               width: "100%",
@@ -343,32 +346,15 @@ export function CheckinFlow({
               padding: "18px",
               display: "flex",
               flexDirection: "column",
-              gap: "12px",
+              gap: "8px",
               marginTop: "6px",
             }}
           >
-            <span style={{ ...heading, fontSize: "21px" }}>I&apos;m New Here · Get connected</span>
+            <span style={{ ...heading, fontSize: "21px" }}>Our welcome team knows you&apos;re here</span>
             <span style={{ color: "#cdd3e0", fontSize: "16px", lineHeight: 1.5 }}>
-              Tell us a little more and our welcome team will help you find your next step.
+              Someone will reach out to say thanks for visiting. Come find us at the welcome desk
+              any time — we&apos;d love to meet you.
             </span>
-            <Link
-              href="/new-here"
-              style={{
-                minHeight: "54px",
-                borderRadius: "12px",
-                border: "1.5px solid #e7b84e",
-                background: "transparent",
-                color: "#e7b84e",
-                fontWeight: 800,
-                fontSize: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textDecoration: "none",
-              }}
-            >
-              Tell us about you
-            </Link>
           </div>
         )}
         <Link href="/" style={{ ...quietButton, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
@@ -682,6 +668,42 @@ export function CheckinFlow({
                         }}
                       >
                         {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <span style={fieldLabel}>Want to hear more about anything?</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {INTERESTS.map((it) => {
+                    const on = form.interests.includes(it);
+                    return (
+                      <button
+                        key={it}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            interests: on
+                              ? f.interests.filter((x) => x !== it)
+                              : [...f.interests, it],
+                          }))
+                        }
+                        style={{
+                          minHeight: "48px",
+                          padding: "0 16px",
+                          borderRadius: "11px",
+                          border: on ? "1.5px solid #e7b84e" : "1.5px solid rgba(244,241,234,.18)",
+                          background: on ? "#e7b84e" : "#121a2e",
+                          color: on ? "#0b101c" : "#f4f1ea",
+                          fontWeight: 700,
+                          fontSize: "15px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {it}
                       </button>
                     );
                   })}

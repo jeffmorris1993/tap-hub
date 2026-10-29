@@ -9,6 +9,33 @@ export type NavItem = {
   icon: ReactNode;
   /** Optional badge node (e.g. a Suspense-wrapped pending count). */
   badge?: ReactNode;
+  /** Same count styled for the bottom tab bar / More sheet. */
+  badgeCompact?: ReactNode;
+};
+
+/**
+ * Which four sections start in the bottom tab bar, per role. People can
+ * change this from the account sheet (stored per role in localStorage);
+ * these are the starting points. Overview is always first and can't be
+ * removed, so the home tab never disappears.
+ */
+export const DEFAULT_MOBILE_TABS: Record<PortalRole, string[]> = {
+  member: ["/portal", "/portal/my-events", "/portal/my-forms"],
+  lead: ["/portal", "/portal/events", "/portal/announcements", "/portal/submissions"],
+  pastoral: ["/portal", "/portal/submissions", "/portal/attendance", "/portal/events"],
+};
+
+/** Tab-bar labels have ~70px to work with, so a few get shortened. */
+export const TAB_LABEL: Record<string, string> = {
+  "/portal": "Home",
+  "/portal/submissions": "Inbox",
+  "/portal/announcements": "News",
+  "/portal/events/pending": "Pending",
+  "/portal/kids-youth": "Kids",
+  "/portal/notifications": "Alerts",
+  "/portal/my-events": "My Events",
+  "/portal/my-forms": "My Forms",
+  "/portal/agent-log": "Agent log",
 };
 
 const sw = 1.7;
@@ -112,7 +139,12 @@ export const ICONS: Record<string, ReactNode> = {
 export function buildNavForRole(
   role: PortalRole,
   ministries: string[],
-  badges: { pendingEvents?: ReactNode; pendingAnnouncements?: ReactNode } = {},
+  badges: {
+    pendingEvents?: ReactNode;
+    pendingAnnouncements?: ReactNode;
+    pendingEventsCompact?: ReactNode;
+    pendingAnnouncementsCompact?: ReactNode;
+  } = {},
 ): NavItem[] {
   const memberItems: NavItem[] = [
     { href: "/portal/my-events", label: "My Events", icon: ICONS.calendar },
@@ -147,12 +179,14 @@ export function buildNavForRole(
       label: "Pending approval",
       icon: ICONS.pending,
       badge: badges.pendingEvents,
+      badgeCompact: badges.pendingEventsCompact,
     },
     {
       href: "/portal/announcements",
       label: "Announcements",
       icon: ICONS.megaphone,
       badge: badges.pendingAnnouncements,
+      badgeCompact: badges.pendingAnnouncementsCompact,
     },
     { href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/portal/users", label: "Users", icon: ICONS.users },

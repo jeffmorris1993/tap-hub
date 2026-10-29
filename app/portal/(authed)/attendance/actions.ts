@@ -6,6 +6,7 @@ import { supabaseAdmin } from "../../../../lib/supabase/server";
 import {
   consecutiveMissStreak,
   heldSundayDates,
+  type AttendeeType,
   type FollowUpStatus,
 } from "../../../../lib/attendance";
 import { loadOverrides, loadServices } from "../../../../lib/attendance-data";
@@ -185,6 +186,32 @@ export async function setFollowUpStatus(
     updated_by: actor.email,
     updated_at: new Date().toISOString(),
   });
+  if (error) return { ok: false, error: error.message };
+
+  revalidate();
+  return { ok: true };
+}
+
+/**
+ * Reclassify someone (guest → regular/member, or back). Guest check-ins
+ * notify the welcome team every time, so moving a guest who now attends
+ * regularly to "Regular Attendee" is how staff stop those notifications.
+ * Past check-in rows keep the category they were recorded with, so history
+ * and the trend chart don't change retroactively.
+ */
+export async function setAttendeeType(
+  attendeeId: string,
+  type: AttendeeType,
+): Promise<AttendanceActionResult> {
+  await assertPastoral();
+  if (!["member", "regular", "first", "returning"].includes(type)) {
+    return { ok: false, error: "Unknown category." };
+  }
+
+  const { error } = await supabaseAdmin()
+    .from("attendees")
+    .update({ attendee_type: type })
+    .eq("id", attendeeId);
   if (error) return { ok: false, error: error.message };
 
   revalidate();

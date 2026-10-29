@@ -10,6 +10,12 @@ export async function updateProfile(formData: FormData): Promise<{ ok: boolean; 
     return { ok: false, error: "Name is too long (max 80 characters)." };
   }
 
+  // Digits only, same convention as attendees.phone.
+  const phoneDigits = String(formData.get("phone") ?? "").replace(/\D/g, "");
+  if (phoneDigits && (phoneDigits.length < 10 || phoneDigits.length > 15)) {
+    return { ok: false, error: "That phone number doesn't look right — include the area code." };
+  }
+
   const sb = await supabaseSession();
   const { data: userData, error } = await sb.auth.updateUser({
     data: { full_name: fullName || null },
@@ -21,7 +27,11 @@ export async function updateProfile(formData: FormData): Promise<{ ok: boolean; 
   if (userData.user) {
     await supabaseAdmin()
       .from("profiles")
-      .update({ full_name: fullName || null, updated_at: new Date().toISOString() })
+      .update({
+        full_name: fullName || null,
+        phone: phoneDigits || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", userData.user.id);
   }
 

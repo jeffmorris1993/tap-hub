@@ -266,7 +266,7 @@ export function AnnouncementForm({
   }
 
   return (
-    <form onSubmit={onSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+    <form onSubmit={onSave} className="p-2col" style={{ display: "grid", gap: "16px" }}>
       {/* Status banner */}
       {isExisting && (
         <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
@@ -435,7 +435,7 @@ export function AnnouncementForm({
         </div>
 
         {linkMode === "event" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div className="p-2col" style={{ display: "grid", gap: "12px" }}>
             <div>
               <select
                 value={linkEventSlug}
@@ -468,7 +468,7 @@ export function AnnouncementForm({
         )}
 
         {linkMode === "custom" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div className="p-2col" style={{ display: "grid", gap: "12px" }}>
             <input
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}

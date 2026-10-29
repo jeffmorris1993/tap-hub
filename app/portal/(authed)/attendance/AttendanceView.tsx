@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   ATTENDEE_TYPE_LABEL,
   DOW_LABEL,
@@ -11,6 +11,7 @@ import {
 import {
   addOneOffService,
   deleteOneOffService,
+  setAttendeeType,
   setFollowUpStatus,
   setOccurrenceDidNotOccur,
   updateRecurringService,
@@ -182,15 +183,7 @@ export function AttendanceView({
   services: ServiceView[];
 }) {
   const [tab, setTab] = useState(initialTab);
-  const [narrow, setNarrow] = useState(false);
   const [personId, setPersonId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const onResize = () => setNarrow(window.innerWidth < 860);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const activeFlags = flags.filter((f) => f.status !== "resolved" && f.status !== "dismissed");
   const returnedCount = guests.filter((g) => g.returned).length;
@@ -225,7 +218,7 @@ export function AttendanceView({
         </div>
       </div>
 
-      <div role="tablist" style={{ display: "flex", gap: "6px", flexWrap: "wrap", borderBottom: "1px solid rgba(244,241,234,.1)", paddingBottom: "12px" }}>
+      <div role="tablist" className="p-tabstrip" style={{ gap: "6px", borderBottom: "1px solid rgba(244,241,234,.1)", paddingBottom: "12px" }}>
         {tabs.map((t) => {
           const on = tab === t.id;
           return (
@@ -244,6 +237,7 @@ export function AttendanceView({
                 fontSize: "15.5px",
                 display: "inline-flex",
                 alignItems: "center",
+                whiteSpace: "nowrap",
                 background: on ? "#e7b84e" : "transparent",
                 color: on ? "#0b101c" : "#cdd3e0",
               }}
@@ -282,16 +276,17 @@ export function AttendanceView({
         />
       )}
       {tab === "history" && (
-        <HistoryTab occurrences={occurrences} checkins={checkins} narrow={narrow} openPerson={openPerson} />
+        <HistoryTab occurrences={occurrences} checkins={checkins} openPerson={openPerson} />
       )}
-      {tab === "follow" && <FollowUpTab flags={flags} narrow={narrow} openPerson={openPerson} />}
-      {tab === "guests" && <GuestsTab guests={guests} narrow={narrow} openPerson={openPerson} />}
+      {tab === "follow" && <FollowUpTab flags={flags} openPerson={openPerson} />}
+      {tab === "guests" && <GuestsTab guests={guests} openPerson={openPerson} />}
       {tab === "services" && <ServicesTab services={services} occurrences={occurrences} />}
 
       {person && (
         <div
           onClick={() => setPersonId(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(5,8,15,.72)", display: "flex", justifyContent: "flex-end", zIndex: 50 }}
+          /* Above the mobile bottom tab bar (z-index 50). */
+          style={{ position: "fixed", inset: 0, background: "rgba(5,8,15,.72)", display: "flex", justifyContent: "flex-end", zIndex: 80 }}
         >
           <div
             role="dialog"
@@ -303,7 +298,7 @@ export function AttendanceView({
               overflow: "auto",
               background: "#0f1626",
               borderLeft: "1px solid rgba(244,241,234,.1)",
-              padding: "28px 24px",
+              padding: "28px 24px calc(28px + env(safe-area-inset-bottom))",
               display: "flex",
               flexDirection: "column",
               gap: "18px",
@@ -353,6 +348,7 @@ export function AttendanceView({
                 {person.prefLabel !== "—" ? ` · prefers ${person.prefLabel.toLowerCase()}` : ""}
               </p>
             )}
+            <TypeEditor attendeeId={person.id} current={person.type} />
             <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid rgba(244,241,234,.08)" }}>
               {person.rows.map((r, i) => (
                 <div
@@ -494,12 +490,10 @@ function OverviewTab({
 function HistoryTab({
   occurrences,
   checkins,
-  narrow,
   openPerson,
 }: {
   occurrences: OccurrenceView[];
   checkins: CheckinView[];
-  narrow: boolean;
   openPerson: (id: string) => void;
 }) {
   const [q, setQ] = useState("");
@@ -550,22 +544,21 @@ function HistoryTab({
       </div>
       <span style={{ color: "#aab3c5", fontSize: "15px", fontWeight: 600 }}>{summary}</span>
 
-      {narrow ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {rows.map((c) => (
-            <div key={c.id} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-              {nameButton(() => openPerson(c.attendeeId), c.name)}
-              <span>
-                <span style={typePill(c.type)}>{ATTENDEE_TYPE_LABEL[c.type]}</span>
-              </span>
-              <span style={{ fontSize: "15.5px", color: "#cdd3e0" }}>
-                {c.serviceLabel} · {c.timeLabel}
-              </span>
-            </div>
-          ))}
-          {rows.length === 0 && <Empty>No check-ins match these filters.</Empty>}
-        </div>
-      ) : (
+      <div className="p-cards-only">
+        {rows.map((c) => (
+          <div key={c.id} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {nameButton(() => openPerson(c.attendeeId), c.name)}
+            <span>
+              <span style={typePill(c.type)}>{ATTENDEE_TYPE_LABEL[c.type]}</span>
+            </span>
+            <span style={{ fontSize: "15.5px", color: "#cdd3e0" }}>
+              {c.serviceLabel} · {c.timeLabel}
+            </span>
+          </div>
+        ))}
+        {rows.length === 0 && <Empty>No check-ins match these filters.</Empty>}
+      </div>
+      <div className="p-table-only">
         <div style={{ overflowX: "auto", border: "1px solid rgba(244,241,234,.08)", borderRadius: "16px", background: "#121a2e" }}>
           <div style={{ minWidth: "760px" }}>
             <GridHeader cols="minmax(180px, 2fr) 190px minmax(200px, 1.6fr) 120px" labels={["Name", "Category", "Service", "Time"]} />
@@ -593,18 +586,16 @@ function HistoryTab({
             {rows.length === 0 && <Empty>No check-ins match these filters.</Empty>}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 function FollowUpTab({
   flags,
-  narrow,
   openPerson,
 }: {
   flags: FlagView[];
-  narrow: boolean;
   openPerson: (id: string) => void;
 }) {
   const [showDismissed, setShowDismissed] = useState(false);
@@ -694,22 +685,21 @@ function FollowUpTab({
         </p>
       )}
 
-      {narrow ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {shown.map((f) => (
-            <div key={f.attendeeId} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                {nameButton(() => openPerson(f.attendeeId), f.name)}
-                <span style={{ ...anton, fontSize: "20px", color: "#e7b84e", whiteSpace: "nowrap" }}>{f.miss} missed</span>
-              </div>
-              <span style={{ fontSize: "15.5px", color: "#cdd3e0" }}>Last check-in: {f.lastLabel}</span>
-              {statusSelect(f)}
-              {dismissButton(f)}
+      <div className="p-cards-only">
+        {shown.map((f) => (
+          <div key={f.attendeeId} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+              {nameButton(() => openPerson(f.attendeeId), f.name)}
+              <span style={{ ...anton, fontSize: "20px", color: "#e7b84e", whiteSpace: "nowrap" }}>{f.miss} missed</span>
             </div>
-          ))}
-          {shown.length === 0 && <Empty>No follow-up candidates right now.</Empty>}
-        </div>
-      ) : (
+            <span style={{ fontSize: "15.5px", color: "#cdd3e0" }}>Last check-in: {f.lastLabel}</span>
+            {statusSelect(f)}
+            {dismissButton(f)}
+          </div>
+        ))}
+        {shown.length === 0 && <Empty>No follow-up candidates right now.</Empty>}
+      </div>
+      <div className="p-table-only">
         <div style={{ overflowX: "auto", border: "1px solid rgba(244,241,234,.08)", borderRadius: "16px", background: "#121a2e" }}>
           <div style={{ minWidth: "860px" }}>
             <GridHeader
@@ -739,18 +729,16 @@ function FollowUpTab({
             {shown.length === 0 && <Empty>No follow-up candidates right now.</Empty>}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 function GuestsTab({
   guests,
-  narrow,
   openPerson,
 }: {
   guests: GuestView[];
-  narrow: boolean;
   openPerson: (id: string) => void;
 }) {
   const [returnedOnly, setReturnedOnly] = useState(false);
@@ -796,26 +784,25 @@ function GuestsTab({
         </span>
       </div>
 
-      {narrow ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {shown.map((g) => (
-            <div key={g.attendeeId} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                {nameButton(() => openPerson(g.attendeeId), g.name)}
-                {g.returned && cameBack}
-              </div>
-              <span style={contactStyle(g)}>{g.contact}</span>
-              <span style={{ fontSize: "15px", color: "#cdd3e0" }}>
-                Prefers: {g.pref} · {g.visits} visits
-              </span>
-              <span style={{ fontSize: "15px", color: "#aab3c5" }}>
-                First {g.firstLabel} · Last {g.lastLabel}
-              </span>
+      <div className="p-cards-only">
+        {shown.map((g) => (
+          <div key={g.attendeeId} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+              {nameButton(() => openPerson(g.attendeeId), g.name)}
+              {g.returned && cameBack}
             </div>
-          ))}
-          {shown.length === 0 && <Empty>No guests to show.</Empty>}
-        </div>
-      ) : (
+            <span style={contactStyle(g)}>{g.contact}</span>
+            <span style={{ fontSize: "15px", color: "#cdd3e0" }}>
+              Prefers: {g.pref} · {g.visits} visits
+            </span>
+            <span style={{ fontSize: "15px", color: "#aab3c5" }}>
+              First {g.firstLabel} · Last {g.lastLabel}
+            </span>
+          </div>
+        ))}
+        {shown.length === 0 && <Empty>No guests to show.</Empty>}
+      </div>
+      <div className="p-table-only">
         <div style={{ overflowX: "auto", border: "1px solid rgba(244,241,234,.08)", borderRadius: "16px", background: "#121a2e" }}>
           <div style={{ minWidth: "940px" }}>
             <GridHeader
@@ -847,7 +834,7 @@ function GuestsTab({
             {shown.length === 0 && <Empty>No guests to show.</Empty>}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -1235,4 +1222,60 @@ function GridHeader({ cols, labels }: { cols: string; labels: string[] }) {
 
 function Empty({ children }: { children: ReactNode }) {
   return <div style={{ padding: "28px 20px", color: "#aab3c5", textAlign: "center" }}>{children}</div>;
+}
+
+/**
+ * Change someone's category from the person drawer. Guests trigger a
+ * welcome-team email on every check-in, so this is how staff move someone
+ * who now attends regularly off that list.
+ */
+function TypeEditor({ attendeeId, current }: { attendeeId: string; current: AttendeeType }) {
+  const [value, setValue] = useState<AttendeeType>(current);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function change(next: AttendeeType) {
+    const previous = value;
+    setValue(next);
+    setErr("");
+    setSaved(false);
+    const result = await setAttendeeType(attendeeId, next);
+    if (result.ok) {
+      setSaved(true);
+    } else {
+      setValue(previous);
+      setErr(result.error);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <label>
+        <span style={fieldLabel}>Category</span>
+        <select
+          value={value}
+          onChange={(e) => change(e.target.value as AttendeeType)}
+          style={{ ...selectStyle, minHeight: "46px", fontSize: "15.5px", fontWeight: 700 }}
+        >
+          {(Object.keys(ATTENDEE_TYPE_LABEL) as AttendeeType[]).map((t) => (
+            <option key={t} value={t}>
+              {ATTENDEE_TYPE_LABEL[t]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {saved && (
+        <span style={{ color: "#8fdba8", fontSize: "14px", fontWeight: 700 }}>Category updated.</span>
+      )}
+      {err && (
+        <span role="alert" style={{ color: "#ff9d8a", fontSize: "14px", fontWeight: 700 }}>
+          {err}
+        </span>
+      )}
+      <span style={{ color: "#8a93a8", fontSize: "13.5px", lineHeight: 1.45 }}>
+        Guests notify the welcome team each time they check in. Past check-ins keep the category
+        they were recorded with.
+      </span>
+    </div>
+  );
 }

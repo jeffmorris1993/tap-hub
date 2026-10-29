@@ -68,21 +68,26 @@ export default async function Submissions({
         Inbox
       </h1>
 
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+      <div className="p-tabstrip" style={{ marginBottom: "20px" }}>
         {TABS.map((t) => {
           const on = t.key === tab;
           return (
             <Link
               key={t.key}
               href={`/portal/submissions?tab=${t.key}`}
+              aria-current={on ? "page" : undefined}
               style={{
                 fontWeight: 800,
                 fontSize: "12.5px",
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
-                padding: "10px 16px",
+                padding: "0 16px",
+                minHeight: "48px",
+                display: "flex",
+                alignItems: "center",
                 borderRadius: "10px",
                 textDecoration: "none",
+                whiteSpace: "nowrap",
                 background: on ? "#e7b84e" : "#121a2e",
                 color: on ? "#0b101c" : "#cdd3e0",
                 border: `1.5px solid ${on ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
@@ -145,6 +150,13 @@ const tdStyle: React.CSSProperties = {
   verticalAlign: "top",
 };
 
+const cardStyle: React.CSSProperties = {
+  background: "#121a2e",
+  border: "1px solid rgba(244,241,234,.08)",
+  borderRadius: "14px",
+  padding: "18px",
+};
+
 function EmptyState({ label }: { label: string }) {
   return (
     <div
@@ -163,10 +175,58 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
+const firstTimePill: React.CSSProperties = {
+  background: "#e7b84e",
+  color: "#6b531a",
+  fontSize: "10.5px",
+  fontWeight: 800,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  padding: "4px 9px",
+  borderRadius: "5px",
+};
+
+/** Stacked card for one visitor — the phone layout of VisitorsTable. */
+function VisitorCard({ r }: { r: Awaited<ReturnType<typeof listVisitors>>[number] }) {
+  return (
+    <div style={{ ...cardStyle, padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+        <span style={{ fontWeight: 700, fontSize: "15px" }}>{r.name}</span>
+        {r.first_time === true ? (
+          <span style={firstTimePill}>First time</span>
+        ) : r.first_time === false ? (
+          <span style={{ color: "#9aa3b8", fontSize: "12.5px" }}>Returning</span>
+        ) : null}
+      </div>
+      <span style={{ color: "#9aa3b8", fontSize: "12.5px" }}>{fmtDate(r.created_at)}</span>
+      {r.email && (
+        <a href={`mailto:${r.email}`} style={{ color: "#e7b84e", textDecoration: "none", fontSize: "14px" }}>
+          {r.email}
+        </a>
+      )}
+      {r.phone && (
+        <a href={`tel:${r.phone}`} style={{ color: "#cdd3e0", textDecoration: "none", fontSize: "14px" }}>
+          {r.phone}
+        </a>
+      )}
+      {!r.email && !r.phone && <span style={{ color: "#6a738b", fontSize: "14px" }}>No contact shared</span>}
+      {r.interests.length > 0 && (
+        <span style={{ color: "#cdd3e0", fontSize: "13px" }}>Interested in: {r.interests.join(", ")}</span>
+      )}
+    </div>
+  );
+}
+
 function VisitorsTable({ rows }: { rows: Awaited<ReturnType<typeof listVisitors>> }) {
   if (rows.length === 0) return <EmptyState label="visitor submissions" />;
   return (
-    <div style={{ overflowX: "auto" }}>
+    <>
+      <div className="p-cards-only">
+        {rows.map((r) => (
+          <VisitorCard key={r.id} r={r} />
+        ))}
+      </div>
+      <div className="p-table-only" style={{ overflowX: "auto" }}>
       <table style={tableStyle}>
         <thead>
           <tr>
@@ -201,20 +261,7 @@ function VisitorsTable({ rows }: { rows: Awaited<ReturnType<typeof listVisitors>
               </td>
               <td style={tdStyle}>
                 {r.first_time === true ? (
-                  <span
-                    style={{
-                      background: "#e7b84e",
-                      color: "#6b531a",
-                      fontSize: "10.5px",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      padding: "4px 9px",
-                      borderRadius: "5px",
-                    }}
-                  >
-                    First time
-                  </span>
+                  <span style={firstTimePill}>First time</span>
                 ) : r.first_time === false ? (
                   <span style={{ color: "#9aa3b8", fontSize: "12.5px" }}>Returning</span>
                 ) : (
@@ -228,7 +275,8 @@ function VisitorsTable({ rows }: { rows: Awaited<ReturnType<typeof listVisitors>
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -673,10 +721,93 @@ function IgniteFamilies({ rows }: { rows: Awaited<ReturnType<typeof listIgniteFa
   );
 }
 
+function rolePill(role: string): React.CSSProperties {
+  return {
+    background: role === "volunteer" ? "rgba(78,184,107,.15)" : "rgba(78,141,231,.15)",
+    color: role === "volunteer" ? "#7ed996" : "#7eaef0",
+    fontSize: "10.5px",
+    fontWeight: 800,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    padding: "4px 9px",
+    borderRadius: "5px",
+  };
+}
+
+function attendancePill(attendance: string): React.CSSProperties {
+  return {
+    background: attendance === "yes" ? "rgba(78,184,107,.15)" : "rgba(231,184,78,.15)",
+    color: attendance === "yes" ? "#7ed996" : "#e7b84e",
+    fontSize: "10.5px",
+    fontWeight: 800,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    padding: "4px 9px",
+    borderRadius: "5px",
+    whiteSpace: "nowrap",
+  };
+}
+
+function occurrenceLabel(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Stacked card for one signup — the phone layout of SignupsTable. */
+function SignupCard({ r }: { r: Awaited<ReturnType<typeof listSignups>>[number] }) {
+  const responses = parseStoredResponses(r.responses);
+  return (
+    <div style={{ ...cardStyle, padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <span style={{ fontWeight: 700, fontSize: "15px" }}>{r.name}</span>
+        <span style={{ display: "inline-flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={rolePill(r.role)}>{r.role}</span>
+          {r.attendance && (
+            <span style={attendancePill(r.attendance)}>
+              {r.attendance === "yes" ? "For sure" : "Not sure"}
+            </span>
+          )}
+        </span>
+      </div>
+      {r.events && (
+        <Link href={`/events/${r.events.slug}`} style={{ color: "#e7b84e", textDecoration: "none", fontSize: "14.5px", fontWeight: 700 }}>
+          {r.events.title}
+        </Link>
+      )}
+      {r.occurrence_date && (
+        <span style={{ fontSize: "13.5px", color: "#cdd3e0" }}>
+          Attending {occurrenceLabel(r.occurrence_date)}
+        </span>
+      )}
+      <span style={{ fontSize: "14px", color: "#cdd3e0" }}>{r.contact}</span>
+      {responses.map((resp) => (
+        <div key={resp.id} style={{ fontSize: "12.5px", color: "#9aa3b8", lineHeight: 1.4 }}>
+          <span style={{ color: "#6a738b", fontWeight: 700 }}>{resp.label}:</span>{" "}
+          <span style={{ color: "#cdd3e0" }}>
+            {Array.isArray(resp.value) ? resp.value.join(", ") : resp.value}
+          </span>
+        </div>
+      ))}
+      {r.notes && <div style={{ fontSize: "12.5px", color: "#9aa3b8", lineHeight: 1.4 }}>{r.notes}</div>}
+      <span style={{ color: "#6a738b", fontSize: "12px" }}>Signed up {fmtDate(r.created_at)}</span>
+    </div>
+  );
+}
+
 function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> }) {
   if (rows.length === 0) return <EmptyState label="event signups" />;
   return (
-    <div style={{ overflowX: "auto" }}>
+    <>
+      <div className="p-cards-only">
+        {rows.map((r) => (
+          <SignupCard key={r.id} r={r} />
+        ))}
+      </div>
+      <div className="p-table-only" style={{ overflowX: "auto" }}>
       <table style={tableStyle}>
         <thead>
           <tr>
@@ -704,12 +835,7 @@ function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> 
               </td>
               <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                 {r.occurrence_date ? (
-                  new Date(`${r.occurrence_date}T12:00:00Z`).toLocaleDateString("en-US", {
-                    timeZone: "UTC",
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
+                  occurrenceLabel(r.occurrence_date)
                 ) : (
                   <span style={{ color: "#6a738b" }}>—</span>
                 )}
@@ -718,34 +844,9 @@ function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> 
               <td style={tdStyle}>{r.contact}</td>
               <td style={tdStyle}>
                 <span style={{ display: "inline-flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                  <span
-                    style={{
-                      background: r.role === "volunteer" ? "rgba(78,184,107,.15)" : "rgba(78,141,231,.15)",
-                      color: r.role === "volunteer" ? "#7ed996" : "#7eaef0",
-                      fontSize: "10.5px",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      padding: "4px 9px",
-                      borderRadius: "5px",
-                    }}
-                  >
-                    {r.role}
-                  </span>
+                  <span style={rolePill(r.role)}>{r.role}</span>
                   {r.attendance && (
-                    <span
-                      style={{
-                        background: r.attendance === "yes" ? "rgba(78,184,107,.15)" : "rgba(231,184,78,.15)",
-                        color: r.attendance === "yes" ? "#7ed996" : "#e7b84e",
-                        fontSize: "10.5px",
-                        fontWeight: 800,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        padding: "4px 9px",
-                        borderRadius: "5px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span style={attendancePill(r.attendance)}>
                       {r.attendance === "yes" ? "For sure" : "Not sure"}
                     </span>
                   )}
@@ -778,6 +879,7 @@ function SignupsTable({ rows }: { rows: Awaited<ReturnType<typeof listSignups>> 
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

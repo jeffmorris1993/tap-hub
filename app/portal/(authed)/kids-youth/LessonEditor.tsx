@@ -86,13 +86,13 @@ export function LessonEditor({ recent }: { recent: LessonRow[] }) {
 
       <form
         onSubmit={onSubmit}
+        className="p-2col"
         style={{
           background: "#121a2e",
           border: "1px solid rgba(244,241,234,.08)",
           borderRadius: "14px",
           padding: "20px",
           display: "grid",
-          gridTemplateColumns: "150px 1fr 1fr",
           gap: "14px",
           marginBottom: "32px",
         }}
@@ -107,10 +107,6 @@ export function LessonEditor({ recent }: { recent: LessonRow[] }) {
             required
           />
         </div>
-        <div style={{ gridColumn: "span 2" }}>
-          <label style={labelStyle}>Topic</label>
-          <input value={topic} onChange={(e) => setTopic(e.target.value)} style={inputStyle} required />
-        </div>
         <div>
           <label style={labelStyle}>Reference</label>
           <input
@@ -121,7 +117,11 @@ export function LessonEditor({ recent }: { recent: LessonRow[] }) {
             required
           />
         </div>
-        <div style={{ gridColumn: "span 2" }}>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label style={labelStyle}>Topic</label>
+          <input value={topic} onChange={(e) => setTopic(e.target.value)} style={inputStyle} required />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
           <label style={labelStyle}>Teacher / context</label>
           <input
             value={teacher}
@@ -174,15 +174,13 @@ export function LessonEditor({ recent }: { recent: LessonRow[] }) {
           {recent.map((r) => (
             <div
               key={r.id}
+              className="p-lesson-row"
               style={{
                 background: "#121a2e",
                 border: "1px solid rgba(244,241,234,.08)",
                 borderRadius: "10px",
                 padding: "14px 16px",
-                display: "grid",
-                gridTemplateColumns: "120px 1fr 1fr 1fr",
                 gap: "12px",
-                alignItems: "center",
               }}
             >
               <div style={{ color: "#9aa3b8", fontSize: "12.5px", fontWeight: 700 }}>{r.lesson_date}</div>

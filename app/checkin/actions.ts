@@ -4,7 +4,12 @@ import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 import { supabaseAdmin } from "../../lib/supabase/server";
 import { fmtDetroitTime } from "../../lib/tz";
-import { openServiceNow, type AttendeeType, type CheckinServiceRow } from "../../lib/attendance";
+import {
+  fmtDateIso,
+  openServiceNow,
+  type AttendeeType,
+  type CheckinServiceRow,
+} from "../../lib/attendance";
 import {
   allowAttempt,
   loadOverrides,
@@ -12,6 +17,8 @@ import {
   sha256Hex,
   type AttendeeRow,
 } from "../../lib/attendance-data";
+import { sanitizeInterests } from "../../lib/interests";
+import { notifyWelcomeTeam } from "../../lib/email/welcome";
 
 export type CheckinOutcome =
   | {
@@ -120,6 +127,70 @@ async function performCheckin(
   };
 }
 
+/**
+ * Guests used to have to tap through to /new-here for the welcome team to
+ * hear about them, which most never did. Now a guest check-in itself files
+ * the connect card and emails the team.
+ *
+ * Only called for fresh check-ins (never "already"), so the unique
+ * (attendee, service, occurrence) constraint caps this at one notification
+ * per guest per service. `createVisitor` is false for a remembered-device
+ * tap — the connect card already exists from their first visit.
+ *
+ * Contact details are withheld when the guest declined contact consent.
+ * Everything here is best-effort: a failure is logged, never surfaced, so a
+ * guest's check-in always succeeds.
+ */
+async function notifyGuestCheckin(opts: {
+  attendee: AttendeeRow;
+  window: { service: CheckinServiceRow; date: string };
+  /** Snapshot type stored on the check-in row ("first" or "returning"). */
+  checkinType: AttendeeType;
+  checkedInAtLabel: string;
+  interests: string[];
+  createVisitor: boolean;
+}): Promise<void> {
+  const { attendee, window, checkinType, interests, createVisitor } = opts;
+  if (checkinType !== "first" && checkinType !== "returning") return;
+
+  const name = `${attendee.first_name} ${attendee.last_name}`.trim();
+  const consented = attendee.contact_consent === true;
+  const email = consented ? attendee.email : null;
+  const phone = consented ? attendee.phone : null;
+  const contactWithheld = !consented && Boolean(attendee.email || attendee.phone);
+  const firstTime = checkinType === "first";
+
+  if (createVisitor) {
+    const { error } = await supabaseAdmin().from("visitors").insert({
+      name,
+      email,
+      phone,
+      first_time: firstTime,
+      interests,
+      source: "checkin",
+    });
+    if (error) console.error("[checkin] visitor card insert failed", error);
+  }
+
+  try {
+    await notifyWelcomeTeam({
+      name,
+      email,
+      phone,
+      firstTime,
+      interests,
+      checkin: {
+        serviceName: window.service.name,
+        dateLabel: fmtDateIso(window.date),
+        timeLabel: opts.checkedInAtLabel,
+      },
+      contactWithheld,
+    });
+  } catch (err) {
+    console.error("[checkin] welcome notify failed", err);
+  }
+}
+
 async function newDeviceToken(attendeeId: string): Promise<string | null> {
   const token = randomBytes(32).toString("hex");
   const { error } = await supabaseAdmin()
@@ -163,7 +234,20 @@ export async function quickCheckin(input: { token: string }): Promise<CheckinOut
     .update({ last_seen_at: new Date().toISOString() })
     .eq("token_hash", hash);
 
-  return performCheckin(attendee, window);
+  const result = await performCheckin(attendee, window);
+  if (result.ok && result.status === "checked_in") {
+    // A guest returning on a remembered device: tell the welcome team, but
+    // don't file a second connect card.
+    await notifyGuestCheckin({
+      attendee,
+      window,
+      checkinType: result.attendeeType,
+      checkedInAtLabel: result.checkedInAtLabel,
+      interests: [],
+      createVisitor: false,
+    });
+  }
+  return result;
 }
 
 export type RegisterCheckinInput = {
@@ -174,6 +258,8 @@ export type RegisterCheckinInput = {
   email?: string;
   preferredContact?: "text" | "call" | "email";
   contactConsent?: boolean;
+  /** Guests only — what they'd like to hear more about. */
+  interests?: string[];
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -201,6 +287,7 @@ export async function registerAndCheckin(input: RegisterCheckinInput): Promise<C
     guest && (input.preferredContact === "text" || input.preferredContact === "call" || input.preferredContact === "email")
       ? input.preferredContact
       : null;
+  const interests = guest ? sanitizeInterests(input.interests) : [];
 
   const window = await currentWindow();
   if (!window) return CLOSED;
@@ -225,6 +312,16 @@ export async function registerAndCheckin(input: RegisterCheckinInput): Promise<C
 
   const token = await newDeviceToken(attendee.id as string);
   const result = await performCheckin(attendee as AttendeeRow, window);
+  if (result.ok && result.status === "checked_in") {
+    await notifyGuestCheckin({
+      attendee: attendee as AttendeeRow,
+      window,
+      checkinType: result.attendeeType,
+      checkedInAtLabel: result.checkedInAtLabel,
+      interests,
+      createVisitor: true,
+    });
+  }
   if (result.ok && token) {
     return { ...result, attendeeId: attendee.id as string, token };
   }
@@ -282,6 +379,17 @@ export async function findAndCheckin(input: {
   const attendee = hits[0];
   const token = await newDeviceToken(attendee.id);
   const result = await performCheckin(attendee, window);
+  if (result.ok && result.status === "checked_in") {
+    // Known guest on a new phone — notify, but their connect card already exists.
+    await notifyGuestCheckin({
+      attendee,
+      window,
+      checkinType: result.attendeeType,
+      checkedInAtLabel: result.checkedInAtLabel,
+      interests: [],
+      createVisitor: false,
+    });
+  }
   if (result.ok && token) {
     return { ...result, attendeeId: attendee.id, token };
   }
