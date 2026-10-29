@@ -143,6 +143,27 @@ export async function listPrayers(
   return data ?? [];
 }
 
+export type PastorRequestRow = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  details: string;
+  status: string;
+  created_at: string;
+};
+
+/** Meeting-with-the-Pastor requests — surfaced only to the Bishop. */
+export async function listPastorRequests(limit = 100): Promise<PastorRequestRow[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("pastor_meeting_requests")
+    .select("id, name, phone, email, details, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export type SignupRow = {
   id: string;
   event_id: string;

@@ -7,6 +7,7 @@ import { Greeting } from "../components/Greeting";
 import { HubAnnouncements } from "../components/HubAnnouncements";
 import { LivePoller } from "../components/LivePoller";
 import { IgniteParentCard } from "../components/IgniteParentCard";
+import { MeetPastorCard } from "../components/MeetPastorCard";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
 import { igniteParentFormOpen } from "../lib/ignite-form";
 
@@ -173,6 +174,8 @@ export default async function Hub() {
             }
           />
         </div>
+
+        <MeetPastorCard />
 
         <HubAnnouncements />
 

@@ -5,6 +5,7 @@ import {
   listPrayers,
   listSignups,
   listIgniteFamilies,
+  listPastorRequests,
 } from "../../../../lib/supabase/admin-queries";
 import { requireLead, ministryScope, type PortalUser } from "../../../../lib/portal-auth";
 import { isBishop } from "../../../../lib/approvers";
@@ -12,11 +13,12 @@ import { parseStoredResponses } from "../../../../lib/event-signup-forms";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "visitors" | "feedback" | "prayers" | "signups" | "ignite";
+type Tab = "visitors" | "feedback" | "prayers" | "signups" | "ignite" | "pastor";
 
 const ALL_TABS: { key: Tab; label: string }[] = [
   { key: "visitors", label: "I'm New" },
   { key: "prayers", label: "Prayer Requests" },
+  { key: "pastor", label: "Pastor Meetings" },
   { key: "feedback", label: "Feedback" },
   { key: "signups", label: "Event Signups" },
   { key: "ignite", label: "Ignite Parents" },
@@ -28,6 +30,9 @@ const ALL_TABS: { key: Tab; label: string }[] = [
 // ministry does).
 const LEAD_TABS = ALL_TABS.filter((t) => t.key === "prayers" || t.key === "feedback" || t.key === "signups");
 const IGNITE_TAB = ALL_TABS.filter((t) => t.key === "ignite");
+// Meeting-with-the-Pastor requests are the Bishop's alone — hidden even from
+// other pastoral users (the form promises "only the Pastor's office sees this").
+const PASTORAL_TABS = ALL_TABS.filter((t) => t.key !== "pastor");
 
 export default async function Submissions({
   searchParams,
@@ -37,7 +42,9 @@ export default async function Submissions({
   const pu = await requireLead();
   const TABS =
     pu.role === "pastoral"
-      ? ALL_TABS
+      ? isBishop(pu.email)
+        ? ALL_TABS
+        : PASTORAL_TABS
       : pu.ministries.includes("Youth")
         ? [...LEAD_TABS, ...IGNITE_TAB]
         : LEAD_TABS;
@@ -92,6 +99,7 @@ export default async function Submissions({
       {tab === "feedback" && <FeedbackTable rows={data as Awaited<ReturnType<typeof listFeedback>>} />}
       {tab === "signups" && <SignupsTable rows={data as Awaited<ReturnType<typeof listSignups>>} />}
       {tab === "ignite" && <IgniteFamilies rows={data as Awaited<ReturnType<typeof listIgniteFamilies>>} />}
+      {tab === "pastor" && <PastorRequestsTable rows={data as Awaited<ReturnType<typeof listPastorRequests>>} />}
     </div>
   );
 }
@@ -102,6 +110,7 @@ async function loadTab(tab: Tab, pu: PortalUser) {
   if (tab === "prayers") return await listPrayers(100, scope, isBishop(pu.email));
   if (tab === "feedback") return await listFeedback(100, scope);
   if (tab === "ignite") return await listIgniteFamilies();
+  if (tab === "pastor") return await listPastorRequests();
   return await listSignups(200, scope);
 }
 
@@ -267,6 +276,64 @@ function PrayersTable({ rows }: { rows: Awaited<ReturnType<typeof listPrayers>> 
           )}
           <p style={{ color: "#f4f1ea", fontSize: "14px", lineHeight: 1.55, marginTop: "12px", whiteSpace: "pre-wrap" }}>
             {r.request}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PastorRequestsTable({ rows }: { rows: Awaited<ReturnType<typeof listPastorRequests>> }) {
+  if (rows.length === 0) return <EmptyState label="meeting requests" />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      {rows.map((r) => (
+        <div
+          key={r.id}
+          style={{
+            background: "#121a2e",
+            border: "1px solid rgba(244,241,234,.08)",
+            borderRadius: "14px",
+            padding: "18px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ fontWeight: 700, fontSize: "14px" }}>{r.name}</div>
+              {r.status === "new" && (
+                <span
+                  style={{
+                    background: "rgba(231,184,78,.16)",
+                    color: "#e7b84e",
+                    fontSize: "10.5px",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  New
+                </span>
+              )}
+            </div>
+            <div style={{ color: "#9aa3b8", fontSize: "12.5px", whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</div>
+          </div>
+          <div style={{ color: "#cdd3e0", fontSize: "12.5px", marginTop: "3px" }}>
+            {r.email && (
+              <a href={`mailto:${r.email}`} style={{ color: "#e7b84e", textDecoration: "none", marginRight: "12px" }}>
+                {r.email}
+              </a>
+            )}
+            {r.phone && (
+              <a href={`tel:${r.phone}`} style={{ color: "#cdd3e0", textDecoration: "none" }}>
+                {r.phone}
+              </a>
+            )}
+          </div>
+          <p style={{ color: "#f4f1ea", fontSize: "14px", lineHeight: 1.55, marginTop: "12px", whiteSpace: "pre-wrap" }}>
+            {r.details}
           </p>
         </div>
       ))}
