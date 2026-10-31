@@ -75,7 +75,7 @@ export function CustomizeSheet({
   }
 
   return (
-    <BottomSheet label="Customize bottom menu" onClose={onClose} zIndex={92}>
+    <BottomSheet label="Customize bottom menu" onClose={onClose} layer="stacked">
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           <h2 style={sheetHeading}>Your bottom menu</h2>

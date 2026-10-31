@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
 import {
   ATTENDEE_TYPE_LABEL,
   DOW_LABEL,
@@ -25,8 +26,13 @@ export type OccurrenceView = {
   dateLabel: string;
   timeLabel: string;
   status: "upcoming" | "held" | "skipped";
+  /** Named check-ins only. */
   count: number;
+  /** Anonymous door count, kept separate so the breakdown still adds up. */
+  walkins: number;
   kind: "recurring" | "oneoff";
+  /** Today or later, and not cancelled — a QR screen is still useful. */
+  canDisplay: boolean;
 };
 
 export type CheckinView = {
@@ -86,6 +92,8 @@ export type ServiceView = {
   opensMinutes: number;
   closesMinutes: number;
   enabled: boolean;
+  /** Set when an event owns this window — managed from the event, not here. */
+  eventId: string | null;
 };
 
 const TYPE_COLORS: Record<AttendeeType, [string, string]> = {
@@ -407,6 +415,11 @@ function OverviewTab({
     { label: "First-time guests", value: cnt("first"), color: "#8fdba8" },
     { label: "Returning guests", value: cnt("returning"), color: "#c9b4f5" },
   ];
+  // Only shown when there are any: a permanent zero on every Sunday would
+  // just be noise.
+  if (selected && selected.walkins > 0) {
+    stats.push({ label: "Walk-ins (no name)", value: selected.walkins, color: "#aab3c5" });
+  }
 
   const max = Math.max(1, ...trend.map((b) => b.total));
 
@@ -1148,6 +1161,9 @@ function OccurrenceList({
               <span style={{ fontWeight: 800, fontSize: "16px" }}>{o.serviceName}</span>
               <span style={{ color: "#aab3c5", fontSize: "14.5px" }}>
                 {o.dateLabel} · {o.timeLabel} · {o.count} check-ins
+                {o.walkins > 0
+                  ? ` + ${o.walkins} walk-in${o.walkins === 1 ? "" : "s"}`
+                  : ""}
               </span>
             </div>
             <span style={p.style}>{p.label}</span>
@@ -1170,7 +1186,47 @@ function OccurrenceList({
                 {o.status === "skipped" ? "Mark as held" : "Mark as did not occur"}
               </button>
             )}
-            {oneoff && o.count === 0 && (
+            {o.canDisplay && (
+              <Link
+                href={`/portal/display/${o.serviceId}`}
+                style={{
+                  minHeight: "44px",
+                  padding: "0 14px",
+                  borderRadius: "10px",
+                  border: "1.5px solid rgba(231,184,78,.35)",
+                  background: "transparent",
+                  color: "#e7b84e",
+                  fontWeight: 700,
+                  fontSize: "14.5px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                Display screen
+              </Link>
+            )}
+            {oneoff?.eventId && (
+              <Link
+                href={`/portal/events/${oneoff.eventId}`}
+                style={{
+                  minHeight: "44px",
+                  padding: "0 14px",
+                  borderRadius: "10px",
+                  border: "1.5px solid rgba(244,241,234,.2)",
+                  background: "transparent",
+                  color: "#cdd3e0",
+                  fontWeight: 700,
+                  fontSize: "14.5px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                Event
+              </Link>
+            )}
+            {oneoff && !oneoff.eventId && o.count === 0 && o.walkins === 0 && (
               <button
                 onClick={() => run(() => deleteOneOffService(oneoff.id))}
                 disabled={busy}

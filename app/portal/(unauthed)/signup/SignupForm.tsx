@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { signUp } from "./actions";
 import { PasswordInput } from "../../../../components/PasswordInput";
+import { EmailSuggestion } from "../../../../components/EmailSuggestion";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -22,6 +23,7 @@ export function SignupForm() {
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   if (done) {
@@ -45,14 +47,32 @@ export function SignupForm() {
     );
   }
 
+  /** `useEmail` lets the suggestion buttons submit an address that isn't in
+   *  state yet, so accepting a correction takes one tap instead of two. */
+  function submit(opts?: { useEmail?: string; confirmedEmail?: boolean }) {
+    const address = opts?.useEmail ?? email;
+    setError(null);
+    setSuggestion(null);
+    startTransition(async () => {
+      const r = await signUp({
+        name,
+        email: address,
+        password,
+        confirmedEmail: opts?.confirmedEmail,
+      });
+      if (r.ok) {
+        setEmail(address);
+        setDone(true);
+        return;
+      }
+      setError(r.error);
+      setSuggestion(r.suggestion ?? null);
+    });
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const r = await signUp({ name, email, password });
-      if (r.ok) setDone(true);
-      else setError(r.error);
-    });
+    submit();
   }
 
   const disabled = pending || !name || !email || !password;
@@ -86,8 +106,16 @@ export function SignupForm() {
         placeholder="Password (8+ characters)"
         style={inputStyle}
       />
-      {error && (
+      {error && !suggestion && (
         <div style={{ color: "#ff8a8a", fontSize: "13px", fontWeight: 700, marginBottom: "12px" }}>{error}</div>
+      )}
+      {suggestion && (
+        <EmailSuggestion
+          suggestion={suggestion}
+          pending={pending}
+          onAccept={() => submit({ useEmail: suggestion, confirmedEmail: true })}
+          onKeep={() => submit({ confirmedEmail: true })}
+        />
       )}
       <button
         type="submit"

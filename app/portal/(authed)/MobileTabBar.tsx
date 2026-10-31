@@ -76,13 +76,14 @@ export function MobileTabBar({
   return (
     <nav
       aria-label="Portal sections"
-      className="psh-mobile-block"
+      className="psh-mobile-block psh-tabbar"
       style={{
         position: "fixed",
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 50,
+        // z-index comes from .psh-tabbar (100) so it stays above the sheet
+        // scrim — see the scale documented in portal-shell.css.
         background: "#121a2e",
         borderTop: "1px solid rgba(244,241,234,.1)",
         padding: "6px 6px calc(6px + env(safe-area-inset-bottom))",

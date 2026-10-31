@@ -65,3 +65,59 @@ export async function updateUserRole(input: UpdateRoleInput): Promise<UpdateRole
   revalidatePath("/portal", "layout");
   return { ok: true };
 }
+
+export type DeleteUserResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Remove an account entirely. Exists because a mistyped signup email leaves a
+ * second, unusable account for the same person and there was previously no way
+ * to clear one without a developer.
+ *
+ * Deleting the auth user cascades public.profiles away. Their submissions
+ * survive — prayer requests, feedback, event signups and visitor cards all
+ * reference auth.users with `on delete set null`, so those rows stay and
+ * simply stop being linked to an account.
+ */
+export async function deleteUserAccount(input: {
+  profileId: string;
+}): Promise<DeleteUserResult> {
+  const actor = await assertPastoral();
+
+  const sb = supabaseAdmin();
+  const { data } = await sb
+    .from("profiles")
+    .select("id, email, role")
+    .eq("id", input.profileId)
+    .limit(1);
+  const target = data?.[0] as { id: string; email: string; role: PortalRole } | undefined;
+  if (!target) return { ok: false, error: "That account no longer exists." };
+
+  if (target.email === actor.email) {
+    return { ok: false, error: "You can't delete your own account." };
+  }
+
+  // Same reasoning as the demotion guard above: never leave the portal with
+  // nobody who can approve.
+  if (target.role === "pastoral") {
+    const { count } = await sb
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "pastoral");
+    if ((count ?? 0) <= 1) {
+      return {
+        ok: false,
+        error: "You can't delete the last pastoral account. Promote someone else first.",
+      };
+    }
+  }
+
+  const { error } = await sb.auth.admin.deleteUser(target.id);
+  if (error) {
+    console.error("[users] delete failed", error);
+    return { ok: false, error: "Couldn't delete that account. Try again in a moment." };
+  }
+
+  revalidatePath("/portal/users");
+  revalidatePath("/portal", "layout");
+  return { ok: true };
+}

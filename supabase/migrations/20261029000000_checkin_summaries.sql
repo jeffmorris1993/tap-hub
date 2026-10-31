@@ -1,7 +1,12 @@
 -- Check-in summary emails: once a window closes, the cron route emails the
 -- configured recipients the occurrence's attendance metrics. This table is
 -- the idempotency log — one summary per (service, occurrence), ever.
-create table public.checkin_summary_sends (
+--
+-- `if not exists` because this table was created by hand on the live database
+-- before the migration was ever recorded as applied; the shape below matches
+-- what's already there. The constraint changes further down were always
+-- re-runnable, so the whole file is now safe to replay.
+create table if not exists public.checkin_summary_sends (
   service_id uuid not null references public.checkin_services (id) on delete cascade,
   occurrence_date date not null,
   recipients text[] not null default '{}',

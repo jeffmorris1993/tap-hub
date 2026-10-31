@@ -7,7 +7,23 @@
  *   960px — shell: sidebar + header email vs. bottom tab bar + avatar sheet
  *   820px — data views: real table vs. stacked cards
  *   700px — content grids: one column vs. two (small tablet and up)
+ *
+ * Z-index scale — keep new overlays on it, or they land under something:
+ *   30  page header (sticky)
+ *   50  desktop sidebar
+ *   90  sheet scrim (phones: stops above the tab bar, see below)
+ *   100 mobile tab bar — ABOVE the scrim on purpose, so a tab is tappable on
+ *       the first tap while a sheet is open
+ *   110 bottom sheet itself
+ *   130 toast dock
+ *   140 confirm dialog
  */
+
+:root {
+  /* Height of the fixed bottom tab bar, including the iOS home indicator.
+     The scrim stops here and the sheet sits on top of it. */
+  --psh-tabbar: calc(76px + env(safe-area-inset-bottom));
+}
 
 /* ---------- shell visibility ---------- */
 
@@ -64,6 +80,12 @@
   }
 }
 
+/* The tab bar sits ABOVE the sheet scrim so tapping another section navigates
+   on the first tap instead of merely dismissing the sheet. */
+.psh-tabbar {
+  z-index: 100;
+}
+
 /* ---------- bottom sheet / dialog ---------- */
 
 @keyframes pshFade {
@@ -84,40 +106,79 @@
   }
 }
 
+/*
+ * Desktop modal entry. The translate has to be baked into both keyframes:
+ * an animation overrides the rule's own `transform`, and with fill-mode
+ * `both` the final keyframe sticks — so a bare `scale(1)` here would leave
+ * the modal un-centered once the animation finished.
+ */
 @keyframes pshPop {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: translate(-50%, -50%) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
-/* Backdrop: sheet sits at the bottom on phones, centers as a modal on desktop. */
+/*
+ * Scrim and sheet are SIBLINGS, not parent and child. A scrim that wrapped the
+ * sheet would create a stacking context, making it impossible to put the sheet
+ * above the tab bar while the dimmed area stays below it — which is what lets
+ * the navigation keep working while the drawer is open.
+ */
+
+/* Dimmed area only, stopping at the top of the tab bar so taps on the bar
+   reach the bar. */
 .psh-scrim {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--psh-tabbar);
   z-index: 90;
   background: rgba(5, 8, 15, 0.66);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
   animation: pshFade 0.2s both;
 }
 
+/* Drawer: above the tab bar on phones, resting on top of it. */
 .psh-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--psh-tabbar);
+  z-index: 110;
   width: 100%;
   max-width: 100%;
+  margin: 0 auto;
   background: #121a2e;
   border: 1px solid rgba(244, 241, 234, 0.1);
   border-bottom: none;
   border-radius: 22px 22px 0 0;
-  padding: 10px 16px calc(22px + env(safe-area-inset-bottom));
-  max-height: 86vh;
+  padding: 10px 16px 18px;
+  max-height: calc(100dvh - var(--psh-tabbar) - 24px);
   overflow-y: auto;
   animation: pshUp 0.25s both;
+  /* Dragging sets an inline transform; keep the entry animation from fighting
+     it by letting the inline style win (it does — specificity of style attr). */
+  touch-action: pan-y;
+}
+
+/* The grab row owns the drag gesture, so it must not also scroll the sheet. */
+.psh-sheet-drag {
+  touch-action: none;
+  cursor: grab;
+}
+.psh-sheet-drag:active {
+  cursor: grabbing;
+}
+
+/* Spring back after a drag that didn't go far enough to dismiss. Applied only
+   when the finger is up — during a drag the sheet must track it exactly. */
+.psh-sheet-springy {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 @media (min-width: 700px) {
@@ -127,15 +188,20 @@
 }
 
 @media (min-width: 960px) {
+  /* No tab bar up here — back to a full backdrop and a centered modal. */
   .psh-scrim {
-    align-items: center;
-    padding: 24px;
+    bottom: 0;
   }
   .psh-sheet {
+    top: 50%;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
     max-width: 520px;
     border: 1px solid rgba(244, 241, 234, 0.12);
     border-radius: 18px;
-    padding: 22px 24px 26px;
+    padding: 18px 24px 26px;
     max-height: 88vh;
     animation: pshPop 0.18s both;
   }
@@ -143,12 +209,19 @@
   .psh-grabber {
     display: none;
   }
+  .psh-sheet-drag {
+    cursor: default;
+    touch-action: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .psh-scrim,
   .psh-sheet {
     animation: none;
+  }
+  .psh-sheet-springy {
+    transition: none;
   }
 }
 

@@ -2,8 +2,11 @@
 
 import { headers } from "next/headers";
 import { supabaseSession } from "../../../../lib/supabase/auth";
+import { suggestEmailFix } from "../../../../lib/email-typos";
 
-export type ResetRequestResult = { ok: true } | { ok: false; error: string };
+export type ResetRequestResult =
+  | { ok: true }
+  | { ok: false; error: string; suggestion?: string };
 export type ResetConfirmResult = { ok: true } | { ok: false; error: string };
 
 async function siteOrigin(): Promise<string> {
@@ -14,9 +17,21 @@ async function siteOrigin(): Promise<string> {
   return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
-export async function requestPasswordReset(email: string): Promise<ResetRequestResult> {
+export async function requestPasswordReset(
+  email: string,
+  opts?: { confirmedEmail?: boolean },
+): Promise<ResetRequestResult> {
   const e = email?.trim().toLowerCase();
   if (!e) return { ok: false, error: "Email is required." };
+
+  // A typo here sends the reset to nobody, which is indistinguishable from
+  // "my account is broken". Offer the correction first.
+  if (!opts?.confirmedEmail) {
+    const suggestion = suggestEmailFix(e);
+    if (suggestion && suggestion !== e) {
+      return { ok: false, suggestion, error: `Did you mean ${suggestion}?` };
+    }
+  }
 
   const sb = await supabaseSession();
   const origin = await siteOrigin();

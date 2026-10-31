@@ -2,9 +2,18 @@
 
 import { headers } from "next/headers";
 import { supabaseSession } from "../../../../lib/supabase/auth";
+import { EMAIL_RE, suggestEmailFix } from "../../../../lib/email-typos";
 
-export type SignupInput = { name: string; email: string; password: string };
-export type SignupResult = { ok: true } | { ok: false; error: string };
+export type SignupInput = {
+  name: string;
+  email: string;
+  password: string;
+  /** Set once the person has seen a "did you mean…?" prompt and declined it. */
+  confirmedEmail?: boolean;
+};
+export type SignupResult =
+  | { ok: true }
+  | { ok: false; error: string; suggestion?: string };
 
 async function siteOrigin(): Promise<string> {
   const h = await headers();
@@ -21,8 +30,25 @@ export async function signUp(input: SignupInput): Promise<SignupResult> {
   const email = input.email?.trim().toLowerCase();
   if (!name) return { ok: false, error: "Please share your name." };
   if (!email) return { ok: false, error: "Email is required." };
+  if (!EMAIL_RE.test(email)) {
+    return { ok: false, error: "That email doesn't look right — check it and try again." };
+  }
   if (!input.password || input.password.length < 8) {
     return { ok: false, error: "Pick a password with at least 8 characters." };
+  }
+
+  // A mistyped domain means the confirmation email goes nowhere, and the
+  // person signs up a second time — leaving two accounts for one member.
+  // Offer the fix before creating anything; they can still insist.
+  if (!input.confirmedEmail) {
+    const suggestion = suggestEmailFix(email);
+    if (suggestion && suggestion !== email) {
+      return {
+        ok: false,
+        suggestion,
+        error: `Did you mean ${suggestion}?`,
+      };
+    }
   }
 
   const sb = await supabaseSession();

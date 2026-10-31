@@ -6,7 +6,7 @@ import { supabaseAdmin } from "../../lib/supabase/server";
 import { fmtDetroitTime } from "../../lib/tz";
 import {
   fmtDateIso,
-  openServiceNow,
+  openServicesNow,
   type AttendeeType,
   type CheckinServiceRow,
 } from "../../lib/attendance";
@@ -45,10 +45,22 @@ const GENERIC_FAIL: CheckinOutcome = {
   error: "Something went wrong on our end. Try again in a moment.",
 };
 
-/** The open window is always re-derived server-side; the client is never trusted. */
-async function currentWindow(): Promise<{ service: CheckinServiceRow; date: string } | null> {
+/**
+ * The open window is always re-derived server-side; the client is never
+ * trusted.
+ *
+ * `serviceId` names which open window to use — an event's QR carries it, and
+ * the picker sends it when several are open at once. It can only ever select
+ * from the windows that are genuinely open right now: an id for a closed or
+ * unknown service returns null, exactly like no window at all.
+ */
+async function currentWindow(
+  serviceId?: string,
+): Promise<{ service: CheckinServiceRow; date: string } | null> {
   const [services, overrides] = await Promise.all([loadServices(), loadOverrides()]);
-  return openServiceNow(services, overrides);
+  const open = openServicesNow(services, overrides);
+  if (serviceId) return open.find((w) => w.service.id === serviceId) ?? null;
+  return open[0] ?? null;
 }
 
 /**
@@ -204,13 +216,16 @@ async function newDeviceToken(attendeeId: string): Promise<string | null> {
 }
 
 /** One-tap check-in for a device that has checked in before. */
-export async function quickCheckin(input: { token: string }): Promise<CheckinOutcome> {
+export async function quickCheckin(input: {
+  token: string;
+  serviceId?: string;
+}): Promise<CheckinOutcome> {
   const token = typeof input.token === "string" ? input.token.trim() : "";
   if (!token || token.length > 200) {
     return { ok: false, code: "not_found", error: "We couldn't find your check-in on this phone." };
   }
 
-  const window = await currentWindow();
+  const window = await currentWindow(input.serviceId);
   if (!window) return CLOSED;
 
   const sb = supabaseAdmin();
@@ -260,6 +275,8 @@ export type RegisterCheckinInput = {
   contactConsent?: boolean;
   /** Guests only — what they'd like to hear more about. */
   interests?: string[];
+  /** Which open check-in window — an event's QR or the picker supplies it. */
+  serviceId?: string;
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -289,7 +306,7 @@ export async function registerAndCheckin(input: RegisterCheckinInput): Promise<C
       : null;
   const interests = guest ? sanitizeInterests(input.interests) : [];
 
-  const window = await currentWindow();
+  const window = await currentWindow(input.serviceId);
   if (!window) return CLOSED;
 
   const { data: attendee, error } = await supabaseAdmin()
@@ -336,6 +353,7 @@ export async function findAndCheckin(input: {
   firstName: string;
   lastName: string;
   contact: string;
+  serviceId?: string;
 }): Promise<CheckinOutcome> {
   const first = (input.firstName ?? "").trim().toLowerCase();
   const last = (input.lastName ?? "").trim().toLowerCase();
@@ -350,7 +368,7 @@ export async function findAndCheckin(input: {
     return { ok: false, error: "Too many tries — wait a few minutes and try again." };
   }
 
-  const window = await currentWindow();
+  const window = await currentWindow(input.serviceId);
   if (!window) return CLOSED;
 
   const digits = contact.replace(/\D/g, "");

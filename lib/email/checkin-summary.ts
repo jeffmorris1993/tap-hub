@@ -13,7 +13,15 @@ export type CheckinSummaryPayload = {
   dateLabel: string;
   /** Service start time label ("12:00 PM"). */
   serviceTimeLabel: string;
-  kpis: { total: number; members: number; regulars: number; first: number; returning: number };
+  kpis: {
+    total: number;
+    members: number;
+    regulars: number;
+    first: number;
+    returning: number;
+    /** Anonymous door count. Separate from `total` so the breakdown adds up. */
+    walkins: number;
+  };
 };
 
 /**
@@ -38,6 +46,16 @@ export async function sendCheckinSummary(payload: CheckinSummaryPayload): Promis
     { label: "First-time guests", value: String(kpis.first) },
     { label: "Returning guests", value: String(kpis.returning) },
   ];
+
+  // Only when there are any — a permanent "0" on every Sunday email would
+  // train people to ignore the line.
+  if (kpis.walkins > 0) {
+    fields.push({ label: "Walk-ins (counted, not named)", value: String(kpis.walkins) });
+    fields.push({
+      label: "Everyone counted",
+      value: String(kpis.total + kpis.walkins),
+    });
+  }
 
   const html = renderBrandedEmail({
     eyebrow: "Nehemiah's Temple · Attendance",

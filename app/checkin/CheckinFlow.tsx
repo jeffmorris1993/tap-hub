@@ -108,16 +108,39 @@ const linkButton: CSSProperties = {
   textUnderlineOffset: "4px",
 };
 
-type Screen = "welcome" | "form" | "find" | "loading" | "success" | "already" | "closed";
+type Screen =
+  | "pick"
+  | "welcome"
+  | "form"
+  | "find"
+  | "loading"
+  | "success"
+  | "already"
+  | "closed";
+
+export type CheckinWindowView = {
+  serviceId: string;
+  serviceName: string;
+  whenLabel: string;
+};
 
 export function CheckinFlow({
   window: win,
+  choices,
   closed,
 }: {
-  window: { serviceName: string; whenLabel: string } | null;
+  /** The single open window, or the one pinned by `?s=`. */
+  window: CheckinWindowView | null;
+  /** Two or more windows open and none pinned — ask which one they're at. */
+  choices: CheckinWindowView[];
   closed: { nextLabel: string | null; schedule: string[] } | null;
 }) {
-  const [screen, setScreen] = useState<Screen>(win ? "form" : "closed");
+  // Whichever window we're checking into: the one handed down, or the one
+  // picked from `choices`. The server re-derives it either way.
+  const [active, setActive] = useState<CheckinWindowView | null>(win);
+  const [screen, setScreen] = useState<Screen>(
+    win ? "form" : choices.length > 0 ? "pick" : "closed",
+  );
   const [device, setDevice] = useState<StoredDevice | null>(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState<{
@@ -140,7 +163,7 @@ export function CheckinFlow({
   const [find, setFind] = useState({ first: "", last: "", contact: "", miss: false });
 
   useEffect(() => {
-    if (!win) return;
+    if (!active) return;
     const stored = loadDevice();
     if (!stored) return;
     // Deferred so hydration completes against the server-rendered form
@@ -150,7 +173,7 @@ export function CheckinFlow({
       setScreen("welcome");
     }, 0);
     return () => clearTimeout(t);
-  }, [win]);
+  }, [active]);
 
   function applyOutcome(result: CheckinOutcome, fallback: Screen) {
     if (result.ok) {
@@ -184,7 +207,10 @@ export function CheckinFlow({
     if (!device) return;
     setErr("");
     setScreen("loading");
-    const result = await quickCheckin({ token: device.token });
+    const result = await quickCheckin({
+      token: device.token,
+      serviceId: active?.serviceId,
+    });
     if (!result.ok && result.code === "not_found") {
       // The server no longer knows this device — fall back to the form.
       clearDevice();
@@ -216,6 +242,7 @@ export function CheckinFlow({
       preferredContact: form.pref || undefined,
       contactConsent: form.consent,
       interests: form.interests,
+      serviceId: active?.serviceId,
     });
     applyOutcome(result, "form");
   }
@@ -228,6 +255,7 @@ export function CheckinFlow({
       firstName: find.first,
       lastName: find.last,
       contact: find.contact,
+      serviceId: active?.serviceId,
     });
     if (!result.ok && result.code === "not_found") {
       setFind((f) => ({ ...f, miss: true }));
@@ -245,6 +273,73 @@ export function CheckinFlow({
   }
 
   const guest = form.type === "first" || form.type === "returning";
+
+  if (screen === "pick") {
+    return (
+      <div style={{ padding: "26px 20px 40px", display: "flex", flexDirection: "column", gap: "18px" }}>
+        <h2 style={{ ...heading, fontSize: "32px" }}>Which one are you here for?</h2>
+        <p style={{ color: "#cdd3e0", fontSize: "17px", lineHeight: 1.55 }}>
+          More than one check-in is open right now. Tap the one you&apos;re attending.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {choices.map((c) => (
+            <button
+              key={c.serviceId}
+              type="button"
+              onClick={() => {
+                setActive(c);
+                setErr("");
+                setScreen("form");
+              }}
+              style={{
+                width: "100%",
+                minHeight: "80px",
+                padding: "16px 18px",
+                background: "#121a2e",
+                border: "1.5px solid rgba(231,184,78,.32)",
+                borderRadius: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                textAlign: "left",
+              }}
+            >
+              <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
+                <span style={{ fontWeight: 800, fontSize: "19px", color: "#f4f1ea" }}>
+                  {c.serviceName}
+                </span>
+                <span style={{ color: "#aab3c5", fontSize: "15px", fontWeight: 600 }}>
+                  {c.whenLabel}
+                </span>
+              </span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 6l6 6-6 6"
+                  stroke="#e7b84e"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ))}
+        </div>
+        <Link
+          href="/"
+          style={{
+            ...quietButton,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textDecoration: "none",
+          }}
+        >
+          Back to Hub
+        </Link>
+      </div>
+    );
+  }
 
   if (screen === "closed") {
     return (
@@ -385,7 +480,7 @@ export function CheckinFlow({
     );
   }
 
-  if (screen === "welcome" && device && win) {
+  if (screen === "welcome" && device && active) {
     const initials = device.firstName.trim().charAt(0).toUpperCase();
     return (
       <Centered>
@@ -424,8 +519,8 @@ export function CheckinFlow({
             textAlign: "left",
           }}
         >
-          <span style={{ fontWeight: 800, fontSize: "18px" }}>{win.serviceName}</span>
-          <span style={{ color: "#aab3c5", fontSize: "15px", fontWeight: 600 }}>{win.whenLabel}</span>
+          <span style={{ fontWeight: 800, fontSize: "18px" }}>{active.serviceName}</span>
+          <span style={{ color: "#aab3c5", fontSize: "15px", fontWeight: 600 }}>{active.whenLabel}</span>
         </div>
         {err && (
           <p role="alert" style={{ color: "#ffb3a5", fontWeight: 700, fontSize: "16px", lineHeight: 1.45 }}>
@@ -549,7 +644,7 @@ export function CheckinFlow({
         </p>
       </div>
 
-      {win && (
+      {active && (
         <div
           style={{
             background: "#121a2e",
@@ -561,8 +656,8 @@ export function CheckinFlow({
             gap: "3px",
           }}
         >
-          <span style={{ fontWeight: 800, fontSize: "16px" }}>{win.serviceName}</span>
-          <span style={{ color: "#aab3c5", fontSize: "14.5px", fontWeight: 600 }}>{win.whenLabel}</span>
+          <span style={{ fontWeight: 800, fontSize: "16px" }}>{active.serviceName}</span>
+          <span style={{ color: "#aab3c5", fontSize: "14.5px", fontWeight: 600 }}>{active.whenLabel}</span>
         </div>
       )}
 

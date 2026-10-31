@@ -86,7 +86,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           alignItems: "flex-end",
           gap: "10px",
           pointerEvents: "none",
-          zIndex: 100,
+          // Above an open bottom sheet (110) — see portal-shell.css.
+          zIndex: 130,
         }}
       >
         {toasts.map((t) => {

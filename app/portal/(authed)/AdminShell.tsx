@@ -63,6 +63,18 @@ export function AdminShell({
     };
   }, [sheet]);
 
+  // A reload with a sheet open leaves BottomSheet's "Back closes me" marker on
+  // the current history entry with no sheet to close. Clear it on mount, or
+  // the next sheet would adopt that entry and closing it would navigate away.
+  useEffect(() => {
+    const state = window.history.state as Record<string, unknown> | null;
+    if (state?.pshSheet) {
+      const rest = { ...state };
+      delete rest.pshSheet;
+      window.history.replaceState(rest, "");
+    }
+  }, []);
+
   function isActive(item: NavItem) {
     if (item.href === "/portal") return pathname === "/portal";
     return pathname === item.href || pathname.startsWith(item.href + "/");

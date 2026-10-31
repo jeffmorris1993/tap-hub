@@ -61,7 +61,9 @@ export function ConfirmDialog({
         background: "rgba(0,0,0,.65)",
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
-        zIndex: 100,
+        // Top of the stack: a confirm can be raised from inside a sheet, and
+        // must sit above both it and the toasts — see portal-shell.css.
+        zIndex: 140,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

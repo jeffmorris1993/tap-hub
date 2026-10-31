@@ -92,13 +92,26 @@ export async function GET(request: Request) {
     const service = serviceById.get(occ.serviceId);
     if (!service) continue;
 
-    const { data: rows, error: cErr } = await sb
-      .from("checkins")
-      .select("attendee_type")
-      .eq("service_id", occ.serviceId)
-      .eq("occurrence_date", occ.date);
+    const [{ data: rows, error: cErr }, { count: walkinCount, error: wErr }] = await Promise.all([
+      sb
+        .from("checkins")
+        .select("attendee_type")
+        .eq("service_id", occ.serviceId)
+        .eq("occurrence_date", occ.date),
+      sb
+        .from("checkin_walkins")
+        .select("*", { count: "exact", head: true })
+        .eq("service_id", occ.serviceId)
+        .eq("occurrence_date", occ.date),
+    ]);
     if (cErr) {
       console.error("[checkin-summary] checkins query failed", occ.serviceId, occ.date, cErr);
+      continue;
+    }
+    // 42P01 = table missing, i.e. the event_checkin migration hasn't run yet.
+    // Summaries shouldn't stop going out over a count that is zero anyway.
+    if (wErr && wErr.code !== "42P01") {
+      console.error("[checkin-summary] walk-ins query failed", occ.serviceId, occ.date, wErr);
       continue;
     }
     const types = (rows ?? []).map((r) => (r as { attendee_type: AttendeeType }).attendee_type);
@@ -108,11 +121,13 @@ export async function GET(request: Request) {
       regulars: types.filter((t) => t === "regular").length,
       first: types.filter((t) => t === "first").length,
       returning: types.filter((t) => t === "returning").length,
+      walkins: walkinCount ?? 0,
     };
 
     // A quiet occurrence gets a log row but no email — stops retries without
-    // emailing "0 check-ins" noise every week.
-    if (kpis.total === 0) {
+    // emailing "0 check-ins" noise every week. Walk-ins count as attendance,
+    // so a door-counted-only occurrence still sends.
+    if (kpis.total === 0 && kpis.walkins === 0) {
       await sb
         .from("checkin_summary_sends")
         .upsert(

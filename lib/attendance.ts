@@ -36,6 +36,8 @@ export type CheckinServiceRow = {
   closes_minutes: number;
   enabled: boolean;
   created_at: string;
+  /** Set when this window belongs to an event rather than a standing service. */
+  event_id: string | null;
 };
 
 export type OccurrenceOverride = {
@@ -121,6 +123,33 @@ function occursOn(service: CheckinServiceRow, dateIso: string, dow: number): boo
   return service.day_of_week === dow;
 }
 
+export type OpenWindow = { service: CheckinServiceRow; date: string };
+
+/**
+ * Every check-in window open right now, soonest service time first.
+ *
+ * Usually one, but an event's window can overlap a standing service — so the
+ * public page offers a choice and the QR on the display screen pins one by id.
+ */
+export function openServicesNow(
+  services: CheckinServiceRow[],
+  overrides: OccurrenceOverride[],
+  now: Date = detroitNow(),
+): OpenWindow[] {
+  const dateIso = dateToIso(now);
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return services
+    .filter(
+      (s) =>
+        occursOn(s, dateIso, now.getDay()) &&
+        minutes >= s.opens_minutes &&
+        minutes < s.closes_minutes &&
+        !isSkipped(overrides, s.id, dateIso),
+    )
+    .sort((a, b) => a.service_minutes - b.service_minutes)
+    .map((service) => ({ service, date: dateIso }));
+}
+
 /**
  * The service whose check-in window is open right now, or null. If two
  * windows overlap, the one whose service time is soonest wins.
@@ -129,19 +158,8 @@ export function openServiceNow(
   services: CheckinServiceRow[],
   overrides: OccurrenceOverride[],
   now: Date = detroitNow(),
-): { service: CheckinServiceRow; date: string } | null {
-  const dateIso = dateToIso(now);
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const open = services
-    .filter(
-      (s) =>
-        occursOn(s, dateIso, now.getDay()) &&
-        minutes >= s.opens_minutes &&
-        minutes < s.closes_minutes &&
-        !isSkipped(overrides, s.id, dateIso),
-    )
-    .sort((a, b) => a.service_minutes - b.service_minutes);
-  return open[0] ? { service: open[0], date: dateIso } : null;
+): OpenWindow | null {
+  return openServicesNow(services, overrides, now)[0] ?? null;
 }
 
 /** The next time check-in opens within the coming two weeks, or null. */

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateUserRole } from "./actions";
+import { useRouter } from "next/navigation";
+import { deleteUserAccount, updateUserRole } from "./actions";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { useToast } from "../Toaster";
 import type { PortalRole } from "../../../../lib/portal-auth";
 
 export type UserRow = {
@@ -12,6 +15,8 @@ export type UserRow = {
   ministries: string[];
   created_at: string;
   isStaffEligible: boolean;
+  /** Another account shares this person's name — likely a mistyped signup. */
+  sharesName: boolean;
 };
 
 const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage"];
@@ -28,14 +33,18 @@ function initials(name: string | null, email: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || src.slice(0, 2).toUpperCase();
 }
 
-function Row({ user }: { user: UserRow }) {
+function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [role, setRole] = useState<PortalRole>(user.role);
   const [ministries, setMinistries] = useState<string[]>(user.ministries);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { toast } = useToast();
+  const router = useRouter();
 
   const badge = ROLE_BADGE[user.role];
+  const displayName = user.full_name?.trim() || user.email;
 
   function save() {
     setError(null);
@@ -43,6 +52,20 @@ function Row({ user }: { user: UserRow }) {
       const r = await updateUserRole({ profileId: user.id, role, ministries });
       if (r.ok) setEditing(false);
       else setError(r.error);
+    });
+  }
+
+  function remove() {
+    setError(null);
+    startTransition(async () => {
+      const r = await deleteUserAccount({ profileId: user.id });
+      setConfirming(false);
+      if (r.ok) {
+        toast(`Removed ${user.email}.`, "success");
+        router.refresh();
+      } else {
+        toast(r.error, "error");
+      }
     });
   }
 
@@ -76,8 +99,25 @@ function Row({ user }: { user: UserRow }) {
         <div style={{ flex: 1, minWidth: "160px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "9px", flexWrap: "wrap" }}>
             <span style={{ fontWeight: 800, fontSize: "14.5px", color: "#f4f1ea" }}>
-              {user.full_name?.trim() || user.email}
+              {displayName}
             </span>
+            {user.sharesName && (
+              <span
+                title="Another account uses this name — check whether one is a mistyped signup."
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  background: "rgba(231,184,78,.16)",
+                  color: "#e7b84e",
+                }}
+              >
+                Duplicate name
+              </span>
+            )}
             <span
               style={{
                 fontSize: "10px",
@@ -122,6 +162,61 @@ function Row({ user }: { user: UserRow }) {
           {editing ? "Close" : "Change role"}
         </button>
       </div>
+
+      {editing && !isSelf && (
+        <div
+          style={{
+            marginTop: "14px",
+            paddingTop: "14px",
+            borderTop: "1px solid rgba(244,241,234,.07)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setConfirming(true)}
+            style={{
+              background: "transparent",
+              border: "1.5px solid rgba(181,50,65,.55)",
+              color: "#e0707d",
+              fontWeight: 800,
+              fontSize: "11.5px",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              padding: "10px 16px",
+              borderRadius: "10px",
+              cursor: pending ? "wait" : "pointer",
+            }}
+          >
+            Remove account
+          </button>
+          <span style={{ fontSize: "12px", color: "#6a738b", fontWeight: 600 }}>
+            For a duplicate or mistyped signup.
+          </span>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirming}
+        danger
+        pending={pending}
+        title="Remove account?"
+        confirmLabel="Remove"
+        body={
+          <>
+            This deletes the account for <strong style={{ color: "#f4f1ea" }}>{user.email}</strong>
+            {user.full_name?.trim() ? ` (${user.full_name.trim()})` : ""} and they will no longer
+            be able to sign in. Anything they submitted — prayer requests, feedback, event
+            signups — stays, but is no longer linked to an account. This can&apos;t be undone.
+          </>
+        }
+        onConfirm={remove}
+        onCancel={() => setConfirming(false)}
+      />
 
       {editing && (
         <div
@@ -239,11 +334,18 @@ function Row({ user }: { user: UserRow }) {
   );
 }
 
-export function UsersList({ users }: { users: UserRow[] }) {
+export function UsersList({
+  users,
+  currentEmail,
+}: {
+  users: UserRow[];
+  /** The signed-in pastoral user — their own row hides the remove control. */
+  currentEmail: string;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       {users.map((u) => (
-        <Row key={u.id} user={u} />
+        <Row key={u.id} user={u} isSelf={u.email === currentEmail} />
       ))}
     </div>
   );

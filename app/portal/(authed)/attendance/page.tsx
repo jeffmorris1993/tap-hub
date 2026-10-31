@@ -34,7 +34,8 @@ export default async function AttendancePage({
   const { tab } = await searchParams;
   const initialTab = (TABS as readonly string[]).includes(tab ?? "") ? (tab as string) : "overview";
 
-  const { services, overrides, attendees, checkins, followUps } = await loadAttendanceDataset();
+  const { services, overrides, attendees, checkins, followUps, walkins } =
+    await loadAttendanceDataset();
   const todayIso = detroitDateIso();
 
   // Date range for derived occurrences: from the earliest data point (first
@@ -68,7 +69,10 @@ export default async function AttendancePage({
       timeLabel: minutesToLabel(o.serviceMinutes),
       status: o.status,
       count: counts.get(occurrenceKey(o.serviceId, o.date)) ?? 0,
+      walkins: walkins.get(occurrenceKey(o.serviceId, o.date)) ?? 0,
       kind: serviceById.get(o.serviceId)?.kind ?? "recurring",
+      // A QR screen is only useful for something that hasn't happened yet.
+      canDisplay: o.date >= todayIso && o.status !== "skipped",
     }))
     .sort((a, b) => (a.date === b.date ? a.timeLabel.localeCompare(b.timeLabel) : a.date < b.date ? 1 : -1));
 
@@ -195,6 +199,7 @@ export default async function AttendancePage({
     opensMinutes: s.opens_minutes,
     closesMinutes: s.closes_minutes,
     enabled: s.enabled,
+    eventId: s.event_id,
   }));
 
   const host = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tap-hub.nehtemple.org";
