@@ -1,4 +1,4 @@
-import { requirePastoral } from "../../../../lib/portal-auth";
+import { requireCapability } from "../../../../lib/portal-auth";
 import {
   consecutiveMissStreak,
   fmtDateIso,
@@ -30,9 +30,20 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  await requirePastoral();
+  // Pastoral sees all five tabs. The `welcome` capability opens this page too,
+  // but only the Guests tab — member absence follow-ups, member contact
+  // details and service configuration stay pastoral-only. Every action in
+  // ./actions.ts is still assertPastoral(), so the restriction is enforced on
+  // the server regardless of what the client renders.
+  const pu = await requireCapability("welcome");
+  const guestsOnly = pu.role !== "pastoral";
+
   const { tab } = await searchParams;
-  const initialTab = (TABS as readonly string[]).includes(tab ?? "") ? (tab as string) : "overview";
+  const initialTab = guestsOnly
+    ? "guests"
+    : (TABS as readonly string[]).includes(tab ?? "")
+      ? (tab as string)
+      : "overview";
 
   const { services, overrides, attendees, checkins, followUps, walkins } =
     await loadAttendanceDataset();
@@ -204,17 +215,22 @@ export default async function AttendancePage({
 
   const host = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tap-hub.nehtemple.org";
 
+  // Props are serialised into the page for the client component, so a
+  // guests-only viewer must not be SENT the member data — hiding the tabs
+  // would still leave member names, contact details and absence streaks
+  // readable in the page source.
   return (
     <AttendanceView
       initialTab={initialTab}
+      guestsOnly={guestsOnly}
       nfcLink={`${host.replace(/\/$/, "")}/?checkin`}
-      occurrences={occurrences}
-      checkins={checkinViews}
-      people={people}
-      flags={flags}
+      occurrences={guestsOnly ? [] : occurrences}
+      checkins={guestsOnly ? [] : checkinViews}
+      people={guestsOnly ? {} : people}
+      flags={guestsOnly ? [] : flags}
       guests={guests}
-      trend={trend}
-      services={serviceViews}
+      trend={guestsOnly ? [] : trend}
+      services={guestsOnly ? [] : serviceViews}
     />
   );
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { deleteUserAccount, updateUserRole } from "./actions";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { useToast } from "../Toaster";
-import type { PortalRole } from "../../../../lib/portal-auth";
+import type { PortalRole, PortalCapability } from "../../../../lib/portal-auth";
 
 export type UserRow = {
   id: string;
@@ -13,6 +13,7 @@ export type UserRow = {
   full_name: string | null;
   role: PortalRole;
   ministries: string[];
+  capabilities: PortalCapability[];
   created_at: string;
   isStaffEligible: boolean;
   /** Another account shares this person's name — likely a mistyped signup. */
@@ -38,6 +39,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [role, setRole] = useState<PortalRole>(user.role);
   const [ministries, setMinistries] = useState<string[]>(user.ministries);
+  const [capabilities, setCapabilities] = useState<PortalCapability[]>(user.capabilities);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -49,7 +51,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   function save() {
     setError(null);
     startTransition(async () => {
-      const r = await updateUserRole({ profileId: user.id, role, ministries });
+      const r = await updateUserRole({ profileId: user.id, role, ministries, capabilities });
       if (r.ok) setEditing(false);
       else setError(r.error);
     });
@@ -133,6 +135,22 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
               {badge.label}
               {user.role === "lead" && user.ministries.length > 0 ? ` · ${user.ministries.join(", ")}` : ""}
             </span>
+            {user.capabilities.includes("welcome") && (
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  fontWeight: 800,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  background: "rgba(121,168,238,.16)",
+                  color: "#9cc0f3",
+                }}
+              >
+                Welcome team
+              </span>
+            )}
           </div>
           <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "3px" }}>
             {user.email}
@@ -145,6 +163,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
             setError(null);
             setRole(user.role);
             setMinistries(user.ministries);
+            setCapabilities(user.capabilities);
           }}
           style={{
             background: editing ? "#1a2438" : "transparent",
@@ -159,7 +178,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
             cursor: "pointer",
           }}
         >
-          {editing ? "Close" : "Change role"}
+          {editing ? "Close" : "Change access"}
         </button>
       </div>
 
@@ -299,6 +318,51 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Pastoral already sees guests, so the toggle would be a no-op. */}
+          {role !== "pastoral" && (
+            <div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "#9aa3b8",
+                  marginBottom: "8px",
+                }}
+              >
+                Extra access
+              </div>
+              <button
+                type="button"
+                disabled={!user.isStaffEligible}
+                title={!user.isStaffEligible ? "Requires an @nehtemple.org email" : undefined}
+                onClick={() =>
+                  setCapabilities((cur) =>
+                    cur.includes("welcome") ? cur.filter((c) => c !== "welcome") : [...cur, "welcome"],
+                  )
+                }
+                style={{
+                  fontWeight: 800,
+                  fontSize: "12px",
+                  padding: "9px 14px",
+                  borderRadius: "9px",
+                  cursor: user.isStaffEligible ? "pointer" : "not-allowed",
+                  opacity: user.isStaffEligible ? 1 : 0.4,
+                  background: capabilities.includes("welcome") ? "rgba(121,168,238,.16)" : "#1a2438",
+                  color: capabilities.includes("welcome") ? "#9cc0f3" : "#cdd3e0",
+                  border: `1.5px solid ${capabilities.includes("welcome") ? "#79a8ee" : "rgba(244,241,234,.12)"}`,
+                }}
+              >
+                Welcome team
+              </button>
+              <div style={{ fontSize: "12px", color: "#9aa3b8", marginTop: "8px", lineHeight: 1.5 }}>
+                Adds the &ldquo;I&apos;m New&rdquo; inbox and the Sunday guest list — and nothing
+                else. No member follow-ups, contact details, or prayer requests.
               </div>
             </div>
           )}

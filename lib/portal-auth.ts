@@ -23,10 +23,20 @@ import { isApprover } from "./approvers";
  */
 export type PortalRole = "member" | "lead" | "pastoral";
 
+/**
+ * Narrow grants that don't fit the role ladder. `welcome` lets someone see
+ * guest connect cards and the Sunday guest roster without any of the rest of
+ * pastoral — see supabase/migrations/20261031000100_profiles_capabilities.sql.
+ */
+export type PortalCapability = "welcome";
+
+export const PORTAL_CAPABILITIES: PortalCapability[] = ["welcome"];
+
 export type PortalProfile = {
   full_name: string | null;
   role: PortalRole;
   ministries: string[];
+  capabilities: PortalCapability[];
   phone: string | null;
   /** When the profile row was created — shown as "Member since". */
   created_at: string | null;
@@ -39,12 +49,28 @@ export type PortalUser = {
   /** Effective role after bootstrap/demotion adjustments. */
   role: PortalRole;
   ministries: string[];
+  capabilities: PortalCapability[];
 };
 
 function effectiveRole(email: string, profileRole: PortalRole): PortalRole {
   if (isApprover(email)) return "pastoral";
   if (profileRole !== "member" && !isAllowedAdminEmail(email)) return "member";
   return profileRole;
+}
+
+/** Same demotion rule as roles: capabilities expose other people's contact
+ *  details, so they lapse if the address is no longer a church one. */
+function effectiveCapabilities(email: string, stored: PortalCapability[]): PortalCapability[] {
+  if (!isAllowedAdminEmail(email)) return [];
+  return stored.filter((c) => PORTAL_CAPABILITIES.includes(c));
+}
+
+/**
+ * Whether this user may use a capability. Pastoral implicitly has all of them
+ * — it already sees everything — so surfaces only need one check.
+ */
+export function can(pu: PortalUser, capability: PortalCapability): boolean {
+  return pu.role === "pastoral" || pu.capabilities.includes(capability);
 }
 
 /** The signed-in portal user with their resolved role, or null. cache()
@@ -57,7 +83,7 @@ export const getPortalUser = cache(async (): Promise<PortalUser | null> => {
 
   const { data: rows } = await supabaseAdmin()
     .from("profiles")
-    .select("full_name, role, ministries, phone, created_at")
+    .select("full_name, role, ministries, capabilities, phone, created_at")
     .eq("id", data.user.id)
     .limit(1);
   const p = rows?.[0] as
@@ -65,6 +91,7 @@ export const getPortalUser = cache(async (): Promise<PortalUser | null> => {
         full_name: string | null;
         role: PortalRole;
         ministries: string[];
+        capabilities: PortalCapability[] | null;
         phone: string | null;
         created_at: string | null;
       }
@@ -73,11 +100,13 @@ export const getPortalUser = cache(async (): Promise<PortalUser | null> => {
     full_name: p?.full_name ?? ((data.user.user_metadata?.full_name as string | undefined) ?? null),
     role: p?.role ?? "member",
     ministries: p?.ministries ?? [],
+    capabilities: p?.capabilities ?? [],
     phone: p?.phone ?? null,
     created_at: p?.created_at ?? data.user.created_at ?? null,
   };
   const role = effectiveRole(email, profile.role);
-  return { user: data.user, email, profile, role, ministries: profile.ministries };
+  const capabilities = effectiveCapabilities(email, profile.capabilities);
+  return { user: data.user, email, profile, role, ministries: profile.ministries, capabilities };
 });
 
 /** Page guards — redirect away when the viewer doesn't qualify. */
@@ -96,6 +125,14 @@ export async function requireLead(): Promise<PortalUser> {
 export async function requirePastoral(): Promise<PortalUser> {
   const pu = await requirePortalUser();
   if (pu.role !== "pastoral") redirect("/portal");
+  return pu;
+}
+
+/** For pages a capability unlocks on its own — the viewer may be a plain
+ *  member otherwise. Pastoral always passes. */
+export async function requireCapability(capability: PortalCapability): Promise<PortalUser> {
+  const pu = await requirePortalUser();
+  if (!can(pu, capability)) redirect("/portal");
   return pu;
 }
 

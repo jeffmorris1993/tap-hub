@@ -71,7 +71,7 @@ export default async function PortalLayout({ children }: { children: React.React
         <PendingBadge table="announcements" variant="compact" />
       </Suspense>
     ),
-  });
+  }, pu.capabilities);
 
   return (
     <AdminShell persona={persona} nav={nav} role={pu.role}>

@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertPastoral, type PortalRole } from "../../../../lib/portal-auth";
+import {
+  assertPastoral,
+  PORTAL_CAPABILITIES,
+  type PortalRole,
+  type PortalCapability,
+} from "../../../../lib/portal-auth";
 import { isAllowedAdminEmail } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
 
@@ -12,6 +17,7 @@ export type UpdateRoleInput = {
   profileId: string;
   role: PortalRole;
   ministries: string[];
+  capabilities: PortalCapability[];
 };
 
 export type UpdateRoleResult = { ok: true } | { ok: false; error: string };
@@ -25,6 +31,11 @@ export async function updateUserRole(input: UpdateRoleInput): Promise<UpdateRole
   if (input.role === "lead" && ministries.length === 0) {
     return { ok: false, error: "Pick at least one ministry for a lead." };
   }
+  // Pastoral already sees everything, so a capability on top is noise.
+  const capabilities =
+    input.role === "pastoral"
+      ? []
+      : input.capabilities.filter((c) => PORTAL_CAPABILITIES.includes(c));
 
   const sb = supabaseAdmin();
   const { data } = await sb
@@ -38,6 +49,10 @@ export async function updateUserRole(input: UpdateRoleInput): Promise<UpdateRole
   // Staff roles require a church address (also enforced by a DB constraint).
   if (input.role !== "member" && !isAllowedAdminEmail(target.email)) {
     return { ok: false, error: "Lead and pastoral roles require an @nehtemple.org email." };
+  }
+  // Capabilities expose other people's contact details, so same rule.
+  if (capabilities.length > 0 && !isAllowedAdminEmail(target.email)) {
+    return { ok: false, error: "Welcome-team access requires an @nehtemple.org email." };
   }
 
   // Never demote the last pastoral account — that would lock approvals out.
@@ -57,7 +72,7 @@ export async function updateUserRole(input: UpdateRoleInput): Promise<UpdateRole
 
   const { error } = await sb
     .from("profiles")
-    .update({ role: input.role, ministries, updated_at: new Date().toISOString() })
+    .update({ role: input.role, ministries, capabilities, updated_at: new Date().toISOString() })
     .eq("id", input.profileId);
   if (error) return { ok: false, error: error.message };
 

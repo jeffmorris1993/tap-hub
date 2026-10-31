@@ -7,7 +7,8 @@ import {
   listIgniteFamilies,
   listPastorRequests,
 } from "../../../../lib/supabase/admin-queries";
-import { requireLead, ministryScope, type PortalUser } from "../../../../lib/portal-auth";
+import { redirect } from "next/navigation";
+import { requirePortalUser, ministryScope, can, type PortalUser } from "../../../../lib/portal-auth";
 import { isBishop } from "../../../../lib/approvers";
 import { parseStoredResponses } from "../../../../lib/event-signup-forms";
 
@@ -33,21 +34,32 @@ const IGNITE_TAB = ALL_TABS.filter((t) => t.key === "ignite");
 // Meeting-with-the-Pastor requests are the Bishop's alone — hidden even from
 // other pastoral users (the form promises "only the Pastor's office sees this").
 const PASTORAL_TABS = ALL_TABS.filter((t) => t.key !== "pastor");
+// The welcome team's whole surface: guest connect cards, nothing else.
+const VISITORS_TAB = ALL_TABS.filter((t) => t.key === "visitors");
 
 export default async function Submissions({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const pu = await requireLead();
-  const TABS =
+  // Not requireLead(): the `welcome` capability opens the "I'm New" tab for
+  // someone who is otherwise a plain member.
+  const pu = await requirePortalUser();
+  const welcome = can(pu, "welcome");
+  if (pu.role === "member" && !welcome) redirect("/portal");
+
+  const roleTabs =
     pu.role === "pastoral"
       ? isBishop(pu.email)
         ? ALL_TABS
         : PASTORAL_TABS
-      : pu.ministries.includes("Youth")
-        ? [...LEAD_TABS, ...IGNITE_TAB]
-        : LEAD_TABS;
+      : pu.role === "lead"
+        ? pu.ministries.includes("Youth")
+          ? [...LEAD_TABS, ...IGNITE_TAB]
+          : LEAD_TABS
+        : [];
+  // Pastoral already has it; a lead or member with the capability gains it.
+  const TABS = roleTabs.some((t) => t.key === "visitors") ? roleTabs : [...VISITORS_TAB, ...roleTabs];
   const params = await searchParams;
   const tab: Tab = (TABS.find((t) => t.key === params.tab)?.key ?? TABS[0].key) as Tab;
 

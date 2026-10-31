@@ -171,6 +171,7 @@ function nameButton(onClick: () => void, label: string): ReactNode {
 
 export function AttendanceView({
   initialTab,
+  guestsOnly = false,
   nfcLink,
   occurrences,
   checkins,
@@ -181,6 +182,9 @@ export function AttendanceView({
   services,
 }: {
   initialTab: string;
+  /** Welcome-team view: the Guests tab and nothing else. The server also
+   *  withholds the member data entirely, so there is nothing to reveal. */
+  guestsOnly?: boolean;
   nfcLink: string;
   occurrences: OccurrenceView[];
   checkins: CheckinView[];
@@ -196,13 +200,15 @@ export function AttendanceView({
   const activeFlags = flags.filter((f) => f.status !== "resolved" && f.status !== "dismissed");
   const returnedCount = guests.filter((g) => g.returned).length;
 
-  const tabs: { id: string; label: string; count?: number }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "history", label: "Attendance history" },
-    { id: "follow", label: "Follow-up", count: activeFlags.length },
-    { id: "guests", label: "Guests" },
-    { id: "services", label: "Services" },
-  ];
+  const tabs: { id: string; label: string; count?: number }[] = guestsOnly
+    ? [{ id: "guests", label: "Guests" }]
+    : [
+        { id: "overview", label: "Overview" },
+        { id: "history", label: "Attendance history" },
+        { id: "follow", label: "Follow-up", count: activeFlags.length },
+        { id: "guests", label: "Guests" },
+        { id: "services", label: "Services" },
+      ];
 
   const openPerson = (id: string) => setPersonId(id);
   const person = personId ? people[personId] : null;
@@ -287,7 +293,9 @@ export function AttendanceView({
         <HistoryTab occurrences={occurrences} checkins={checkins} openPerson={openPerson} />
       )}
       {tab === "follow" && <FollowUpTab flags={flags} openPerson={openPerson} />}
-      {tab === "guests" && <GuestsTab guests={guests} openPerson={openPerson} />}
+      {tab === "guests" && (
+        <GuestsTab guests={guests} openPerson={guestsOnly ? undefined : openPerson} />
+      )}
       {tab === "services" && <ServicesTab services={services} occurrences={occurrences} />}
 
       {person && (
@@ -752,10 +760,24 @@ function GuestsTab({
   openPerson,
 }: {
   guests: GuestView[];
-  openPerson: (id: string) => void;
+  /** Omitted for the welcome-team view — the person drawer carries full
+   *  attendance history and the category changer, which stay pastoral-only.
+   *  Names render as plain text rather than a button that does nothing. */
+  openPerson?: (id: string) => void;
 }) {
   const [returnedOnly, setReturnedOnly] = useState(false);
   const shown = guests.filter((g) => !returnedOnly || g.returned);
+
+  const guestName = (g: GuestView): ReactNode => {
+    const open = openPerson;
+    return open ? (
+      nameButton(() => open(g.attendeeId), g.name)
+    ) : (
+      <span style={{ color: "#f4f1ea", fontWeight: 800, fontSize: "16px", padding: "4px 0" }}>
+        {g.name}
+      </span>
+    );
+  };
 
   const cameBack = (
     <span
@@ -801,7 +823,7 @@ function GuestsTab({
         {shown.map((g) => (
           <div key={g.attendeeId} style={{ ...card, borderRadius: "14px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-              {nameButton(() => openPerson(g.attendeeId), g.name)}
+              {guestName(g)}
               {g.returned && cameBack}
             </div>
             <span style={contactStyle(g)}>{g.contact}</span>
@@ -835,7 +857,7 @@ function GuestsTab({
                   minHeight: "60px",
                 }}
               >
-                {nameButton(() => openPerson(g.attendeeId), g.name)}
+                {guestName(g)}
                 <span style={contactStyle(g)}>{g.contact}</span>
                 <span style={{ fontSize: "15px", color: "#cdd3e0" }}>{g.pref}</span>
                 <span style={{ fontSize: "15px", color: "#cdd3e0" }}>{g.firstLabel}</span>

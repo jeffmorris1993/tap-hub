@@ -1,4 +1,8 @@
-import { requirePastoral, type PortalRole } from "../../../../lib/portal-auth";
+import {
+  requirePastoral,
+  type PortalRole,
+  type PortalCapability,
+} from "../../../../lib/portal-auth";
 import { isAllowedAdminEmail } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
 import { UsersList, type UserRow } from "./UsersList";
@@ -10,7 +14,7 @@ export default async function UsersPage() {
 
   const { data, error } = await supabaseAdmin()
     .from("profiles")
-    .select("id, email, full_name, role, ministries, created_at")
+    .select("id, email, full_name, role, ministries, capabilities, created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
 
@@ -20,6 +24,7 @@ export default async function UsersPage() {
     full_name: string | null;
     role: PortalRole;
     ministries: string[];
+    capabilities: PortalCapability[] | null;
     created_at: string;
   }>;
 
@@ -37,6 +42,7 @@ export default async function UsersPage() {
 
   const users: UserRow[] = rows.map((u) => ({
     ...u,
+    capabilities: u.capabilities ?? [],
     isStaffEligible: isAllowedAdminEmail(u.email),
     sharesName: (nameCounts.get(nameKey(u)) ?? 0) > 1,
   }));
@@ -49,8 +55,10 @@ export default async function UsersPage() {
       return acc;
     }, new Map());
 
-  const staff = users.filter((u) => u.role !== "member");
-  const members = users.filter((u) => u.role === "member");
+  // Someone with only a capability is still role 'member', but they belong in
+  // the staff list — they have back-office access and shouldn't be buried.
+  const staff = users.filter((u) => u.role !== "member" || u.capabilities.length > 0);
+  const members = users.filter((u) => u.role === "member" && u.capabilities.length === 0);
 
   return (
     <div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 // Type-only import — erased at compile time, so the server-only module
 // never actually loads into this (client-imported) file.
-import type { PortalRole } from "../../../lib/portal-auth";
+import type { PortalRole, PortalCapability } from "../../../lib/portal-auth";
 
 export type NavItem = {
   href: string;
@@ -145,6 +145,7 @@ export function buildNavForRole(
     pendingEventsCompact?: ReactNode;
     pendingAnnouncementsCompact?: ReactNode;
   } = {},
+  capabilities: PortalCapability[] = [],
 ): NavItem[] {
   const memberItems: NavItem[] = [
     { href: "/portal/my-events", label: "My Events", icon: ICONS.calendar },
@@ -152,8 +153,18 @@ export function buildNavForRole(
   ];
   const overview: NavItem = { href: "/portal", label: "Overview", icon: ICONS.home };
 
+  // The welcome team's two destinations. Both pages re-check server-side, so
+  // this only decides what's offered, never what's allowed.
+  const welcome = capabilities.includes("welcome");
+  const welcomeItems: NavItem[] = welcome
+    ? [
+        { href: "/portal/submissions", label: "Inbox", icon: ICONS.inbox },
+        { href: "/portal/attendance", label: "Guests", icon: ICONS.checkin },
+      ]
+    : [];
+
   if (role === "member") {
-    return [overview, ...memberItems];
+    return [overview, ...welcomeItems, ...memberItems];
   }
 
   if (role === "lead") {
@@ -162,6 +173,7 @@ export function buildNavForRole(
       { href: "/portal/events", label: "Events", icon: ICONS.calendar },
       { href: "/portal/announcements", label: "Announcements", icon: ICONS.megaphone },
       { href: "/portal/submissions", label: "Inbox", icon: ICONS.inbox },
+      ...(welcome ? [{ href: "/portal/attendance", label: "Guests", icon: ICONS.checkin }] : []),
       ...(ministries.includes("Youth")
         ? [{ href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids }]
         : []),
