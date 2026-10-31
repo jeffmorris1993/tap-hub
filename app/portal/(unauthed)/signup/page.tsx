@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignupForm } from "./SignupForm";
+import { GoogleSignInButton } from "../../../../components/GoogleSignInButton";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,11 @@ export default function PortalSignup() {
         <p style={{ color: "#9aa3b8", fontSize: "14px", lineHeight: 1.5, marginBottom: "22px" }}>
           See your event signups, forms, and profile in one place. Any email works.
         </p>
+
+        {/* Staff should land here, not on the password form: signing up with
+            Google skips email confirmation and guarantees one account per
+            person rather than a second one on the same address. */}
+        <GoogleSignInButton next="/portal" label="Sign up with Google" />
 
         <SignupForm />
 

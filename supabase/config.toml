@@ -10,6 +10,8 @@ site_url = "https://tap-hub.nehtemple.org"
 additional_redirect_urls = [
   "https://tap-hub-theta.vercel.app/auth/callback",
   "http://localhost:3000/auth/callback",
+  # Any dev port, so `npm run dev` still works when 3000 is already taken.
+  "http://localhost:*/auth/callback",
   "https://tap-hub.nehtemple.org/auth/callback",
   "https://tap-hub.nehtemple.org/",
   # token_hash targets used by the email templates ({{ .RedirectTo }});
@@ -26,6 +28,23 @@ additional_redirect_urls = [
 # [auth.sessions]
 # timebox = "168h"
 # inactivity_timeout = "24h"
+
+# Google sign-in. Staff use their @nehtemple.org Workspace account; members may
+# use a personal Gmail — the portal role decides what they see, not the domain.
+#
+# Secrets are interpolated from the shell env at `supabase config push` time
+# only; the Next app never reads them at runtime, so they stay in .env.local and
+# out of Vercel. url/redirect_uri are deliberately empty: those are for custom
+# or self-hosted endpoints, and we use Google's well-known endpoints plus
+# Supabase's own https://qcfakwzqkltifelperep.supabase.co/auth/v1/callback,
+# which is the single redirect URI registered on the Google client.
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_OAUTH_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+url = ""
+redirect_uri = ""
+skip_nonce_check = false
 
 [auth.mfa.totp]
 enroll_enabled = true

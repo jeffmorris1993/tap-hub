@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LoginForm } from "./LoginForm";
+import { GoogleSignInButton } from "../../../../components/GoogleSignInButton";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,12 @@ export default async function PortalLogin({
           Welcome back
         </h1>
         <p style={{ color: "#9aa3b8", fontSize: "14px", lineHeight: 1.5, marginBottom: "22px" }}>
-          Sign in to your dashboard. Staff sign in with their{" "}
-          <strong style={{ color: "#cdd3e0" }}>@nehtemple.org</strong> email.
+          Sign in to your dashboard. Staff can use their{" "}
+          <strong style={{ color: "#cdd3e0" }}>@nehtemple.org</strong> Google account — everyone
+          else, whichever you prefer.
         </p>
+
+        <GoogleSignInButton next={params.next ?? "/portal"} label="Continue with Google" />
 
         <LoginForm next={params.next ?? "/portal"} />
 
@@ -121,6 +125,8 @@ function errorMessage(code: string): string {
       return "That link expired. Sign in again or request a new one.";
     case "config":
       return "Auth isn't configured on the server. Contact the admin.";
+    case "oauth":
+      return "Google sign-in didn't finish. Try again, or use your password below.";
     default:
       return "Sign-in failed. Try again.";
   }
