@@ -99,10 +99,11 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong style={termStyle}>Checking in on a Sunday.</strong>{" "}Your name and whether
-                you&apos;re a guest or a regular attender. Contact details are saved{" "}
-                <strong style={termStyle}>only if you tell us it&apos;s okay</strong>{" "}&mdash; if you
-                decline, we keep the attendance record without them. A check-in kiosk also stores a
-                token on that device so it can recognise returning families, not a person.
+                you&apos;re a guest or a regular attender. Guests can add a phone number or an
+                email, and someone from the welcome team follows up when you do &mdash; leaving
+                them is <strong style={termStyle}>entirely optional</strong>, and checking in
+                without them works the same. A check-in kiosk also stores a token on that device so
+                it can recognise returning families, not a person.
               </li>
               <li>
                 <strong style={termStyle}>Prayer requests.</strong>{" "}Your request, and your name and

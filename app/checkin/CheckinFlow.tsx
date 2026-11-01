@@ -157,7 +157,6 @@ export function CheckinFlow({
     phone: "",
     email: "",
     pref: "" as "" | "text" | "call" | "email",
-    consent: false,
     interests: [] as string[],
   });
   const [find, setFind] = useState({ first: "", last: "", contact: "", miss: false });
@@ -240,7 +239,6 @@ export function CheckinFlow({
       phone: form.phone,
       email: form.email,
       preferredContact: form.pref || undefined,
-      contactConsent: form.consent,
       interests: form.interests,
       serviceId: active?.serviceId,
     });
@@ -804,28 +802,6 @@ export function CheckinFlow({
                   })}
                 </div>
               </div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "12px",
-                  cursor: "pointer",
-                  padding: "14px",
-                  borderRadius: "12px",
-                  background: "#121a2e",
-                  border: "1px solid rgba(244,241,234,.1)",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={form.consent}
-                  onChange={(e) => setForm((f) => ({ ...f, consent: e.target.checked }))}
-                  style={{ width: "24px", height: "24px", flexShrink: 0, accentColor: "#e7b84e", marginTop: "1px" }}
-                />
-                <span style={{ fontSize: "16px", fontWeight: 600, lineHeight: 1.45 }}>
-                  It&apos;s okay for someone from the church to contact me.
-                </span>
-              </label>
             </div>
           )}
         </div>

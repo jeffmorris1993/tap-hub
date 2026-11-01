@@ -149,7 +149,8 @@ async function performCheckin(
  * per guest per service. `createVisitor` is false for a remembered-device
  * tap — the connect card already exists from their first visit.
  *
- * Contact details are withheld when the guest declined contact consent.
+ * Contact details are withheld when the guest declined contact consent — only
+ * possible for guests who checked in while the form still offered that choice.
  * Everything here is best-effort: a failure is logged, never surfaced, so a
  * guest's check-in always succeeds.
  */
@@ -272,7 +273,6 @@ export type RegisterCheckinInput = {
   phone?: string;
   email?: string;
   preferredContact?: "text" | "call" | "email";
-  contactConsent?: boolean;
   /** Guests only — what they'd like to hear more about. */
   interests?: string[];
   /** Which open check-in window — an event's QR or the picker supplies it. */
@@ -318,7 +318,12 @@ export async function registerAndCheckin(input: RegisterCheckinInput): Promise<C
       phone: phone || null,
       email: email || null,
       preferred_contact: pref,
-      contact_consent: guest && input.contactConsent === true,
+      // The form no longer asks permission to make contact — leaving a phone
+      // number or an email is the permission. The column stays because guests
+      // who checked in while the opt-out existed declined under a promise we
+      // keep: their details are still withheld everywhere (notifyGuestCheckin,
+      // /portal/attendance).
+      contact_consent: guest,
     })
     .select("*")
     .single();
