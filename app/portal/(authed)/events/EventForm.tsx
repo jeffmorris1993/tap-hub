@@ -105,6 +105,7 @@ type Initial = {
   recurrence_until?: string | null;
   all_day?: boolean | null;
   signup_questions?: unknown;
+  notify_emails?: string[] | null;
 };
 
 export function EventForm({
@@ -174,6 +175,7 @@ export function EventForm({
   const [signupQuestions, setSignupQuestions] = useState<SignupQuestions>(() =>
     parseSignupQuestions(initial?.signup_questions),
   );
+  const [notifyEmails, setNotifyEmails] = useState((initial?.notify_emails ?? []).join(", "));
 
   const status = (initial?.approval_status ?? "draft") as ApprovalStatus;
   const statusStyle = STATUS_STYLES[status];
@@ -224,6 +226,7 @@ export function EventForm({
           : null,
       all_day: allDay,
       signup_questions: signupQuestions,
+      notify_emails_raw: notifyEmails,
     };
   }
 
@@ -738,6 +741,21 @@ export function EventForm({
         />
         Allow volunteer signups
       </label>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <label style={labelStyle}>Send signup notifications to (optional)</label>
+        <input
+          value={notifyEmails}
+          onChange={(e) => setNotifyEmails(e.target.value)}
+          placeholder="name@nehtemple.org, second@nehtemple.org"
+          style={inputStyle}
+        />
+        <p style={{ marginTop: "6px", color: "#9aa3b8", fontSize: "12px" }}>
+          {category === "General"
+            ? "Leave blank and signup emails go to whoever submitted this event. General has no ministry leads, so name the person running it here."
+            : `Leave blank and signup emails go to the ${category} ministry lead(s). Set this to notify someone else instead — e.g. the person actually running the event.`}
+        </p>
+      </div>
 
       <div style={{ gridColumn: "1 / -1" }}>
         <SignupQuestionsEditor

@@ -325,6 +325,8 @@ export type AdminEventRow = {
   all_day: boolean;
   /** Custom signup questions jsonb — parse with parseSignupQuestions, never cast. */
   signup_questions: unknown;
+  /** Explicit signup-notification recipients; null = ministry leads for the category. */
+  notify_emails: string[] | null;
 };
 
 const ADMIN_EVENT_FIELDS =
@@ -333,7 +335,7 @@ const ADMIN_EVENT_FIELDS =
   "published, approval_status, approval_notes, " +
   "submitted_by, reviewed_by, submitted_at, reviewed_at, " +
   "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, " +
-  "signup_questions";
+  "signup_questions, notify_emails";
 
 export async function listAllEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
   let q = supabaseAdmin().from("events").select(ADMIN_EVENT_FIELDS);

@@ -18,7 +18,7 @@ import {
   type StoredResponse,
 } from "../../../lib/event-signup-forms";
 import { notifyOrganizerOfSignup, notifySignerOfSignup } from "../../../lib/email/event-signup";
-import { listApproverEmails } from "../../../lib/approvers";
+import { resolveEventNotifyRecipients } from "../../../lib/event-notify";
 import { formatWhenText } from "../../../lib/events-display";
 import type { EventRow } from "../../../lib/supabase/queries";
 
@@ -66,7 +66,7 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
   const sb = supabaseAdmin();
   const { data: event, error: lookupError } = await sb
     .from("events")
-    .select("id, slug, title, location, submitted_by, allow_volunteers, signup_mode, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
+    .select("id, slug, title, location, category, submitted_by, notify_emails, allow_volunteers, signup_mode, signup_questions, starts_at, ends_at, recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day")
     .eq("slug", input.slug)
     .limit(1);
   if (lookupError) {
@@ -161,12 +161,13 @@ export async function submitEventSignup(input: EventSignupInput): Promise<EventS
     return { ok: false, error: "Something went wrong on our end. Try again in a moment." };
   }
 
-  // Tell the organizer. Older events without a submitter fall back to the
-  // pastoral list so no signup goes unnoticed.
-  const organizer =
-    typeof row.submitted_by === "string" && row.submitted_by.trim()
-      ? [row.submitted_by.trim()]
-      : await listApproverEmails();
+  // Tell whoever runs this event: the event's own notify list, else the
+  // ministry leads for its category, else the submitter, else pastoral.
+  const organizer = await resolveEventNotifyRecipients({
+    category: row.category as string | null,
+    notify_emails: (row as { notify_emails?: string[] | null }).notify_emails ?? null,
+    submitted_by: row.submitted_by as string | null,
+  });
   await notifyOrganizerOfSignup({
     to: organizer,
     event: { id: row.id, title: row.title },

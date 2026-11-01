@@ -23,6 +23,7 @@ import {
   type SignupQuestions,
 } from "../../../../lib/event-signup-forms";
 import { syncEventToCalendar, removeEventFromCalendar } from "../../../../lib/google-calendar";
+import { parseNotifyEmails } from "../../../../lib/event-notify";
 
 export type EventFormInput = {
   id?: string;
@@ -49,6 +50,9 @@ export type EventFormInput = {
   recurrence_until: string | null;
   all_day: boolean;
   signup_questions?: SignupQuestions;
+  /** Raw recipients box — comma/newline separated. Blank = use the ministry
+   *  leads for this event's category (see lib/event-notify.ts). */
+  notify_emails_raw?: string | null;
 };
 
 export type EventActionResult = { ok: true; id: string } | { ok: false; error: string };
@@ -144,6 +148,16 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
   if (questionError) return { ok: false, error: questionError };
   const signup_questions = parseSignupQuestions(input.signup_questions);
 
+  // Refuse a mistyped recipient rather than silently dropping it — a dropped
+  // address means someone stops hearing about their own event's signups.
+  const notify = parseNotifyEmails(input.notify_emails_raw);
+  if (notify.invalid.length > 0) {
+    return {
+      ok: false,
+      error: `Not a valid email address: ${notify.invalid.join(", ")}`,
+    };
+  }
+
   const payload = {
     slug: slugify(slug),
     title,
@@ -175,6 +189,8 @@ export async function saveEvent(input: EventFormInput): Promise<EventActionResul
         : null,
     all_day: !!input.all_day,
     signup_questions,
+    // Empty stores as null so the resolver's ministry-lead default kicks in.
+    notify_emails: notify.emails.length > 0 ? notify.emails : null,
   };
 
   if (input.id) {
