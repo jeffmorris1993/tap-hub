@@ -14,8 +14,14 @@ import "server-only";
  *        - GCP_WORKLOAD_IDENTITY_POOL
  *        - GCP_WORKLOAD_IDENTITY_PROVIDER
  *        - GCP_SERVICE_ACCOUNT_EMAIL
- *      Plus VERCEL_OIDC_TOKEN, which Vercel auto-injects when OIDC
- *      Federation is enabled in the project's Security settings.
+ *      Plus a Vercel OIDC token, read via getVercelOidcToken().
+ *
+ *      That helper matters: on Fluid Compute the token is REQUEST-SCOPED and
+ *      lives in the request context, not in process.env. Reading
+ *      process.env.VERCEL_OIDC_TOKEN works locally — `vercel env pull` writes
+ *      one into .env.local — but is empty in production, which silently
+ *      disabled every Google push. The env var is kept only as the local
+ *      fallback.
  *
  * Failures are logged but never thrown — all Google pushes are best-effort.
  */
@@ -25,6 +31,22 @@ const STS_URL = "https://sts.googleapis.com/v1/token";
 type TokenCache = { token: string; expiresAt: number };
 // Tokens are scope-bound, so the cache is keyed by the sorted scope set.
 const cachedTokens = new Map<string, TokenCache>();
+
+/**
+ * The current Vercel OIDC token. Request-scoped on Fluid Compute, so it has to
+ * come from the request context; process.env is only the local-dev fallback.
+ */
+async function readOidcToken(logTag: string): Promise<string | null> {
+  try {
+    const { getVercelOidcToken } = await import("@vercel/oidc");
+    const token = await getVercelOidcToken();
+    if (token) return token;
+  } catch (err) {
+    // Expected outside a Vercel request (scripts, tests) — fall through.
+    console.warn(`[${logTag}] getVercelOidcToken unavailable`, (err as Error)?.message);
+  }
+  return process.env.VERCEL_OIDC_TOKEN ?? null;
+}
 
 function buildWifAudience(): string | null {
   const projectNumber = process.env.GCP_PROJECT_NUMBER;
@@ -45,7 +67,7 @@ export async function getGoogleAccessToken(
   }
 
   // Path A: WIF via Vercel OIDC (preferred)
-  const oidc = process.env.VERCEL_OIDC_TOKEN;
+  const oidc = await readOidcToken(logTag);
   const audience = buildWifAudience();
   const sa = process.env.GCP_SERVICE_ACCOUNT_EMAIL;
   if (oidc && audience && sa) {
