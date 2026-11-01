@@ -6,6 +6,7 @@ import { deleteUserAccount, updateUserRole } from "./actions";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { useToast } from "../Toaster";
 import type { PortalRole, PortalCapability } from "../../../../lib/portal-auth";
+import { ROLE_BADGE, avatarInitials } from "../../../../lib/staff-display";
 
 export type UserRow = {
   id: string;
@@ -21,18 +22,6 @@ export type UserRow = {
 };
 
 const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage"];
-
-const ROLE_BADGE: Record<PortalRole, { bg: string; color: string; label: string }> = {
-  member: { bg: "rgba(154,163,184,.16)", color: "#cdd3e0", label: "Member" },
-  lead: { bg: "rgba(231,184,78,.16)", color: "#e7b84e", label: "Lead" },
-  pastoral: { bg: "rgba(78,184,107,.16)", color: "#7ed996", label: "Pastoral" },
-};
-
-function initials(name: string | null, email: string): string {
-  const src = name?.trim() || email.split("@")[0];
-  const parts = src.split(/[\s._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || src.slice(0, 2).toUpperCase();
-}
 
 function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   const [editing, setEditing] = useState(false);
@@ -96,7 +85,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
             color: "#f4f1ea",
           }}
         >
-          {initials(user.full_name, user.email)}
+          {avatarInitials(user.full_name, user.email)}
         </span>
         <div style={{ flex: 1, minWidth: "160px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "9px", flexWrap: "wrap" }}>

@@ -10,6 +10,8 @@
  *
  * Z-index scale — keep new overlays on it, or they land under something:
  *   30  page header (sticky)
+ *   40  unsaved-changes save bar (fixed, bottom) — under the sidebar so it
+ *       never covers navigation, over the page content it belongs to
  *   50  desktop sidebar
  *   90  sheet scrim (phones: stops above the tab bar, see below)
  *   100 mobile tab bar — ABOVE the scrim on purpose, so a tab is tappable on
@@ -346,4 +348,110 @@
     flex-wrap: wrap;
     overflow-x: visible;
   }
+}
+
+/* ---------- unsaved-changes bar ---------- */
+
+/*
+ * Fixed rather than sticky: the bar only exists while there are unsaved
+ * changes, and a sticky element on a page shorter than the viewport would just
+ * sit at the end of the content instead of staying reachable.
+ *
+ * Lifted above the mobile tab bar for the same reason .psh-scrim is, and inset
+ * past the sidebar on desktop so it spans only the content column.
+ */
+.p-savebar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--psh-tabbar);
+  z-index: 40;
+}
+
+@media (min-width: 960px) {
+  .p-savebar {
+    left: 248px;
+    bottom: 0;
+  }
+}
+
+/* ---------- interactive bits that need a real pseudo-class ---------- */
+
+/*
+ * These own their background/border because an inline style would outrank the
+ * :hover and :focus rules below and silently kill them. If you find yourself
+ * setting one of those properties inline on an element with these classes,
+ * that's the bug.
+ */
+
+/* Quiet round icon button — the × on a recipient chip. */
+.p-iconbtn {
+  background: transparent;
+  color: #aab3c5;
+  transition: background 0.12s, color 0.12s;
+}
+
+.p-iconbtn:hover {
+  background: rgba(244, 241, 234, 0.1);
+  color: #f4f1ea;
+}
+
+/* Text field that takes the gold focus ring instead of the UA outline. */
+.p-field {
+  border: 2px solid rgba(244, 241, 234, 0.18);
+  transition: border-color 0.12s;
+}
+
+.p-field:focus {
+  outline: none;
+  border-color: #e7b84e;
+}
+
+/* The search input inside a picker is transparent with no outline by design,
+   which would leave keyboard users no focus indicator at all. Ring the row. */
+.p-searchrow:focus-within {
+  box-shadow: inset 0 0 0 2px rgba(231, 184, 78, 0.55);
+}
+
+/* Picker rows. The selected tint is keyed off aria-checked so the visual state
+   and the announced state are the same declaration and can't drift apart. */
+.p-pickrow {
+  background: transparent;
+  transition: background 0.1s;
+}
+
+.p-pickrow:hover {
+  background: rgba(244, 241, 234, 0.045);
+}
+
+.p-pickrow[aria-checked="true"] {
+  background: rgba(231, 184, 78, 0.07);
+}
+
+.p-pickrow[aria-checked="true"]:hover {
+  background: rgba(231, 184, 78, 0.11);
+}
+
+/* Collapsible card header. */
+.p-cardhead {
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.p-cardhead:hover {
+  background: rgba(244, 241, 234, 0.03);
+}
+
+/* Link-styled button — "Select all 9", "Change roles in Users". */
+.p-linkbtn {
+  background: transparent;
+  border: none;
+  color: #e7b84e;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.p-linkbtn:hover {
+  color: #f0cd7e;
 }

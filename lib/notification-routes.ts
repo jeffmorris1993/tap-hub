@@ -1,6 +1,7 @@
 import "server-only";
 
 import { listApproverEmails } from "./approvers";
+import { NOTIFICATION_KINDS, type NotificationKind } from "./notification-kinds";
 
 /**
  * Who gets prayer-request, feedback, and check-in summary notification
@@ -8,22 +9,64 @@ import { listApproverEmails } from "./approvers";
  * /portal/notifications (stored in notification_routes); an empty or
  * unreadable list falls back to the default so a config problem never
  * swallows a notification.
+ *
+ * The kinds themselves live in ./notification-kinds so the client-side
+ * settings UI can import them without pulling this server-only module in.
+ * Re-exported here so existing callers keep working unchanged.
  */
 
-export const NOTIFICATION_KINDS = ["prayer", "feedback", "checkin"] as const;
-export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+export { NOTIFICATION_KINDS };
+export type { NotificationKind };
 
 function normalize(emails: string[]): string[] {
   return [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
 }
 
-async function defaultRecipients(kind: NotificationKind): Promise<string[]> {
+/**
+ * The address of the prayer-team group, when one is configured. Exposed so the
+ * settings page can label it as a group rather than listing it as an
+ * unexplained extra address.
+ */
+export function getPrayerTeamEmail(): string | null {
+  const value = process.env.PRAYER_TEAM_EMAIL?.trim().toLowerCase();
+  return value ? value : null;
+}
+
+/**
+ * Where a kind's notifications go when nothing is configured: everyone with
+ * the pastoral role, plus the env approver list — and, for prayer only, the
+ * prayer-team group.
+ *
+ * Exported so /portal/notifications can show the real list. It used to be
+ * private, which is why that page could only show pastoral-role profiles and
+ * silently under-reported who receives prayer requests.
+ */
+export async function getDefaultRecipients(kind: NotificationKind): Promise<string[]> {
   const pastoral = await listApproverEmails();
   if (kind === "prayer") {
-    const envTo = process.env.PRAYER_TEAM_EMAIL?.trim();
+    const envTo = getPrayerTeamEmail();
     return normalize([...pastoral, ...(envTo ? [envTo] : [])]);
   }
   return normalize(pastoral);
+}
+
+/**
+ * Every kind's default in one pass, so the settings page makes a single
+ * approver lookup instead of one per kind. Must stay byte-identical to
+ * getDefaultRecipients(kind) for each kind — the page shows this to the user as
+ * the literal recipient list, so a divergence here is a lie on screen.
+ */
+export async function getDefaultRecipientsByKind(): Promise<
+  Record<NotificationKind, string[]>
+> {
+  const pastoral = await listApproverEmails();
+  const envTo = getPrayerTeamEmail();
+  const base = normalize(pastoral);
+  return {
+    prayer: normalize([...pastoral, ...(envTo ? [envTo] : [])]),
+    feedback: base,
+    checkin: base,
+  };
 }
 
 export async function getConfiguredRecipients(kind: NotificationKind): Promise<string[]> {
@@ -43,5 +86,5 @@ export async function getConfiguredRecipients(kind: NotificationKind): Promise<s
 export async function resolveNotificationRecipients(kind: NotificationKind): Promise<string[]> {
   const configured = await getConfiguredRecipients(kind);
   if (configured.length > 0) return configured;
-  return defaultRecipients(kind);
+  return getDefaultRecipients(kind);
 }

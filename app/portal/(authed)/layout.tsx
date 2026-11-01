@@ -3,23 +3,10 @@ import { requirePortalUser } from "../../../lib/portal-auth";
 import { AdminShell } from "./AdminShell";
 import { buildNavForRole } from "./admin-nav";
 import { PendingBadge } from "./NavBadge";
-
-function initialsFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? email;
-  const parts = local.split(/[._-]+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return local.slice(0, 2).toUpperCase();
-}
-
-function displayName(email: string): string {
-  const local = email.split("@")[0] ?? email;
-  const parts = local.split(/[._-]+/).filter(Boolean);
-  return parts.length > 0
-    ? parts.map((p) => p[0].toUpperCase() + p.slice(1)).join(" ")
-    : email;
-}
+import {
+  avatarInitials,
+  displayNameFromEmail,
+} from "../../../lib/staff-display";
 
 function roleLabel(role: "member" | "lead" | "pastoral", ministries: string[]): string {
   if (role === "pastoral") return "Pastoral";
@@ -32,20 +19,12 @@ export default async function PortalLayout({ children }: { children: React.React
 
   const email = pu.email || "(unknown)";
   const fullName = pu.profile.full_name?.trim();
-  const name = fullName && fullName.length > 0 ? fullName : displayName(email);
-  const initials = fullName
-    ? fullName
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0]?.toUpperCase() ?? "")
-        .join("") || initialsFromEmail(email)
-    : initialsFromEmail(email);
+  const name = fullName && fullName.length > 0 ? fullName : displayNameFromEmail(email);
   const persona = {
     name,
     email,
     role: roleLabel(pu.role, pu.ministries),
-    initials,
+    initials: avatarInitials(fullName, email),
   };
 
   // Badge counts stream in behind Suspense so the shell paints without
