@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ROLE_BADGE, staffDisplayName } from "../../../../lib/staff-display";
+import { roleBadgeFor, staffDisplayName } from "../../../../lib/staff-display";
 import { RoleTag } from "./Avatar";
 import type { StaffProfile } from "./recipients";
 
@@ -170,7 +170,7 @@ export function StaffPicker({
       <div style={{ maxHeight: "288px", overflowY: "auto" }}>
         {results.map((p, i) => {
           const on = selected.includes(p.email);
-          const badge = ROLE_BADGE[p.role];
+          const badge = roleBadgeFor(p.role, p.email);
           const name = staffDisplayName(p.full_name, p.email);
           return (
             <button

@@ -1,4 +1,5 @@
 import { requirePortalUser } from "../../../../lib/portal-auth";
+import { roleLabelOverride } from "../../../../lib/staff-display";
 import { ProfileForm } from "./ProfileForm";
 import { CustomizeMenuButton } from "./CustomizeMenuButton";
 
@@ -32,8 +33,11 @@ export default async function ProfilePage() {
   const pu = await requirePortalUser();
   const initialName = pu.profile.full_name?.trim() ?? "";
   const displayName = initialName || pu.email;
-  const roleLine =
-    pu.role === "pastoral"
+  // A few accounts are shown under a cosmetic alias — see staff-display.ts.
+  const alias = roleLabelOverride(pu.email);
+  const roleLine = alias
+    ? alias.longLabel
+    : pu.role === "pastoral"
       ? "Pastoral leadership"
       : pu.role === "lead"
         ? `Ministry lead — ${pu.ministries.join(", ") || "no ministry assigned yet"}`

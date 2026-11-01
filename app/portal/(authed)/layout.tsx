@@ -6,9 +6,17 @@ import { PendingBadge } from "./NavBadge";
 import {
   avatarInitials,
   displayNameFromEmail,
+  roleLabelOverride,
 } from "../../../lib/staff-display";
 
-function roleLabel(role: "member" | "lead" | "pastoral", ministries: string[]): string {
+function roleLabel(
+  role: "member" | "lead" | "pastoral",
+  ministries: string[],
+  email: string,
+): string {
+  // A few accounts are shown under a cosmetic alias — see staff-display.ts.
+  const override = roleLabelOverride(email);
+  if (override) return override.label;
   if (role === "pastoral") return "Pastoral";
   if (role === "lead") return ministries.length > 0 ? `Lead — ${ministries.join(", ")}` : "Lead";
   return "Member";
@@ -23,7 +31,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const persona = {
     name,
     email,
-    role: roleLabel(pu.role, pu.ministries),
+    role: roleLabel(pu.role, pu.ministries, email),
     initials: avatarInitials(fullName, email),
   };
 

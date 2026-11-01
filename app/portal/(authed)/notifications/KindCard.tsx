@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { ROLE_BADGE, avatarInitials, staffDisplayName } from "../../../../lib/staff-display";
+import { avatarInitials, roleBadgeFor, staffDisplayName } from "../../../../lib/staff-display";
 import type { NotificationKindConfig } from "../../../../lib/notification-kinds";
 import { Avatar, AvatarStack, NeutralTag, RoleTag, type AvatarItem } from "./Avatar";
 import { StaffPicker } from "./StaffPicker";
@@ -79,7 +79,7 @@ function defaultRow(r: DefaultRecipient): {
   tag: React.ReactNode;
 } {
   if (r.source === "staff") {
-    const badge = ROLE_BADGE[r.profile.role];
+    const badge = roleBadgeFor(r.profile.role, r.profile.email);
     return {
       name: staffDisplayName(r.profile.full_name, r.profile.email),
       sub: r.profile.full_name?.trim() ? r.profile.email : "No name on account",

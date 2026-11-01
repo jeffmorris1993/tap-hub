@@ -42,6 +42,39 @@ export const ROLE_BADGE: Record<PortalRole, RoleBadge> = {
   },
 };
 
+/**
+ * Cosmetic role aliases for specific accounts. The role itself is unchanged —
+ * an address listed here still holds `pastoral` and every power that comes
+ * with it; only the words on the chip differ. websitemediaadmin runs the site,
+ * not the pulpit, and "Pastoral" on their row reads as a claim to be a pastor.
+ *
+ * Keys must be lowercase: lookups lowercase the address first.
+ */
+const ROLE_LABEL_OVERRIDES: Record<string, { label: string; longLabel: string }> = {
+  "websitemediaadmin@nehtemple.org": { label: "Admin", longLabel: "Admin" },
+};
+
+/** The alias for an address, or null if it uses its role's own labels. */
+export function roleLabelOverride(
+  email: string | null | undefined,
+): { label: string; longLabel: string } | null {
+  if (!email) return null;
+  return ROLE_LABEL_OVERRIDES[email.toLowerCase()] ?? null;
+}
+
+/**
+ * The chip for one person. Prefer this over indexing ROLE_BADGE directly
+ * wherever the role belongs to somebody — ROLE_BADGE is for labeling the roles
+ * themselves, like the role-picker buttons on the users page.
+ *
+ * An override replaces only the text. `bg`/`color` still come from the role, so
+ * the chip keeps signalling what the account can actually do.
+ */
+export function roleBadgeFor(role: PortalRole, email: string | null | undefined): RoleBadge {
+  const override = roleLabelOverride(email);
+  return override ? { ...ROLE_BADGE[role], ...override } : ROLE_BADGE[role];
+}
+
 /** "jeff.morr@nehtemple.org" → "JM"; "pastorjones@…" → "PA". */
 export function initialsFromEmail(email: string): string {
   const local = email.split("@")[0] ?? email;

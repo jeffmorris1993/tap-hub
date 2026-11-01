@@ -6,7 +6,7 @@ import { deleteUserAccount, updateUserRole } from "./actions";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { useToast } from "../Toaster";
 import type { PortalRole, PortalCapability } from "../../../../lib/portal-auth";
-import { ROLE_BADGE, avatarInitials } from "../../../../lib/staff-display";
+import { ROLE_BADGE, avatarInitials, roleBadgeFor } from "../../../../lib/staff-display";
 
 export type UserRow = {
   id: string;
@@ -34,7 +34,7 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   const { toast } = useToast();
   const router = useRouter();
 
-  const badge = ROLE_BADGE[user.role];
+  const badge = roleBadgeFor(user.role, user.email);
   const displayName = user.full_name?.trim() || user.email;
 
   function save() {
