@@ -1,6 +1,6 @@
 -- Add Music to the shared audience taxonomy (Youth / Sisterhood / Brotherhood /
 -- Marriage / Music / General) so the music ministry can have its own leads,
--- events, and announcements. The portal-music-leads@nehtemple.org Workspace
+-- events, and announcements. The portal-lead-music@nehtemple.org Workspace
 -- group maps to lead:Music via PORTAL_ROLE_GROUPS.
 --
 -- Categories are text + check (not enums) precisely so this is a constraint
