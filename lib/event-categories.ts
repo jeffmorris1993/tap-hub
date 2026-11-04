@@ -7,6 +7,7 @@ export type EventCategory =
   | "Sisterhood"
   | "Brotherhood"
   | "Marriage"
+  | "Music"
   | "General";
 
 export const EVENT_CATEGORIES: EventCategory[] = [
@@ -14,5 +15,6 @@ export const EVENT_CATEGORIES: EventCategory[] = [
   "Sisterhood",
   "Brotherhood",
   "Marriage",
+  "Music",
   "General",
 ];

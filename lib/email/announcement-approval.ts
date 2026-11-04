@@ -6,7 +6,7 @@ const DEFAULT_FROM = "NT Gateway Announcements <events@nehtemple.org>";
 
 export type AnnouncementSnapshot = {
   id: string;
-  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "Music" | "General";
   title: string;
   body: string;
   date_label: string | null;

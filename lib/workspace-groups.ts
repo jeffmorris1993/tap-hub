@@ -24,7 +24,7 @@ const SCOPE = "https://www.googleapis.com/auth/admin.directory.group.readonly";
 const LOG = "workspace-groups";
 
 /** Mirrors the assignable list in app/portal/(authed)/users/actions.ts. */
-const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage"];
+const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music"];
 
 /** Group membership changes rarely; a sign-in burst shouldn't fan out to Google. */
 const CACHE_MS = 5 * 60_000;

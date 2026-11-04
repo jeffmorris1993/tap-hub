@@ -299,7 +299,7 @@ export type AdminEventRow = {
   id: string;
   slug: string;
   title: string;
-  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "Music" | "General";
   starts_at: string;
   ends_at: string | null;
   location: string;

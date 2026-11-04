@@ -116,7 +116,7 @@ export async function pushRejectionToSubmitter(
 
 export type AnnouncementChatSnapshot = {
   id: string;
-  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
+  category: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "Music" | "General";
   title: string;
   date_label: string | null;
 };

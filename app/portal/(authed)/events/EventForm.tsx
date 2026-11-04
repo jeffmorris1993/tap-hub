@@ -18,7 +18,7 @@ import { ConfirmDialog } from "../ConfirmDialog";
 import { SignupQuestionsEditor } from "./SignupQuestionsEditor";
 import { parseSignupQuestions, type SignupQuestions } from "../../../../lib/event-signup-forms";
 
-const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"] as const;
+const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music", "General"] as const;
 const RECURRENCE_KINDS = [
   { value: "none", label: "Doesn't repeat" },
   { value: "daily", label: "Daily" },
@@ -82,7 +82,7 @@ type Initial = {
   slug?: string;
   title?: string;
   description_long?: string;
-  category?: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "General";
+  category?: "Youth" | "Sisterhood" | "Brotherhood" | "Marriage" | "Music" | "General";
   starts_at?: string | null;
   ends_at?: string | null;
   location?: string;

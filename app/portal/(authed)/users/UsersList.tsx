@@ -21,7 +21,7 @@ export type UserRow = {
   sharesName: boolean;
 };
 
-const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage"];
+const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music"];
 
 function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
   const [editing, setEditing] = useState(false);

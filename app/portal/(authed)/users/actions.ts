@@ -11,7 +11,7 @@ import { isAllowedAdminEmail } from "../../../../lib/supabase/auth";
 import { supabaseAdmin } from "../../../../lib/supabase/server";
 
 const ROLES: PortalRole[] = ["member", "lead", "pastoral"];
-const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage"];
+const MINISTRIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music"];
 
 export type UpdateRoleInput = {
   profileId: string;

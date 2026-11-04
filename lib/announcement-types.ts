@@ -3,6 +3,7 @@ export type AnnouncementCategory =
   | "Sisterhood"
   | "Brotherhood"
   | "Marriage"
+  | "Music"
   | "General";
 
 export const ANNOUNCEMENT_CATEGORIES: AnnouncementCategory[] = [
@@ -10,6 +11,7 @@ export const ANNOUNCEMENT_CATEGORIES: AnnouncementCategory[] = [
   "Sisterhood",
   "Brotherhood",
   "Marriage",
+  "Music",
   "General",
 ];
 
@@ -18,5 +20,6 @@ export const ANNOUNCEMENT_COLORS: Record<AnnouncementCategory, string> = {
   Sisterhood: "#e9787f",
   Brotherhood: "#4e8de7",
   Marriage: "#b884e7",
+  Music: "#e0a23f",
   General: "#aab2c6",
 };

@@ -138,9 +138,9 @@ export function buildAgentTools(ctx: AgentContext) {
         title: z.string().min(1),
         descriptionLong: z.string().min(1),
         category: z
-          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"])
+          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music", "General"])
           .describe(
-            "Audience the event is aimed at. Youth = kids/teens or the people serving them (chaperones, youth leaders). Sisterhood = women's ministry. Brotherhood = men's ministry. Marriage = married couples. General = whole church (Sunday worship, all-church events, holiday services). ASK if it's not obvious — don't guess.",
+            "Audience the event is aimed at. Youth = kids/teens or the people serving them (chaperones, youth leaders). Sisterhood = women's ministry. Brotherhood = men's ministry. Marriage = married couples. Music = choir, praise team, and musicians (rehearsals, choir events). General = whole church (Sunday worship, all-church events, holiday services). ASK if it's not obvious — don't guess.",
           ),
         startsAtLocal: z
           .string()
@@ -512,13 +512,14 @@ export function buildAgentTools(ctx: AgentContext) {
         "BEFORE calling, make sure you have: category, a short title, the body, and ideally a display date/when. If any is missing, ASK one short follow-up first.",
       inputSchema: z.object({
         category: z
-          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "General"])
+          .enum(["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music", "General"])
           .describe(
             "Pick by primary audience: " +
               "Youth = aimed at our kids/teens or the people serving them (chaperones, youth leaders). " +
               "Sisterhood = aimed at the women's ministry. " +
               "Brotherhood = aimed at the men's ministry. " +
               "Marriage = aimed at married couples (marriage ministry, couples' nights, etc.). " +
+              "Music = aimed at the music ministry (choir, praise team, musicians — rehearsals, schedule changes). " +
               "General = aimed at the whole church (facility updates, all-church events, holiday closures). " +
               "If the sender hasn't made the audience obvious, ASK before posting — don't guess. Urgency is separate: set pinned=true for time-sensitive items, regardless of category.",
           ),
