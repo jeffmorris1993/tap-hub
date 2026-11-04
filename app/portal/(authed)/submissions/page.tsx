@@ -58,8 +58,11 @@ export default async function Submissions({
           ? [...LEAD_TABS, ...IGNITE_TAB]
           : LEAD_TABS
         : [];
-  // Pastoral already has it; a lead or member with the capability gains it.
-  const TABS = roleTabs.some((t) => t.key === "visitors") ? roleTabs : [...VISITORS_TAB, ...roleTabs];
+  // Pastoral already has it; a lead or member gains it only via the capability.
+  const TABS =
+    welcome && !roleTabs.some((t) => t.key === "visitors")
+      ? [...VISITORS_TAB, ...roleTabs]
+      : roleTabs;
   const params = await searchParams;
   const tab: Tab = (TABS.find((t) => t.key === params.tab)?.key ?? TABS[0].key) as Tab;
 
