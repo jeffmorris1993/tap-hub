@@ -8,7 +8,7 @@ import {
   type StoredResponse,
 } from "../event-signup-forms";
 
-const DEFAULT_FROM = "NT Gateway Events <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Events <events@nehtemple.org>";
 
 const ROLE_LABEL: Record<SignupRole, string> = {
   attendee: "Attending",

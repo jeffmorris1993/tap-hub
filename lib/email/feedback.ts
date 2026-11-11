@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "NT Gateway Feedback <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Feedback <feedback@nehtemple.org>";
 
 export type FeedbackEmailPayload = {
   to: string[];

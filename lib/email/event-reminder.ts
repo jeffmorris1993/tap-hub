@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 import type { SignupRole } from "../event-signup-forms";
 
-const DEFAULT_FROM = "NT Gateway Events <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Events <events@nehtemple.org>";
 
 const ROLE_LABEL: Record<SignupRole, string> = {
   attendee: "Attending",

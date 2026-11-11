@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { renderBrandedEmail, siteUrl, type Field } from "./template";
 
-const DEFAULT_FROM = "NT Gateway Welcome <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Welcome <welcome@nehtemple.org>";
 
 export type WelcomeEmailPayload = {
   name: string;

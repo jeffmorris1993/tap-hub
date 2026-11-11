@@ -4,7 +4,7 @@ import { renderBrandedEmail, siteUrl, type Field } from "./template";
 import { resolveNotificationRecipients } from "../notification-routes";
 import { getBishopEmails } from "../approvers";
 
-const DEFAULT_FROM = "NT Gateway Prayer <onboarding@resend.dev>";
+const DEFAULT_FROM = "NT Gateway Prayer <prayer@nehtemple.org>";
 
 export type PrayerEmailPayload = {
   name: string | null;
