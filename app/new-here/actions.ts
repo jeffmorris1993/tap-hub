@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../../lib/supabase/server";
 import { supabaseSession } from "../../lib/supabase/auth";
 import { notifyWelcomeTeam } from "../../lib/email/welcome";
 import { sanitizeInterests } from "../../lib/interests";
+import { EMAIL_RE } from "../../lib/email-typos";
 
 export type NewHereSubmission = {
   name: string;
@@ -19,12 +20,13 @@ export type NewHereResult =
 
 export async function submitNewHere(input: NewHereSubmission): Promise<NewHereResult> {
   if (!input.name?.trim()) return { ok: false, error: "Please share your name." };
-  if (!input.email?.trim() && !input.phone?.trim()) {
-    return { ok: false, error: "Email or phone helps us follow up." };
+  const email = input.email?.trim() || null;
+  if (!email) return { ok: false, error: "Please share your email so we can follow up." };
+  if (!EMAIL_RE.test(email)) {
+    return { ok: false, error: "That email doesn't look right — double-check it?" };
   }
 
   const name = input.name.trim();
-  const email = input.email?.trim() || null;
   const phone = input.phone?.trim() || null;
   const interests = sanitizeInterests(input.interests);
 

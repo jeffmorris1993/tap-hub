@@ -140,11 +140,14 @@ export default function NewHere() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
+              required
               placeholder="you@email.com"
               style={{ ...inputStyle, marginBottom: "16px" }}
             />
 
-            <label style={{ ...labelStyle, marginBottom: "7px" }}>Phone</label>
+            <label style={{ ...labelStyle, marginBottom: "7px" }}>
+              Phone <span style={{ color: "#9aa3b8", fontWeight: 600 }}>(optional)</span>
+            </label>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
