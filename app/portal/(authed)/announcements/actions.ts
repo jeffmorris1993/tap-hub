@@ -17,6 +17,9 @@ import {
   pushAnnouncementApprovalToSubmitter,
   pushAnnouncementRejectionToSubmitter,
 } from "../../../../lib/chat-notifications";
+import { localToUtcIso } from "../../../../lib/tz";
+import { parseNotifyEmails } from "../../../../lib/event-notify";
+import { maybeSendPollResults } from "../../../../lib/polls";
 
 const SNAPSHOT_FIELDS = "id, category, title, body, date_label";
 
@@ -42,6 +45,17 @@ export type AnnouncementInput = {
   pinned: boolean;
   link_url: string | null;
   action_label: string | null;
+  // Poll + hero fields are optional so other callers (agent tools) that only
+  // know the base shape keep working — omitted means "standard announcement".
+  kind?: "standard" | "poll";
+  /** Homepage hero slot — pastoral-only; stripped for other roles. */
+  hero?: boolean;
+  /** Voting close time as a datetime-local string (Detroit wall clock). */
+  poll_closes_at_local?: string | null;
+  /** Option labels in display order. */
+  poll_options?: string[];
+  /** Free-text watchers box; validated with parseNotifyEmails. */
+  poll_notify_emails_raw?: string | null;
 };
 
 export type AnnouncementResult =
@@ -58,14 +72,38 @@ function inScope(pu: PortalUser, category: string): boolean {
   return pu.role === "pastoral" || pu.ministries.includes(category);
 }
 
-async function announcementCategory(id: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("announcements").select("category").eq("id", id).limit(1);
-  return (data?.[0] as { category?: string } | undefined)?.category ?? null;
+type ExistingRow = {
+  category: string;
+  approval_status: string;
+  kind: "standard" | "poll";
+  hero: boolean;
+  poll_closes_at: string | null;
+};
+
+async function loadExisting(id: string): Promise<ExistingRow | null> {
+  const { data } = await supabaseAdmin()
+    .from("announcements")
+    .select("category, approval_status, kind, hero, poll_closes_at")
+    .eq("id", id)
+    .limit(1);
+  return (data?.[0] as ExistingRow | undefined) ?? null;
 }
 
-async function announcementStatus(id: string): Promise<string | null> {
-  const { data } = await supabaseAdmin().from("announcements").select("approval_status").eq("id", id).limit(1);
-  return (data?.[0] as { approval_status?: string } | undefined)?.approval_status ?? null;
+async function pollVoteCount(id: string): Promise<number> {
+  const { count } = await supabaseAdmin()
+    .from("poll_votes")
+    .select("id", { count: "exact", head: true })
+    .eq("announcement_id", id);
+  return count ?? 0;
+}
+
+async function listOptionLabels(id: string): Promise<string[]> {
+  const { data } = await supabaseAdmin()
+    .from("poll_options")
+    .select("label, position")
+    .eq("announcement_id", id)
+    .order("position", { ascending: true });
+  return ((data ?? []) as { label: string }[]).map((o) => o.label);
 }
 
 function bustCaches() {
@@ -87,12 +125,12 @@ export async function saveAnnouncement(input: AnnouncementInput): Promise<Announ
   if (!inScope(pu, input.category)) {
     return { ok: false, error: `You can only post ${pu.ministries.join(", ") || "your ministry's"} announcements.` };
   }
+  const existing = input.id ? await loadExisting(input.id) : null;
   if (input.id) {
-    const existing = await announcementCategory(input.id);
-    if (existing && !inScope(pu, existing)) {
+    if (existing && !inScope(pu, existing.category)) {
       return { ok: false, error: "That announcement belongs to another ministry." };
     }
-    if ((await announcementStatus(input.id)) === "pending" && pu.role !== "pastoral") {
+    if (existing?.approval_status === "pending" && pu.role !== "pastoral") {
       return {
         ok: false,
         error: "This announcement is awaiting review and can't be edited. A pastor can approve it, or reject it with notes to unlock edits.",
@@ -111,40 +149,118 @@ export async function saveAnnouncement(input: AnnouncementInput): Promise<Announ
     return { ok: false, error: "Add a label for the action button (or remove the link)." };
   }
 
+  const kind: "standard" | "poll" = input.kind === "poll" ? "poll" : "standard";
+  // Hero is a pastoral-only call (homepage real estate). Non-pastoral edits
+  // preserve whatever a pastor already set rather than silently clearing it.
+  const hero = pu.role === "pastoral" ? !!input.hero : (existing?.hero ?? false);
+
+  const votes = input.id && existing?.kind === "poll" ? await pollVoteCount(input.id) : 0;
+  if (existing?.kind === "poll" && kind === "standard" && votes > 0) {
+    return { ok: false, error: "This poll already has votes, so it can't be turned back into a standard announcement." };
+  }
+
+  let pollClosesAt: string | null = null;
+  let pollNotifyEmails: string[] | null = null;
+  let pollLabels: string[] = [];
+  let expiresAt = input.expires_at;
+
+  if (kind === "poll") {
+    pollLabels = (input.poll_options ?? []).map((l) => l.trim()).filter(Boolean);
+    if (pollLabels.length < 2) return { ok: false, error: "A poll needs at least 2 options." };
+    if (pollLabels.length > 8) return { ok: false, error: "A poll can have at most 8 options." };
+    const seen = new Set(pollLabels.map((l) => l.toLowerCase()));
+    if (seen.size !== pollLabels.length) {
+      return { ok: false, error: "Poll options must be unique." };
+    }
+
+    pollClosesAt = input.poll_closes_at_local ? localToUtcIso(input.poll_closes_at_local) : null;
+    if (!pollClosesAt) return { ok: false, error: "Set when voting closes." };
+    const closeChanged =
+      !existing?.poll_closes_at || Date.parse(existing.poll_closes_at) !== Date.parse(pollClosesAt);
+    if (closeChanged && Date.parse(pollClosesAt) <= Date.now()) {
+      return { ok: false, error: "The voting close time must be in the future." };
+    }
+
+    const { emails, invalid } = parseNotifyEmails(input.poll_notify_emails_raw);
+    if (invalid.length > 0) {
+      return { ok: false, error: `These don't look like email addresses: ${invalid.join(", ")}` };
+    }
+    pollNotifyEmails = emails.length > 0 ? emails : null;
+
+    // Options are locked the moment the first vote lands — a changed option
+    // list would orphan or misattribute votes.
+    if (votes > 0) {
+      const current = await listOptionLabels(input.id as string);
+      const same =
+        current.length === pollLabels.length && current.every((l, i) => l === pollLabels[i]);
+      if (!same) {
+        return {
+          ok: false,
+          error: `Poll options are locked — ${votes} ${votes === 1 ? "vote has" : "votes have"} already been cast. You can still edit the title, body, and close time.`,
+        };
+      }
+    }
+
+    // Closed polls should linger showing results, then archive: default the
+    // auto-hide to a week after voting closes when none was chosen.
+    if (!expiresAt) {
+      expiresAt = new Date(Date.parse(pollClosesAt) + 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
   const baseFields = {
     category: input.category,
     title,
     body,
     date_label: dateLabel,
-    expires_at: input.expires_at,
+    expires_at: expiresAt,
     pinned: input.pinned,
     link_url: linkUrl,
     action_label: actionLabel,
+    kind,
+    hero,
+    poll_closes_at: pollClosesAt,
+    poll_notify_emails: pollNotifyEmails,
   };
 
   const sb = supabaseAdmin();
+  let rowId: string;
   if (input.id) {
     const { error } = await sb.from("announcements").update(baseFields).eq("id", input.id);
     if (error) return { ok: false, error: error.message };
-    bustCaches();
-    return { ok: true, id: input.id };
+    rowId = input.id;
+  } else {
+    // New row → save as draft, unpublished. The user moves it forward
+    // explicitly with "Submit for approval" / "Publish".
+    const { data, error } = await sb
+      .from("announcements")
+      .insert({
+        ...baseFields,
+        approval_status: "draft",
+        published: false,
+        submitted_by: pu.email || null,
+      })
+      .select("id")
+      .single();
+    if (error) return { ok: false, error: error.message };
+    rowId = (data as { id: string }).id;
   }
 
-  // New row → save as draft, unpublished. The user moves it forward
-  // explicitly with "Submit for approval" / "Publish".
-  const { data, error } = await sb
-    .from("announcements")
-    .insert({
-      ...baseFields,
-      approval_status: "draft",
-      published: false,
-      submitted_by: pu.email || null,
-    })
-    .select("id")
-    .single();
-  if (error) return { ok: false, error: error.message };
+  // Rewrite the option rows while that's still safe (no votes reference
+  // them). With votes present the list was validated unchanged above.
+  if (votes === 0) {
+    const { error: delErr } = await sb.from("poll_options").delete().eq("announcement_id", rowId);
+    if (delErr) return { ok: false, error: delErr.message };
+    if (kind === "poll") {
+      const { error: insErr } = await sb.from("poll_options").insert(
+        pollLabels.map((label, position) => ({ announcement_id: rowId, label, position })),
+      );
+      if (insErr) return { ok: false, error: insErr.message };
+    }
+  }
+
   bustCaches();
-  return { ok: true, id: (data as { id: string }).id };
+  return { ok: true, id: rowId };
 }
 
 /** Move a draft / rejected announcement to pending. Approvers' announcements
@@ -157,9 +273,16 @@ export async function submitAnnouncementForApproval(id: string): Promise<Announc
     return { ok: false, error: "Not authorized." };
   }
   const email = pu.email;
-  const category = await announcementCategory(id);
-  if (category && !inScope(pu, category)) {
+  const existing = await loadExisting(id);
+  if (existing && !inScope(pu, existing.category)) {
     return { ok: false, error: "That announcement belongs to another ministry." };
+  }
+  if (
+    existing?.kind === "poll" &&
+    existing.poll_closes_at &&
+    Date.parse(existing.poll_closes_at) <= Date.now()
+  ) {
+    return { ok: false, error: "This poll's voting window has already ended — update the close time first." };
   }
   const senderIsApprover = pu.role === "pastoral";
   const nowIso = new Date().toISOString();
@@ -213,6 +336,15 @@ export async function approveAnnouncement(id: string): Promise<AnnouncementResul
     return { ok: false, error: "Only pastoral leadership can approve announcements." };
   }
   const user = { email: pu.email };
+
+  const existing = await loadExisting(id);
+  if (
+    existing?.kind === "poll" &&
+    existing.poll_closes_at &&
+    Date.parse(existing.poll_closes_at) <= Date.now()
+  ) {
+    return { ok: false, error: "This poll's voting window has already ended — have the close time updated before approving." };
+  }
 
   // Pull the submitter before the update so we know whom to notify.
   const { data: pre } = await supabaseAdmin()
@@ -338,4 +470,33 @@ export async function deleteAnnouncement(id: string): Promise<void> {
 export async function currentUserCanApprove(): Promise<boolean> {
   const pu = await getPortalUser();
   return pu?.role === "pastoral";
+}
+
+/** Manual "send the results email now" — creator or pastoral, closed polls
+ *  only. Safe to click twice: the claim inside maybeSendPollResults is
+ *  send-once. */
+export async function sendPollResultsNow(id: string): Promise<AnnouncementResult> {
+  const pu = await getPortalUser();
+  if (!pu) return { ok: false, error: "Not authorized." };
+
+  const { data } = await supabaseAdmin()
+    .from("announcements")
+    .select("kind, submitted_by, poll_closes_at, poll_results_sent_at")
+    .eq("id", id)
+    .limit(1);
+  const row = data?.[0] as
+    | { kind: string; submitted_by: string | null; poll_closes_at: string | null; poll_results_sent_at: string | null }
+    | undefined;
+  if (!row || row.kind !== "poll") return { ok: false, error: "That announcement isn't a poll." };
+  if (pu.role !== "pastoral" && pu.email !== row.submitted_by) {
+    return { ok: false, error: "Only the poll's creator or pastoral leadership can send results." };
+  }
+  if (!row.poll_closes_at || Date.parse(row.poll_closes_at) > Date.now()) {
+    return { ok: false, error: "The poll hasn't closed yet." };
+  }
+  if (row.poll_results_sent_at) {
+    return { ok: false, error: "Results were already sent." };
+  }
+  const sent = await maybeSendPollResults(id);
+  return sent ? { ok: true, id } : { ok: false, error: "Results were already sent." };
 }

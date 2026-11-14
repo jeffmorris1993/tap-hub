@@ -5,6 +5,7 @@ import { BackBar } from "../../../components/BackBar";
 import { supabaseAdmin } from "../../../lib/supabase/server";
 import { ANNOUNCEMENT_COLORS, type AnnouncementCategory } from "../../../lib/announcement-types";
 import { ANNOUNCEMENT_FRESH_MS } from "../../../lib/announcements";
+import { PollCard } from "../../../components/PollCard";
 
 export const revalidate = 60;
 
@@ -19,6 +20,8 @@ type Row = {
   link_url: string | null;
   action_label: string | null;
   created_at: string;
+  kind: "standard" | "poll";
+  poll_closes_at: string | null;
 };
 
 export default async function AnnouncementDetail({
@@ -35,7 +38,7 @@ export default async function AnnouncementDetail({
   const nowIso = new Date().toISOString();
   const { data, error } = await supabaseAdmin()
     .from("announcements")
-    .select("id, category, title, body, date_label, expires_at, pinned, link_url, action_label, created_at")
+    .select("id, category, title, body, date_label, expires_at, pinned, link_url, action_label, created_at, kind, poll_closes_at")
     .eq("id", id)
     .eq("published", true)
     .eq("approval_status", "approved")
@@ -45,7 +48,7 @@ export default async function AnnouncementDetail({
   const a = (data?.[0] ?? null) as Row | null;
   if (!a) notFound();
   // No explicit expiry → auto-archived ANNOUNCEMENT_FRESH_DAYS after creation.
-  if (!a.expires_at && Date.parse(a.created_at) <= Date.now() - ANNOUNCEMENT_FRESH_MS) {
+  if (!a.expires_at && Date.parse(a.created_at) <= Date.parse(nowIso) - ANNOUNCEMENT_FRESH_MS) {
     notFound();
   }
 
@@ -99,6 +102,25 @@ export default async function AnnouncementDetail({
                   <path d="M14 4l6 6-3 1-3 3-1 5-3-3-5 5 5-5-3-3 5-1 3-3z" />
                 </svg>
                 Pinned
+              </span>
+            )}
+            {a.kind === "poll" && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color:
+                    a.poll_closes_at && Date.parse(a.poll_closes_at) <= Date.parse(nowIso)
+                      ? "#9aa3b8"
+                      : "#7ed996",
+                }}
+              >
+                🗳️ Poll
               </span>
             )}
           </div>
@@ -159,6 +181,8 @@ export default async function AnnouncementDetail({
           >
             {a.body}
           </p>
+
+          {a.kind === "poll" && <PollCard announcementId={a.id} />}
 
           {a.link_url && (
             <Link

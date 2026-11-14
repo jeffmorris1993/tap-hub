@@ -7,8 +7,10 @@ import { Greeting } from "../components/Greeting";
 import { HubAnnouncements } from "../components/HubAnnouncements";
 import { LivePoller } from "../components/LivePoller";
 import { IgniteParentCard } from "../components/IgniteParentCard";
+import { HeroAnnouncementCard } from "../components/HeroAnnouncementCard";
 import { MeetPastorCard } from "../components/MeetPastorCard";
 import { getTodaySchedule, getScheduleForDayOfWeek } from "../lib/supabase/queries";
+import { getHeroAnnouncement } from "../lib/announcements";
 import { igniteParentFormOpen } from "../lib/ignite-form";
 
 const CHURCH_PHONE = "+12483077828";
@@ -21,9 +23,10 @@ const LIVE_STREAM_URL = process.env.LIVE_STREAM_URL ?? "";
 export const dynamic = "force-dynamic";
 
 export default async function Hub() {
-  const [schedule, sundayFallback] = await Promise.all([
+  const [schedule, sundayFallback, heroAnnouncement] = await Promise.all([
     getTodaySchedule(),
     getScheduleForDayOfWeek(0),
+    getHeroAnnouncement(),
   ]);
   return (
     <PhoneShell>
@@ -121,6 +124,10 @@ export default async function Hub() {
             date in lib/ignite-form.ts. This page is force-dynamic, so no
             redeploy is needed for it to disappear. */}
         {igniteParentFormOpen() && <IgniteParentCard />}
+
+        {/* Hero-pinned announcement — the reusable version of the Ignite slot.
+            Renders below the Ignite card while that window is open. */}
+        {heroAnnouncement && <HeroAnnouncementCard hero={heroAnnouncement} />}
 
         {/* 2x2 grid */}
         <div

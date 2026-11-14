@@ -136,6 +136,22 @@ function PreviewCard({ a }: { a: Announcement }) {
             Pinned
           </span>
         )}
+        {a.poll && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "9px",
+              fontWeight: 800,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: a.poll.closed ? "#9aa3b8" : "#7ed996",
+            }}
+          >
+            🗳️ {a.poll.closed ? "Closed" : "Poll"}
+          </span>
+        )}
       </div>
       <div
         style={{

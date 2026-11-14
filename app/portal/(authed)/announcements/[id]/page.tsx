@@ -24,11 +24,17 @@ type Row = {
   approval_notes: string | null;
   submitted_by: string | null;
   reviewed_by: string | null;
+  kind: "standard" | "poll";
+  hero: boolean;
+  poll_closes_at: string | null;
+  poll_notify_emails: string[] | null;
+  poll_results_sent_at: string | null;
 };
 
 const FIELDS =
   "id, category, title, body, date_label, expires_at, pinned, published, link_url, action_label, " +
-  "approval_status, approval_notes, submitted_by, reviewed_by";
+  "approval_status, approval_notes, submitted_by, reviewed_by, " +
+  "kind, hero, poll_closes_at, poll_notify_emails, poll_results_sent_at";
 
 export default async function EditAnnouncement({ params }: { params: Promise<{ id: string }> }) {
   const pu = await requireLead();
@@ -45,6 +51,22 @@ export default async function EditAnnouncement({ params }: { params: Promise<{ i
   // announcements are visible on the list but managed by pastoral).
   if (pu.role !== "pastoral" && !pu.ministries.includes(row.category)) notFound();
 
+  let pollOptions: string[] | undefined;
+  let pollVoteCount = 0;
+  if (row.kind === "poll") {
+    const sb = supabaseAdmin();
+    const [optRes, voteRes] = await Promise.all([
+      sb
+        .from("poll_options")
+        .select("label, position")
+        .eq("announcement_id", row.id)
+        .order("position", { ascending: true }),
+      sb.from("poll_votes").select("id", { count: "exact", head: true }).eq("announcement_id", row.id),
+    ]);
+    pollOptions = ((optRes.data ?? []) as { label: string }[]).map((o) => o.label);
+    pollVoteCount = voteRes.count ?? 0;
+  }
+
   return (
     <div>
       <Link
@@ -59,6 +81,8 @@ export default async function EditAnnouncement({ params }: { params: Promise<{ i
           canApprove={canApprove}
           events={events}
           allowedCategories={pu.role === "pastoral" ? undefined : pu.ministries}
+          pollOptions={pollOptions}
+          pollVoteCount={pollVoteCount}
         />
       </div>
     </div>

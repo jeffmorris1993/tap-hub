@@ -36,6 +36,8 @@ export type Announcement = {
   link?: { href: string; label: string };
   /** Optional inline metadata shown under the body (event details). */
   meta?: { location?: string; cost?: string | null };
+  /** Present when this announcement is a poll. */
+  poll?: { closesAt: string | null; closed: boolean };
 };
 
 type ManualRow = {
@@ -50,6 +52,9 @@ type ManualRow = {
   link_url: string | null;
   action_label: string | null;
   created_at: string;
+  kind: "standard" | "poll";
+  hero: boolean;
+  poll_closes_at: string | null;
 };
 
 function fmtEventDateLabel(starts_at: string, ends_at: string | null, allDay = false): string {
@@ -91,7 +96,7 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     sb
       .from("announcements")
       .select(
-        "id, category, title, body, date_label, expires_at, pinned, published, link_url, action_label, created_at",
+        "id, category, title, body, date_label, expires_at, pinned, published, link_url, action_label, created_at, kind, hero, poll_closes_at",
       )
       .eq("published", true)
       .eq("approval_status", "approved")
@@ -107,8 +112,8 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     // when the migration hasn't been applied yet. Other errors still
     // bubble.
     const code = (manualRes.error as { code?: string }).code;
-    if (code === "PGRST205" || code === "42P01") {
-      console.warn("[announcements] announcements table missing — run the migration");
+    if (code === "PGRST205" || code === "42P01" || code === "42703") {
+      console.warn("[announcements] announcements table/columns missing — run the migrations");
     } else {
       throw manualRes.error;
     }
@@ -136,6 +141,13 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     link: r.link_url
       ? { href: r.link_url, label: r.action_label ?? "Learn more" }
       : undefined,
+    poll:
+      r.kind === "poll"
+        ? {
+            closesAt: r.poll_closes_at,
+            closed: !!r.poll_closes_at && Date.parse(r.poll_closes_at) <= Date.now(),
+          }
+        : undefined,
   }));
 
   // Event-derived announcements: include each published event whose next
@@ -216,4 +228,73 @@ export async function listAnnouncements(): Promise<Announcement[]> {
 export function filterByCategory(items: Announcement[], category: string): Announcement[] {
   if (!category || category === "All") return items;
   return items.filter((a) => a.category === category);
+}
+
+export type HeroAnnouncement = {
+  id: string;
+  category: AnnouncementCategory;
+  title: string;
+  body: string;
+  dateLabel: string | null;
+  isPoll: boolean;
+  pollClosesAt: string | null;
+  pollClosed: boolean;
+  /** Winning option label for a closed poll with a clear winner. */
+  winnerLabel: string | null;
+};
+
+/**
+ * The announcement featured as the homepage hero card (the slot the Ignite
+ * Parent Form card occupies). Newest hero wins; same visibility rules as the
+ * public feed. Returns null when nothing is hero-pinned.
+ */
+export async function getHeroAnnouncement(): Promise<HeroAnnouncement | null> {
+  const sb = supabaseAdmin();
+  const nowIso = new Date().toISOString();
+  const { data, error } = await sb
+    .from("announcements")
+    .select("id, category, title, body, date_label, expires_at, created_at, kind, poll_closes_at")
+    .eq("published", true)
+    .eq("approval_status", "approved")
+    .eq("hero", true)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .order("created_at", { ascending: false })
+    .limit(3);
+  if (error) {
+    // Same grace as listAnnouncements: a missing column/table before the
+    // migration runs shouldn't take the homepage down.
+    console.warn("[announcements] hero lookup failed", error.message);
+    return null;
+  }
+
+  const freshCutoffMs = Date.now() - ANNOUNCEMENT_FRESH_MS;
+  const row = ((data ?? []) as ManualRow[]).find(
+    (r) => r.expires_at !== null || Date.parse(r.created_at) > freshCutoffMs,
+  );
+  if (!row) return null;
+
+  const isPoll = row.kind === "poll";
+  const pollClosed = isPoll && !!row.poll_closes_at && Date.parse(row.poll_closes_at) <= Date.now();
+
+  let winnerLabel: string | null = null;
+  if (pollClosed) {
+    try {
+      const { tallyPoll, tallyWinner } = await import("./polls");
+      winnerLabel = tallyWinner(await tallyPoll(row.id))?.label ?? null;
+    } catch (err) {
+      console.warn("[announcements] hero winner tally failed", err);
+    }
+  }
+
+  return {
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    body: row.body,
+    dateLabel: row.date_label,
+    isPoll,
+    pollClosesAt: row.poll_closes_at,
+    pollClosed,
+    winnerLabel,
+  };
 }
