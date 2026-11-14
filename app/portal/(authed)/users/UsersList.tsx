@@ -140,6 +140,22 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
                 Welcome team
               </span>
             )}
+            {user.capabilities.includes("flyer") && (
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  fontWeight: 800,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  background: "rgba(231,184,78,.16)",
+                  color: "#e7b84e",
+                }}
+              >
+                Design team
+              </span>
+            )}
           </div>
           <div style={{ fontSize: "12.5px", color: "#9aa3b8", fontWeight: 600, marginTop: "3px" }}>
             {user.email}
@@ -349,9 +365,34 @@ function Row({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
               >
                 Welcome team
               </button>
+              <button
+                type="button"
+                disabled={!user.isStaffEligible}
+                title={!user.isStaffEligible ? "Requires an @nehtemple.org email" : undefined}
+                onClick={() =>
+                  setCapabilities((cur) =>
+                    cur.includes("flyer") ? cur.filter((c) => c !== "flyer") : [...cur, "flyer"],
+                  )
+                }
+                style={{
+                  marginLeft: "8px",
+                  fontWeight: 800,
+                  fontSize: "12px",
+                  padding: "9px 14px",
+                  borderRadius: "9px",
+                  cursor: user.isStaffEligible ? "pointer" : "not-allowed",
+                  opacity: user.isStaffEligible ? 1 : 0.4,
+                  background: capabilities.includes("flyer") ? "rgba(231,184,78,.16)" : "#1a2438",
+                  color: capabilities.includes("flyer") ? "#e7b84e" : "#cdd3e0",
+                  border: `1.5px solid ${capabilities.includes("flyer") ? "#e7b84e" : "rgba(244,241,234,.12)"}`,
+                }}
+              >
+                Design team
+              </button>
               <div style={{ fontSize: "12px", color: "#9aa3b8", marginTop: "8px", lineHeight: 1.5 }}>
-                Adds the &ldquo;I&apos;m New&rdquo; inbox and the Sunday guest list — and nothing
-                else. No member follow-ups, contact details, or prayer requests.
+                Welcome team adds the &ldquo;I&apos;m New&rdquo; inbox and the Sunday guest list.
+                Design team adds the flyer queue — uploading event flyers for pastoral approval.
+                Neither grants anything else.
               </div>
             </div>
           )}

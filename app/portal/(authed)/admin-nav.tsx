@@ -163,8 +163,14 @@ export function buildNavForRole(
       ]
     : [];
 
+  // The design team's queue — flyer requests waiting on artwork.
+  const flyer = capabilities.includes("flyer");
+  const flyerItems: NavItem[] = flyer
+    ? [{ href: "/portal/flyers", label: "Design queue", icon: ICONS.doc }]
+    : [];
+
   if (role === "member") {
-    return [overview, ...welcomeItems, ...memberItems];
+    return [overview, ...welcomeItems, ...flyerItems, ...memberItems];
   }
 
   if (role === "lead") {
@@ -174,6 +180,7 @@ export function buildNavForRole(
       { href: "/portal/announcements", label: "Announcements", icon: ICONS.megaphone },
       { href: "/portal/submissions", label: "Inbox", icon: ICONS.inbox },
       ...(welcome ? [{ href: "/portal/attendance", label: "Guests", icon: ICONS.checkin }] : []),
+      ...flyerItems,
       ...(ministries.includes("Youth")
         ? [{ href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids }]
         : []),
@@ -200,6 +207,7 @@ export function buildNavForRole(
       badge: badges.pendingAnnouncements,
       badgeCompact: badges.pendingAnnouncementsCompact,
     },
+    { href: "/portal/flyers", label: "Design queue", icon: ICONS.doc },
     { href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/portal/users", label: "Users", icon: ICONS.users },
     { href: "/portal/notifications", label: "Notifications", icon: ICONS.bell },
