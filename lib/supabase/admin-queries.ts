@@ -327,6 +327,13 @@ export type AdminEventRow = {
   signup_questions: unknown;
   /** Explicit signup-notification recipients; null = ministry leads for the category. */
   notify_emails: string[] | null;
+  flyer_mode: "none" | "uploaded" | "requested";
+  flyer_status: "none" | "awaiting_design" | "submitted" | "approved" | "rejected";
+  flyer_path: string | null;
+  flyer_request_notes: string | null;
+  flyer_notes: string | null;
+  flyer_uploaded_by: string | null;
+  flyer_submitted_at: string | null;
 };
 
 const ADMIN_EVENT_FIELDS =
@@ -335,7 +342,8 @@ const ADMIN_EVENT_FIELDS =
   "published, approval_status, approval_notes, " +
   "submitted_by, reviewed_by, submitted_at, reviewed_at, " +
   "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, " +
-  "signup_questions, notify_emails";
+  "signup_questions, notify_emails, " +
+  "flyer_mode, flyer_status, flyer_path, flyer_request_notes, flyer_notes, flyer_uploaded_by, flyer_submitted_at";
 
 export async function listAllEvents(scope: string[] | null = null): Promise<AdminEventRow[]> {
   let q = supabaseAdmin().from("events").select(ADMIN_EVENT_FIELDS);

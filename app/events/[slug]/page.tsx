@@ -9,7 +9,28 @@ import {
 } from "../../../lib/event-calendar";
 import { CHURCH_TZ } from "../../../lib/tz";
 import { getPortalUser } from "../../../lib/portal-auth";
+import { flyerPublicUrl } from "../../../lib/flyers";
 import { EventDetailView, type OccurrenceChoice, type SelectedOccurrence } from "./EventDetailView";
+
+/** og:image = the approved flyer, so a shared Facebook/iMessage link previews
+ *  the actual artwork instead of a generic card. */
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const event = await getEventBySlug(slug);
+  if (!event) return {};
+  const description = event.description_long.replace(/\s+/g, " ").trim().slice(0, 160);
+  const flyer =
+    event.flyer_path && event.flyer_status === "approved" ? flyerPublicUrl(event.flyer_path) : null;
+  return {
+    title: event.title,
+    description,
+    openGraph: {
+      title: event.title,
+      description,
+      ...(flyer ? { images: [{ url: flyer }] } : {}),
+    },
+  };
+}
 
 // Reading ?date= makes this page dynamic (request-time rendering); the
 // queries behind it are cheap, and it keeps every occurrence link exact.

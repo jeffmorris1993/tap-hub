@@ -17,6 +17,8 @@ import {
 } from "../../../lib/event-signup-forms";
 import { ANNOUNCEMENT_COLORS } from "../../../lib/announcement-types";
 import { googleCalendarUrl, outlookCalendarUrl } from "../../../lib/event-calendar";
+import { FlyerLightbox } from "../../../components/FlyerLightbox";
+import { flyerPublicUrl } from "../../../lib/flyers";
 
 /** One upcoming date of a recurring series, for the date switcher. */
 export type OccurrenceChoice = { date: string; label: string };
@@ -694,6 +696,11 @@ export function EventDetailView({
               )}
             </div>
             <AddToCalendarRow event={event} occurrence={occurrence} />
+            {event.flyer_path && event.flyer_status === "approved" && (
+              <div style={{ marginTop: "14px" }}>
+                <FlyerLightbox flyerUrl={flyerPublicUrl(event.flyer_path)} title={event.title} />
+              </div>
+            )}
             <p style={{ color: "#cdd3e0", fontSize: "14.5px", fontWeight: 500, lineHeight: 1.6, marginTop: "18px", whiteSpace: "pre-line" }}>
               <LinkifiedText text={event.description_long} />
             </p>

@@ -32,6 +32,9 @@ export type EventRow = {
   all_day: boolean;
   /** Custom signup questions jsonb — parse with parseSignupQuestions, never cast. */
   signup_questions: unknown;
+  /** Approved marketing flyer, when the event has one. */
+  flyer_path: string | null;
+  flyer_status: "none" | "awaiting_design" | "submitted" | "approved" | "rejected";
 };
 
 export type WeekLookaheadRow = {
@@ -62,7 +65,8 @@ export type ParentResourceRow = {
 const EVENT_FIELDS =
   "slug, title, description_long, category, starts_at, ends_at, location, " +
   "cost, accepts_rsvps, signup_mode, allow_volunteers, registration_url, registration_label, " +
-  "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, signup_questions";
+  "recurrence_kind, recurrence_interval, recurrence_bydays, recurrence_count, recurrence_until, all_day, signup_questions, " +
+  "flyer_path, flyer_status";
 
 /** Standard schedule for a specific day_of_week (Detroit-local active-date filter). */
 export async function getScheduleForDayOfWeek(dayOfWeek: number): Promise<ScheduleRow[]> {

@@ -27,10 +27,12 @@ export type PortalRole = "member" | "lead" | "pastoral";
  * Narrow grants that don't fit the role ladder. `welcome` lets someone see
  * guest connect cards and the Sunday guest roster without any of the rest of
  * pastoral — see supabase/migrations/20261031000100_profiles_capabilities.sql.
+ * `flyer` marks the design team: the /portal/flyers queue and flyer uploads
+ * — see supabase/migrations/20261113000100_event_flyers.sql.
  */
-export type PortalCapability = "welcome";
+export type PortalCapability = "welcome" | "flyer";
 
-export const PORTAL_CAPABILITIES: PortalCapability[] = ["welcome"];
+export const PORTAL_CAPABILITIES: PortalCapability[] = ["welcome", "flyer"];
 
 export type PortalProfile = {
   full_name: string | null;

@@ -17,6 +17,8 @@ import type { RecurrenceKind } from "../../../../lib/events-occurrence";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SignupQuestionsEditor } from "./SignupQuestionsEditor";
 import { parseSignupQuestions, type SignupQuestions } from "../../../../lib/event-signup-forms";
+import { FlyerSection } from "./FlyerSection";
+import type { FlyerMode, FlyerStatus } from "../../../../lib/flyers";
 
 const CATEGORIES = ["Youth", "Sisterhood", "Brotherhood", "Marriage", "Music", "General"] as const;
 const RECURRENCE_KINDS = [
@@ -106,6 +108,12 @@ type Initial = {
   all_day?: boolean | null;
   signup_questions?: unknown;
   notify_emails?: string[] | null;
+  flyer_mode?: FlyerMode;
+  flyer_status?: FlyerStatus;
+  flyer_path?: string | null;
+  flyer_request_notes?: string | null;
+  flyer_notes?: string | null;
+  flyer_uploaded_by?: string | null;
 };
 
 export function EventForm({
@@ -176,6 +184,8 @@ export function EventForm({
     parseSignupQuestions(initial?.signup_questions),
   );
   const [notifyEmails, setNotifyEmails] = useState((initial?.notify_emails ?? []).join(", "));
+  const [flyerMode, setFlyerMode] = useState<FlyerMode>(initial?.flyer_mode ?? "none");
+  const [flyerRequestNotes, setFlyerRequestNotes] = useState(initial?.flyer_request_notes ?? "");
 
   const status = (initial?.approval_status ?? "draft") as ApprovalStatus;
   const statusStyle = STATUS_STYLES[status];
@@ -227,6 +237,8 @@ export function EventForm({
       all_day: allDay,
       signup_questions: signupQuestions,
       notify_emails_raw: notifyEmails,
+      flyer_mode: flyerMode,
+      flyer_request_notes: flyerRequestNotes || null,
     };
   }
 
@@ -741,6 +753,25 @@ export function EventForm({
         />
         Allow volunteer signups
       </label>
+
+      <div style={{ gridColumn: "1 / -1" }}>
+        <FlyerSection
+          eventId={initial?.id}
+          eventApproved={status === "approved"}
+          canApprove={canApprove}
+          disabled={locked}
+          mode={flyerMode}
+          onModeChange={setFlyerMode}
+          requestNotes={flyerRequestNotes}
+          onRequestNotesChange={setFlyerRequestNotes}
+          flyer={{
+            flyer_status: initial?.flyer_status,
+            flyer_path: initial?.flyer_path,
+            flyer_notes: initial?.flyer_notes,
+            flyer_uploaded_by: initial?.flyer_uploaded_by,
+          }}
+        />
+      </div>
 
       <div style={{ gridColumn: "1 / -1" }}>
         <label style={labelStyle}>Send signup notifications to (optional)</label>
