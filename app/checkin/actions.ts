@@ -297,8 +297,14 @@ export async function registerAndCheckin(input: RegisterCheckinInput): Promise<C
   const guest = type === "first" || type === "returning";
   const phone = guest ? (input.phone ?? "").replace(/\D/g, "").slice(0, 15) : "";
   const email = guest ? (input.email ?? "").trim().toLowerCase().slice(0, 200) : "";
+  // Guests must leave an email — the welcome team follows up by email, so an
+  // email-less check-in leaves them no reliable way to reach out. Phone stays
+  // optional. Same rule as the I'm New form.
+  if (guest && !email) {
+    return { ok: false, error: "Please share your email so we can follow up." };
+  }
   if (email && !EMAIL_RE.test(email)) {
-    return { ok: false, error: "That email doesn't look right — check it and try again." };
+    return { ok: false, error: "That email doesn't look right — double-check it?" };
   }
   const pref =
     guest && (input.preferredContact === "text" || input.preferredContact === "call" || input.preferredContact === "email")

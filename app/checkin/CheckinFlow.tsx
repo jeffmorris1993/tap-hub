@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ATTENDEE_TYPE_LABEL, type AttendeeType } from "../../lib/attendance";
+import { EMAIL_RE } from "../../lib/email-typos";
 import { INTERESTS } from "../../lib/interests";
 import {
   findAndCheckin,
@@ -229,6 +230,19 @@ export function CheckinFlow({
     if (!form.first.trim() || !form.last.trim()) {
       setErr("Please enter your first and last name.");
       return;
+    }
+    // Guests must leave an email (the welcome team follows up by email);
+    // phone stays optional. Same rule as the I'm New form.
+    if (form.type === "first" || form.type === "returning") {
+      const email = form.email.trim();
+      if (!email) {
+        setErr("Please share your email so we can follow up.");
+        return;
+      }
+      if (!EMAIL_RE.test(email)) {
+        setErr("That email doesn't look right — double-check it?");
+        return;
+      }
     }
     setErr("");
     setScreen("loading");
@@ -712,20 +726,9 @@ export function CheckinFlow({
           {guest && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", paddingTop: "6px" }}>
               <p style={{ color: "#aab3c5", fontSize: "15.5px", lineHeight: 1.5 }}>
-                Optional. Leave a way to reach you and we&apos;ll follow up to say thanks for
-                visiting.
+                Leave your email and we&apos;ll follow up to say thanks for visiting. Phone is
+                optional.
               </p>
-              <label>
-                <span style={fieldLabel}>Phone number</span>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  autoComplete="tel"
-                  placeholder="(248) 555-0123"
-                  style={fieldInput}
-                />
-              </label>
               <label>
                 <span style={fieldLabel}>Email</span>
                 <input
@@ -734,6 +737,20 @@ export function CheckinFlow({
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   autoComplete="email"
                   placeholder="you@email.com"
+                  required
+                  style={fieldInput}
+                />
+              </label>
+              <label>
+                <span style={fieldLabel}>
+                  Phone number <span style={{ color: "#9aa3b8", fontWeight: 600 }}>(optional)</span>
+                </span>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  autoComplete="tel"
+                  placeholder="(248) 555-0123"
                   style={fieldInput}
                 />
               </label>
