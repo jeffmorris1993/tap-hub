@@ -91,24 +91,31 @@ function parseField(raw: unknown): SignupField | null {
 }
 
 /**
- * Defensive parse of the jsonb column (or any untrusted input). Malformed
- * fields are dropped, duplicate ids deduped, counts capped — a hand-edited bad
- * value degrades to the default form instead of crashing a page.
+ * Defensive parse of a flat field list. Malformed fields are dropped,
+ * duplicate ids deduped, counts capped — a hand-edited bad value degrades
+ * instead of crashing a page. Also shared by standalone forms
+ * (lib/standalone-forms.ts), whose jsonb column is one flat list.
  */
+export function parseFieldList(raw: unknown): SignupField[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SignupField[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const field = parseField(item);
+    if (!field || seen.has(field.id)) continue;
+    seen.add(field.id);
+    out.push(field);
+    if (out.length >= MAX_QUESTIONS) break;
+  }
+  return out;
+}
+
+/** Defensive parse of the jsonb column (or any untrusted input). */
 export function parseSignupQuestions(raw: unknown): SignupQuestions {
   const out = emptySignupQuestions();
   if (!raw || typeof raw !== "object") return out;
   for (const role of ["attendee", "volunteer"] as const) {
-    const list = (raw as Record<string, unknown>)[role];
-    if (!Array.isArray(list)) continue;
-    const seen = new Set<string>();
-    for (const item of list) {
-      const field = parseField(item);
-      if (!field || seen.has(field.id)) continue;
-      seen.add(field.id);
-      out[role].push(field);
-      if (out[role].length >= MAX_QUESTIONS) break;
-    }
+    out[role] = parseFieldList((raw as Record<string, unknown>)[role]);
   }
   return out;
 }

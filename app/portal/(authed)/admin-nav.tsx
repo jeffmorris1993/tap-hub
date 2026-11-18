@@ -35,6 +35,7 @@ export const TAB_LABEL: Record<string, string> = {
   "/portal/notifications": "Alerts",
   "/portal/my-events": "My Events",
   "/portal/my-forms": "My Forms",
+  "/portal/forms": "Forms",
   "/portal/agent-log": "Agent log",
 };
 
@@ -178,6 +179,7 @@ export function buildNavForRole(
       overview,
       { href: "/portal/events", label: "Events", icon: ICONS.calendar },
       { href: "/portal/announcements", label: "Announcements", icon: ICONS.megaphone },
+      { href: "/portal/forms", label: "One-off forms", icon: ICONS.doc },
       { href: "/portal/submissions", label: "Inbox", icon: ICONS.inbox },
       ...(welcome ? [{ href: "/portal/attendance", label: "Guests", icon: ICONS.checkin }] : []),
       ...flyerItems,
@@ -207,6 +209,7 @@ export function buildNavForRole(
       badge: badges.pendingAnnouncements,
       badgeCompact: badges.pendingAnnouncementsCompact,
     },
+    { href: "/portal/forms", label: "One-off forms", icon: ICONS.doc },
     { href: "/portal/flyers", label: "Design queue", icon: ICONS.doc },
     { href: "/portal/kids-youth", label: "Kids + Youth", icon: ICONS.kids },
     { href: "/portal/users", label: "Users", icon: ICONS.users },
